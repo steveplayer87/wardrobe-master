@@ -7977,26 +7977,22 @@ async function init() {
     setTimeout(() => splash.remove(), 400);
   }, 350);
 
-  // Viewport metrics synchronization and strict scroll lock for iOS PWA standalone mode
-  function syncAppViewportHeight() {
+  // Viewport scroll lock for iOS PWA standalone mode
+  function lockViewportScroll() {
     window.scrollTo(0, 0);
     document.body.scrollTop = 0;
     document.documentElement.scrollTop = 0;
-    const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    document.documentElement.style.setProperty('--app-screen-height', `${h}px`);
     const app = document.getElementById('app');
-    if (app) {
-      app.style.height = ''; // Do NOT force screen.height which overflows and shifts WebKit touch hit-testing!
-    }
+    if (app && app.style.height) app.style.height = '';
   }
-  window.addEventListener('resize', syncAppViewportHeight);
-  window.addEventListener('orientationchange', syncAppViewportHeight);
+  window.addEventListener('resize', lockViewportScroll);
+  window.addEventListener('orientationchange', lockViewportScroll);
   window.addEventListener('scroll', () => {
     if (window.scrollY !== 0 || window.scrollX !== 0) {
       window.scrollTo(0, 0);
     }
   }, { passive: true });
-  syncAppViewportHeight();
+  lockViewportScroll();
 
   const btnForceRefresh = document.getElementById('btnForceRefresh');
   if (btnForceRefresh) {
@@ -8026,7 +8022,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260928a').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20260928b').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
