@@ -4580,11 +4580,13 @@ function openConfirm(title, body, actions) {
     btn.textContent = a.label;
     btn.addEventListener('click', () => {
       if (a.onClick) a.onClick();
-      forceCloseModal();
-      if (a.returnTo) window.setTimeout(() => {
-        if (a.returnTo === 'modal-laundry') openLaundryModal();
-        else openModal(a.returnTo);
-      }, 380);
+      if (!a.keepOpen) {
+        forceCloseModal();
+        if (a.returnTo) window.setTimeout(() => {
+          if (a.returnTo === 'modal-laundry') openLaundryModal();
+          else openModal(a.returnTo);
+        }, 380);
+      }
     });
     wrap.appendChild(btn);
   });
@@ -5499,82 +5501,90 @@ function wireEvents() {
       entry[s] = backfillDraft[s] || null;
     });
 
-    const commitBackfill = () => {
-      if (isToday) {
-        ALL_SLOTS.forEach(s => {
-          setTodaySlot(s, entry[s]);
-        });
-      } else {
-        ALL_SLOTS.forEach(s => {
-          if (entry[s]) {
-            const it = findItem(entry[s]);
-            if (it) it.totalWearCount = (it.totalWearCount || 0) + 1;
-          }
-        });
-        const existingIdx = state.ootdHistory.findIndex(e => e.date === entry.date);
-        if (existingIdx >= 0) state.ootdHistory[existingIdx] = entry;
-        else state.ootdHistory.push(entry);
-      }
-
-      saveState({ action: `更新 ${formatDayWithWeekday(entry.date)} 穿搭` });
-      backfillDraft = null;
-      forceCloseModal({ skipPersist: true });
-      renderHistory();
-      renderHome();
-      toast('已儲存穿搭紀錄');
-    };
-
-    const lastWash = state.laundry?.lastWashDate || '';
-    if (!isToday && (!lastWash || backfillDraft.date >= lastWash)) {
-      const itemsToAsk = ALL_SLOTS
-        .map(s => entry[s] ? findItem(entry[s]) : null)
-        .filter(it => it && it.status === 'clean');
-
-      if (itemsToAsk.length > 0) {
-        const askNextItem = index => {
-          if (index >= itemsToAsk.length) {
-            commitBackfill();
-            return;
-          }
-          const item = itemsToAsk[index];
-          openConfirm(
-            `「${item.name}」穿後狀態`,
-            `這件單品於上次洗衣日（${lastWash ? fmtDate(lastWash) : '近期'}）之後的 ${formatDayWithWeekday(entry.date)} 穿著。要移到暫存衣架或洗衣籃嗎？`,
-            [
-              {
-                label: '移至暫存衣架',
-                kind: 'primary',
-                onClick: () => {
-                  item.status = 'resting';
-                  item.restingSince = entry.date;
-                  askNextItem(index + 1);
-                }
-              },
-              {
-                label: '移至洗衣籃',
-                kind: 'secondary',
-                onClick: () => {
-                  item.status = 'dirty';
-                  item.basketAt = entry.date;
-                  askNextItem(index + 1);
-                }
-              },
-              {
-                label: '維持乾淨',
-                kind: 'secondary',
-                onClick: () => {
-                  askNextItem(index + 1);
-                }
-              }
-            ]
-          );
-        };
-        askNextItem(0);
-        return;
-      }
+    // 1. Commit outfit to history immediately so user never loses entry
+    if (isToday) {
+      ALL_SLOTS.forEach(s => {
+        setTodaySlot(s, entry[s]);
+      });
+    } else {
+      ALL_SLOTS.forEach(s => {
+        if (entry[s]) {
+          const it = findItem(entry[s]);
+          if (it) it.totalWearCount = (it.totalWearCount || 0) + 1;
+        }
+      });
+      const existingIdx = state.ootdHistory.findIndex(e => e.date === entry.date);
+      if (existingIdx >= 0) state.ootdHistory[existingIdx] = entry;
+      else state.ootdHistory.push(entry);
     }
 
-    commitBackfill();
+    saveState({ action: `更新 ${formatDayWithWeekday(entry.date)} 穿搭` });
+    renderHistory();
+    renderHome();
+
+    // 2. Check if laundry/resting status needs prompt
+    const lastWash = state.laundry?.lastWashDate || '';
+    const shouldAsk = !isToday && (!lastWash || entry.date >= lastWash);
+    const itemsToAsk = shouldAsk
+      ? ALL_SLOTS.map(s => entry[s] ? findItem(entry[s]) : null).filter(it => it && it.status === 'clean')
+      : [];
+
+    if (itemsToAsk.length === 0) {
+      backfillDraft = null;
+      forceCloseModal({ skipPersist: true });
+      toast('已儲存穿搭紀錄');
+      return;
+    }
+
+    const askNextItem = index => {
+      if (index >= itemsToAsk.length) {
+        backfillDraft = null;
+        forceCloseModal({ skipPersist: true });
+        saveState({ action: `更新單品穿後狀態` });
+        renderHistory();
+        renderHome();
+        toast('已儲存穿搭與單品狀態');
+        return;
+      }
+      const item = itemsToAsk[index];
+      const countLabel = itemsToAsk.length > 1 ? `（第 ${index + 1}/${itemsToAsk.length} 件）` : '';
+      openConfirm(
+        `「${item.name}」穿後狀態 ${countLabel}`,
+        `這件單品於上次洗衣日（${lastWash ? fmtDate(lastWash) : '近期'}）之後的 ${formatDayWithWeekday(entry.date)} 穿著。要移到暫存衣架或洗衣籃嗎？`,
+        [
+          {
+            label: '移至洗衣籃',
+            kind: 'primary',
+            keepOpen: true,
+            onClick: () => {
+              item.status = 'dirty';
+              item.basketAt = entry.date;
+              askNextItem(index + 1);
+            }
+          },
+          {
+            label: '移至暫存衣架',
+            kind: 'secondary',
+            keepOpen: true,
+            onClick: () => {
+              item.status = 'resting';
+              item.restingSince = entry.date;
+              askNextItem(index + 1);
+            }
+          },
+          {
+            label: '維持乾淨',
+            kind: 'secondary',
+            keepOpen: true,
+            onClick: () => {
+              askNextItem(index + 1);
+            }
+          }
+        ]
+      );
+    };
+
+    askNextItem(0);
   });
 
   document.getElementById('btnNotifications').addEventListener('click', () => { renderNotifications(); openModal('modal-notif'); });
@@ -8022,7 +8032,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260928b').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20260928c').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
