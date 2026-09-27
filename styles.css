@@ -4120,6 +4120,77 @@ body.night-page input[type="range"]::-moz-range-track {
   justify-content: center;
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
+.lhe-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lhe-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.lhe-delete-btn:active, .lhe-delete-btn:hover {
+  color: #d9531e;
+  background: rgba(217, 83, 30, 0.08);
+}
+.laundry-date-picker-row {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border-radius: var(--radius-m);
+  border: 1px solid rgba(44, 66, 112, 0.08);
+  box-shadow: var(--shadow-card);
+}
+.laundry-date-label-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.laundry-date-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.laundry-date-native-input {
+  font-size: 13px;
+  font-family: inherit;
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+.laundry-quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.laundry-chip {
+  padding: 6px 11px;
+  border-radius: 99px;
+  border: 1px solid rgba(44, 66, 112, 0.12);
+  background: var(--color-surface-2);
+  color: var(--color-ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.laundry-chip.is-active {
+  background: var(--color-denim);
+  color: #fff;
+  border-color: var(--color-denim);
+  box-shadow: 0 2px 6px rgba(44, 66, 112, 0.25);
+}
 
 /* =========================== Rank Custom Range =========================== */
 .rank-custom-range {

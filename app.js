@@ -1128,9 +1128,18 @@ function laundryExtraWashDates() {
     .filter(entry => typeof entry !== 'string' && Array.isArray(entry?.extraWashItemIds) && entry.extraWashItemIds.length)
     .map(entry => entry.date).filter(Boolean));
 }
-function recordItemWash(item) {
+function syncLatestLaundryDate() {
+  state.laundry = state.laundry || { lastWashDate: todayStr(), cycleDays: 2, snoozedUntil: null, history: [] };
+  const dates = (state.laundry?.history || [])
+    .map(e => typeof e === 'string' ? e : e?.date)
+    .filter(Boolean)
+    .sort();
+  if (dates.length) {
+    state.laundry.lastWashDate = dates[dates.length - 1];
+  }
+}
+function recordItemWash(item, date = todayStr()) {
   if (!item) return;
-  const date = todayStr();
   const extraWash = !!item.extraWash;
   item.washHistory = item.washHistory || [];
   item.washHistory.unshift({ date, basketAt: item.basketAt || null, extraWash });
@@ -1313,30 +1322,36 @@ function completeConsumableLaundry(c, date = todayStr()) {
   c.laundryPending = false;
   c.laundryAt = null;
 }
-function completeLaundryDone() {
+function completeLaundryDone(targetDate = (typeof selectedLaundryWashDate !== 'undefined' && selectedLaundryWashDate ? selectedLaundryWashDate : todayStr())) {
   const dirtyItems = state.items.filter(item => item.status === 'dirty');
   const pendingConsumables = getPendingLaundryConsumables();
-  dirtyItems.forEach(recordItemWash);
-  pendingConsumables.forEach(c => completeConsumableLaundry(c));
-  state.laundry.lastWashDate = todayStr();
+  dirtyItems.forEach(item => recordItemWash(item, targetDate));
+  pendingConsumables.forEach(c => completeConsumableLaundry(c, targetDate));
+  recordLaundryEvent(targetDate, {
+    boostedItemIds: dirtyItems.filter(i => i.extraWash).map(i => i.id),
+    consumableIds: pendingConsumables.map(c => c.id)
+  });
+  if (!state.laundry.lastWashDate || targetDate >= state.laundry.lastWashDate) {
+    state.laundry.lastWashDate = targetDate;
+  }
   state.laundry.snoozedUntil = null;
-  recordLaundryEvent(todayStr(), { consumableIds: pendingConsumables.map(c => c.id) });
+  syncLatestLaundryDate();
   saveState();
   renderAll();
-  toast('已記錄洗衣日，洗衣籃內容也已更新');
+  toast(`已記錄 ${formatDayWithWeekday(targetDate)} 洗衣服完成`);
 }
-function markLaundryDone() {
+function markLaundryDone(targetDate = (typeof selectedLaundryWashDate !== 'undefined' && selectedLaundryWashDate ? selectedLaundryWashDate : todayStr())) {
   const boostedItems = state.items.filter(item => item.status === 'dirty' && item.extraWash);
   if (boostedItems.length) {
     const names = boostedItems.slice(0, 8).map(item => item.name).join('、');
     const suffix = boostedItems.length > 8 ? ` 等 ${boostedItems.length} 件` : '';
-    openConfirm('確認洗好了嗎？', `以下單品已標記「加強清洗」：${names}${suffix}。確認後會把加強清洗註記寫入單品歷史與洗衣歷史。`, [
+    openConfirm('確認洗好了嗎？', `以下單品已標記「加強清洗」：${names}${suffix}。確認後會把加強清洗註記寫入單品歷史與洗衣歷史（日期：${formatDayWithWeekday(targetDate)}）。`, [
       { label: '先不要', kind: 'secondary', returnTo: 'modal-laundry' },
-      { label: '確認洗好了', kind: 'primary', onClick: completeLaundryDone },
+      { label: '確認洗好了', kind: 'primary', onClick: () => completeLaundryDone(targetDate) },
     ]);
     return false;
   }
-  completeLaundryDone();
+  completeLaundryDone(targetDate);
   return true;
 }
 function postponeLaundry() {
@@ -4545,7 +4560,12 @@ function closeModal() {
 }
 function openConfirm(title, body, actions) {
   document.getElementById('confirmTitle').textContent = title;
-  document.getElementById('confirmBody').textContent = body;
+  const bodyEl = document.getElementById('confirmBody');
+  if (typeof body === 'string' && body.includes('<')) {
+    bodyEl.innerHTML = body;
+  } else {
+    bodyEl.textContent = body;
+  }
   const wrap = document.getElementById('confirmActions');
   wrap.innerHTML = '';
   actions.forEach(a => {
@@ -4585,8 +4605,60 @@ function renderLaundryOverview() {
     }));
   }
 }
+
+let selectedLaundryWashDate = todayStr();
+
+function renderLaundryQuickChips() {
+  const container = document.getElementById('laundryQuickChips');
+  const input = document.getElementById('laundryDateInput');
+  if (!container || !input) return;
+
+  const today = todayStr();
+  input.max = today;
+  input.value = selectedLaundryWashDate || today;
+
+  const quickDates = [
+    { label: '今天', date: today },
+    { label: '昨天', date: addDays(today, -1) },
+    { label: '前天', date: addDays(today, -2) },
+    { label: '大前天', date: addDays(today, -3) },
+  ];
+
+  let chipsHtml = quickDates.map(qd => {
+    const isSel = (selectedLaundryWashDate || today) === qd.date;
+    const dayNum = qd.date.slice(8);
+    return `<button type="button" class="laundry-chip${isSel ? ' is-active' : ''}" data-date="${qd.date}">${qd.label} (${Number(dayNum)}號)</button>`;
+  }).join('');
+
+  const isCustom = !quickDates.some(qd => qd.date === (selectedLaundryWashDate || today));
+  chipsHtml += `<button type="button" class="laundry-chip${isCustom ? ' is-active' : ''}" id="btnLaundryCustomDate">📅 ${isCustom ? selectedLaundryWashDate.slice(5) : '其他日期'}</button>`;
+
+  container.innerHTML = chipsHtml;
+
+  container.querySelectorAll('.laundry-chip[data-date]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedLaundryWashDate = btn.dataset.date;
+      input.value = selectedLaundryWashDate;
+      renderLaundryQuickChips();
+    });
+  });
+
+  const customBtn = document.getElementById('btnLaundryCustomDate');
+  if (customBtn) {
+    customBtn.addEventListener('click', () => {
+      if (typeof input.showPicker === 'function') {
+        input.showPicker();
+      } else {
+        input.focus();
+      }
+    });
+  }
+}
+
 function openLaundryModal() {
+  selectedLaundryWashDate = todayStr();
   renderLaundryOverview();
+  renderLaundryQuickChips();
   const last = state.laundry.lastWashDate;
   const daysSince = Math.max(0, daysBetween(last, todayStr()));
   const next = nextWashDate();
@@ -4602,8 +4674,30 @@ function openLaundryHistory() {
   const container = document.getElementById('laundryHistoryContent');
   if (!container) return;
   const history = state.laundry?.history || [];
+
+  const btnAdd = document.getElementById('btnAddLaundryRecord');
+  if (btnAdd && !btnAdd._bound) {
+    btnAdd._bound = true;
+    btnAdd.addEventListener('click', () => {
+      const defaultDate = addDays(todayStr(), -3);
+      openConfirm('補記歷史洗衣日', `<p style="margin-bottom:8px;font-size:13px;color:var(--color-ink-soft);">選擇欲補記的洗衣日期（例如大前天 24 號）：</p><input type="date" id="backfillLaundryDateInput" max="${todayStr()}" value="${defaultDate}" style="margin-top:6px;padding:8px 12px;font-size:14px;border:1px solid var(--color-border);border-radius:8px;width:100%;box-sizing:border-box;">`, [
+        { label: '取消', kind: 'secondary', returnTo: 'modal-laundry-history' },
+        { label: '確認補記', kind: 'primary', onClick: () => {
+          const input = document.getElementById('backfillLaundryDateInput');
+          const d = input?.value || defaultDate;
+          recordLaundryEvent(d);
+          syncLatestLaundryDate();
+          saveState();
+          renderAll();
+          openLaundryHistory();
+          toast(`已補記 ${formatDayWithWeekday(d)} 洗衣紀錄`);
+        }}
+      ]);
+    });
+  }
+
   if (!history.length) {
-    container.innerHTML = `<p class="empty-hint" style="margin-top:24px;text-align:center;">目前尚無歷史洗衣紀錄<br><span style="font-size:12px;opacity:0.7;">點選「洗好了」完成洗衣後，將在此完整累積洗衣履歷。</span></p>`;
+    container.innerHTML = `<p class="empty-hint" style="margin-top:24px;text-align:center;">目前尚無歷史洗衣紀錄<br><span style="font-size:12px;opacity:0.7;">點選「洗好了」完成洗衣或「補記洗衣」後，將在此完整累積洗衣履歷。</span></p>`;
     openModal('modal-laundry-history');
     return;
   }
@@ -4648,7 +4742,12 @@ function openLaundryHistory() {
       <div class="laundry-history-entry">
         <div class="lhe-head">
           <span class="lhe-date">${formatDayWithWeekday(dateStr)}</span>
-          <span class="lhe-ago">${agoText}</span>
+          <div class="lhe-head-actions">
+            <span class="lhe-ago">${agoText}</span>
+            <button type="button" class="lhe-delete-btn" data-delete-laundry-date="${dateStr}" title="刪除此筆紀錄" aria-label="刪除此筆紀錄">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
         </div>
         <div class="lhe-badges">${badgesHtml}</div>
         ${itemsHtml}
@@ -4657,6 +4756,25 @@ function openLaundryHistory() {
   }).join('');
 
   container.innerHTML = html;
+
+  container.querySelectorAll('[data-delete-laundry-date]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const d = btn.dataset.deleteLaundryDate;
+      openConfirm('刪除洗衣紀錄', `確定要刪除 ${formatDayWithWeekday(d)} 的洗衣紀錄嗎？`, [
+        { label: '取消', kind: 'secondary', returnTo: 'modal-laundry-history' },
+        { label: '確定刪除', kind: 'danger', onClick: () => {
+          state.laundry.history = (state.laundry.history || []).filter(entry => (typeof entry === 'string' ? entry : entry?.date) !== d);
+          syncLatestLaundryDate();
+          saveState();
+          renderAll();
+          openLaundryHistory();
+          toast(`已刪除 ${d} 洗衣紀錄`);
+        }}
+      ]);
+    });
+  });
+
   openModal('modal-laundry-history');
 }
 
@@ -6239,6 +6357,15 @@ function wireEvents() {
   document.getElementById('card-rack').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRackOverview(); } });
   document.getElementById('btnLaundryDone').addEventListener('click', () => { if (markLaundryDone()) closeModal(); });
   document.getElementById('btnLaundryPostpone').addEventListener('click', () => { postponeLaundry(); closeModal(); });
+  const lDateInput = document.getElementById('laundryDateInput');
+  if (lDateInput) {
+    lDateInput.addEventListener('change', () => {
+      if (lDateInput.value) {
+        selectedLaundryWashDate = lDateInput.value;
+        renderLaundryQuickChips();
+      }
+    });
+  }
 
   // calendar: swipe between months + jump-to-date + tap title to return to today
   wireCalendarSwipe();
