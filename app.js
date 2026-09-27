@@ -8024,6 +8024,18 @@ async function init() {
     });
   }
 
+  // Self-healing: if device is still running stale cached styles where tab-bar wasn't fixed
+  const tb = document.querySelector('.tab-bar');
+  if (tb && window.getComputedStyle(tb).position !== 'fixed') {
+    if ('caches' in window) {
+      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => {
+        window.location.reload();
+      });
+    } else {
+      window.location.reload();
+    }
+  }
+
   if ('serviceWorker' in navigator) {
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -8032,7 +8044,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260928c').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20260928d').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
