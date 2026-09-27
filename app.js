@@ -964,6 +964,9 @@ function activateView(view) {
   app.classList.toggle('is-retired-view', isRetired);
   syncHomeThemeColor(isHome, isNight);
 
+  window.scrollTo(0, 0);
+  document.body.scrollTop = 0;
+  document.documentElement.scrollTop = 0;
   document.getElementById('mainScroll').scrollTop = 0;
   syncHomeRackExpansion();
   if (view === 'history') {
@@ -1322,7 +1325,7 @@ function completeConsumableLaundry(c, date = todayStr()) {
   c.laundryPending = false;
   c.laundryAt = null;
 }
-function completeLaundryDone(targetDate = (typeof selectedLaundryWashDate !== 'undefined' && selectedLaundryWashDate ? selectedLaundryWashDate : todayStr())) {
+function completeLaundryDone(targetDate = todayStr()) {
   const dirtyItems = state.items.filter(item => item.status === 'dirty');
   const pendingConsumables = getPendingLaundryConsumables();
   dirtyItems.forEach(item => recordItemWash(item, targetDate));
@@ -1340,7 +1343,7 @@ function completeLaundryDone(targetDate = (typeof selectedLaundryWashDate !== 'u
   renderAll();
   toast(`已記錄 ${formatDayWithWeekday(targetDate)} 洗衣服完成`);
 }
-function markLaundryDone(targetDate = (typeof selectedLaundryWashDate !== 'undefined' && selectedLaundryWashDate ? selectedLaundryWashDate : todayStr())) {
+function markLaundryDone(targetDate = todayStr()) {
   const boostedItems = state.items.filter(item => item.status === 'dirty' && item.extraWash);
   if (boostedItems.length) {
     const names = boostedItems.slice(0, 8).map(item => item.name).join('、');
@@ -4606,59 +4609,129 @@ function renderLaundryOverview() {
   }
 }
 
-let selectedLaundryWashDate = todayStr();
-
-function renderLaundryQuickChips() {
-  const container = document.getElementById('laundryQuickChips');
-  const input = document.getElementById('laundryDateInput');
-  if (!container || !input) return;
-
-  const today = todayStr();
-  input.max = today;
-  input.value = selectedLaundryWashDate || today;
-
-  const quickDates = [
-    { label: '今天', date: today },
-    { label: '昨天', date: addDays(today, -1) },
-    { label: '前天', date: addDays(today, -2) },
-    { label: '大前天', date: addDays(today, -3) },
-  ];
-
-  let chipsHtml = quickDates.map(qd => {
-    const isSel = (selectedLaundryWashDate || today) === qd.date;
-    const dayNum = qd.date.slice(8);
-    return `<button type="button" class="laundry-chip${isSel ? ' is-active' : ''}" data-date="${qd.date}">${qd.label} (${Number(dayNum)}號)</button>`;
-  }).join('');
-
-  const isCustom = !quickDates.some(qd => qd.date === (selectedLaundryWashDate || today));
-  chipsHtml += `<button type="button" class="laundry-chip${isCustom ? ' is-active' : ''}" id="btnLaundryCustomDate">📅 ${isCustom ? selectedLaundryWashDate.slice(5) : '其他日期'}</button>`;
-
-  container.innerHTML = chipsHtml;
-
-  container.querySelectorAll('.laundry-chip[data-date]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      selectedLaundryWashDate = btn.dataset.date;
-      input.value = selectedLaundryWashDate;
-      renderLaundryQuickChips();
+function openLaundryDateChooser() {
+  const defaultDate = addDays(todayStr(), -3); // e.g. 24 號!
+  openConfirm(
+    '調整洗衣日期',
+    `<p style="margin-bottom:10px;font-size:13px;color:var(--color-ink-soft);line-height:1.4;">長按自訂洗衣完成日。請選擇這批衣物實際清洗的日期：</p>
+     <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="confirmQuickDates">
+       <button type="button" class="chip" data-days="0">今天</button>
+       <button type="button" class="chip" data-days="1">昨天</button>
+       <button type="button" class="chip" data-days="2">前天</button>
+       <button type="button" class="chip is-active" data-days="3">大前天 (${Number(defaultDate.slice(8))}號)</button>
+     </div>
+     <input type="date" id="customWashDateInput" max="${todayStr()}" value="${defaultDate}" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:14px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface-2);color:var(--color-ink);">`,
+    [
+      { label: '先不要', kind: 'secondary', returnTo: 'modal-laundry' },
+      { label: '確認以此日期洗好', kind: 'primary', onClick: () => {
+        const input = document.getElementById('customWashDateInput');
+        const chosen = input?.value || defaultDate;
+        completeLaundryDone(chosen);
+      }}
+    ]
+  );
+  setTimeout(() => {
+    const chips = document.querySelectorAll('#confirmQuickDates .chip');
+    const input = document.getElementById('customWashDateInput');
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chips.forEach(c => c.classList.remove('is-active'));
+        chip.classList.add('is-active');
+        const days = Number(chip.dataset.days);
+        const d = addDays(todayStr(), -days);
+        if (input) input.value = d;
+      });
     });
+    if (input) {
+      input.addEventListener('change', () => {
+        chips.forEach(c => {
+          const days = Number(c.dataset.days);
+          c.classList.toggle('is-active', addDays(todayStr(), -days) === input.value);
+        });
+      });
+    }
+  }, 60);
+}
+
+function wireLongPressLaundryDone() {
+  const btn = document.getElementById('btnLaundryDone');
+  if (!btn || btn._wiredLongPress) return;
+  btn._wiredLongPress = true;
+
+  let timer = null;
+  let isLongPress = false;
+  let startX = 0, startY = 0;
+
+  function cancelTimer() {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    btn.classList.remove('is-pressing');
+  }
+
+  function triggerLongPress() {
+    isLongPress = true;
+    cancelTimer();
+    if (navigator.vibrate) {
+      try { navigator.vibrate(40); } catch (_) {}
+    }
+    openLaundryDateChooser();
+  }
+
+  btn.addEventListener('touchstart', e => {
+    isLongPress = false;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    btn.classList.add('is-pressing');
+    timer = setTimeout(triggerLongPress, 450);
+  }, { passive: true });
+
+  btn.addEventListener('touchmove', e => {
+    if (!timer) return;
+    const dx = Math.abs(e.touches[0].clientX - startX);
+    const dy = Math.abs(e.touches[0].clientY - startY);
+    if (dx > 10 || dy > 10) {
+      cancelTimer();
+    }
+  }, { passive: true });
+
+  btn.addEventListener('touchend', e => {
+    if (isLongPress) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    cancelTimer();
   });
 
-  const customBtn = document.getElementById('btnLaundryCustomDate');
-  if (customBtn) {
-    customBtn.addEventListener('click', () => {
-      if (typeof input.showPicker === 'function') {
-        input.showPicker();
-      } else {
-        input.focus();
-      }
-    });
-  }
+  btn.addEventListener('touchcancel', cancelTimer);
+
+  btn.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    isLongPress = false;
+    btn.classList.add('is-pressing');
+    timer = setTimeout(triggerLongPress, 500);
+  });
+
+  btn.addEventListener('mouseup', () => {
+    cancelTimer();
+  });
+
+  btn.addEventListener('mouseleave', cancelTimer);
+
+  btn.addEventListener('click', e => {
+    if (isLongPress) {
+      e.preventDefault();
+      e.stopPropagation();
+      isLongPress = false;
+      return;
+    }
+    if (markLaundryDone()) closeModal();
+  });
 }
 
 function openLaundryModal() {
-  selectedLaundryWashDate = todayStr();
   renderLaundryOverview();
-  renderLaundryQuickChips();
   const last = state.laundry.lastWashDate;
   const daysSince = Math.max(0, daysBetween(last, todayStr()));
   const next = nextWashDate();
@@ -4675,29 +4748,8 @@ function openLaundryHistory() {
   if (!container) return;
   const history = state.laundry?.history || [];
 
-  const btnAdd = document.getElementById('btnAddLaundryRecord');
-  if (btnAdd && !btnAdd._bound) {
-    btnAdd._bound = true;
-    btnAdd.addEventListener('click', () => {
-      const defaultDate = addDays(todayStr(), -3);
-      openConfirm('補記歷史洗衣日', `<p style="margin-bottom:8px;font-size:13px;color:var(--color-ink-soft);">選擇欲補記的洗衣日期（例如大前天 24 號）：</p><input type="date" id="backfillLaundryDateInput" max="${todayStr()}" value="${defaultDate}" style="margin-top:6px;padding:8px 12px;font-size:14px;border:1px solid var(--color-border);border-radius:8px;width:100%;box-sizing:border-box;">`, [
-        { label: '取消', kind: 'secondary', returnTo: 'modal-laundry-history' },
-        { label: '確認補記', kind: 'primary', onClick: () => {
-          const input = document.getElementById('backfillLaundryDateInput');
-          const d = input?.value || defaultDate;
-          recordLaundryEvent(d);
-          syncLatestLaundryDate();
-          saveState();
-          renderAll();
-          openLaundryHistory();
-          toast(`已補記 ${formatDayWithWeekday(d)} 洗衣紀錄`);
-        }}
-      ]);
-    });
-  }
-
   if (!history.length) {
-    container.innerHTML = `<p class="empty-hint" style="margin-top:24px;text-align:center;">目前尚無歷史洗衣紀錄<br><span style="font-size:12px;opacity:0.7;">點選「洗好了」完成洗衣或「補記洗衣」後，將在此完整累積洗衣履歷。</span></p>`;
+    container.innerHTML = `<p class="empty-hint" style="margin-top:24px;text-align:center;">目前尚無歷史洗衣紀錄<br><span style="font-size:12px;opacity:0.7;">點選「洗好了」完成洗衣後，將在此完整累積洗衣履歷。</span></p>`;
     openModal('modal-laundry-history');
     return;
   }
@@ -6355,17 +6407,8 @@ function wireEvents() {
   document.getElementById('btnLaundryHistoryInfo')?.addEventListener('click', openLaundryHistory);
   document.getElementById('card-rack').addEventListener('click', openRackOverview);
   document.getElementById('card-rack').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRackOverview(); } });
-  document.getElementById('btnLaundryDone').addEventListener('click', () => { if (markLaundryDone()) closeModal(); });
+  wireLongPressLaundryDone();
   document.getElementById('btnLaundryPostpone').addEventListener('click', () => { postponeLaundry(); closeModal(); });
-  const lDateInput = document.getElementById('laundryDateInput');
-  if (lDateInput) {
-    lDateInput.addEventListener('change', () => {
-      if (lDateInput.value) {
-        selectedLaundryWashDate = lDateInput.value;
-        renderLaundryQuickChips();
-      }
-    });
-  }
 
   // calendar: swipe between months + jump-to-date + tap title to return to today
   wireCalendarSwipe();
@@ -7934,18 +7977,25 @@ async function init() {
     setTimeout(() => splash.remove(), 400);
   }, 350);
 
-  // Viewport metrics synchronization for iOS PWA standalone mode
+  // Viewport metrics synchronization and strict scroll lock for iOS PWA standalone mode
   function syncAppViewportHeight() {
-    const isStandalone = Boolean(window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches);
-    const h = isStandalone ? window.screen.height : window.innerHeight;
+    window.scrollTo(0, 0);
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+    const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     document.documentElement.style.setProperty('--app-screen-height', `${h}px`);
     const app = document.getElementById('app');
-    if (app && isStandalone) {
-      app.style.height = `${h}px`;
+    if (app) {
+      app.style.height = ''; // Do NOT force screen.height which overflows and shifts WebKit touch hit-testing!
     }
   }
   window.addEventListener('resize', syncAppViewportHeight);
   window.addEventListener('orientationchange', syncAppViewportHeight);
+  window.addEventListener('scroll', () => {
+    if (window.scrollY !== 0 || window.scrollX !== 0) {
+      window.scrollTo(0, 0);
+    }
+  }, { passive: true });
   syncAppViewportHeight();
 
   const btnForceRefresh = document.getElementById('btnForceRefresh');
@@ -7976,7 +8026,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260922h').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20260928a').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });

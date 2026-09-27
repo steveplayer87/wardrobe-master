@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20260927a">
+<link rel="stylesheet" href="styles.css?v=20260928a">
 </head>
 <body>
 
@@ -888,13 +888,6 @@
     <div class="item-grid laundry-overview-grid" id="laundryOverviewGrid"></div>
     <div class="laundry-consumable-list" id="laundryConsumableGrid"></div>
     <p class="empty-hint" id="laundryOverviewEmpty" hidden>洗衣籃目前是空的</p>
-    <div class="laundry-date-picker-row" id="laundryDatePickerRow">
-      <div class="laundry-date-label-bar">
-        <span class="laundry-date-title">清洗完成日</span>
-        <input type="date" id="laundryDateInput" class="laundry-date-native-input" />
-      </div>
-      <div class="laundry-quick-chips" id="laundryQuickChips"></div>
-    </div>
     <div class="settings-actions">
       <button class="btn-secondary" id="btnLaundryPostpone">延後一天洗</button>
       <button class="btn-primary" id="btnLaundryDone" style="margin-top:0">洗好了</button>
@@ -906,13 +899,7 @@
     <div class="modal-handle"></div>
     <div class="modal-head">
       <h2>歷史洗衣紀錄</h2>
-      <div class="modal-head-actions">
-        <button type="button" class="btn-subtle" id="btnAddLaundryRecord" style="font-size:12px;font-weight:700;color:var(--color-denim);display:flex;align-items:center;gap:4px;">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          補記洗衣
-        </button>
-        <button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
-      </div>
+      <button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div class="laundry-history-content" id="laundryHistoryContent"></div>
   </div>
@@ -1314,7 +1301,7 @@
   <img class="photo-viewer-img" id="photoViewerImg" alt="">
 </div>
 
-<script src="seed-items.js?v=20260927a"></script>
-<script src="app.js?v=20260927a"></script>
+<script src="seed-items.js?v=20260928a"></script>
+<script src="app.js?v=20260928a"></script>
 </body>
 </html>
