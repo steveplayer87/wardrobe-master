@@ -92,18 +92,7 @@ body.home-page.night-page {
   }
 }
 
-body.home-page {
-  background:
-    radial-gradient(circle at 76% 14%, rgba(255, 246, 215, 0.65) 0%, rgba(255, 230, 160, 0.25) 28%, transparent 58%),
-    radial-gradient(circle at 18% 22%, rgba(175, 215, 255, 0.55) 0%, transparent 55%),
-    linear-gradient(180deg, #7BAEF8 0%, #9BC4FF 24%, #C2DCFF 54%, #E6F0FA 100%) fixed;
-}
-body.home-page.night-page {
-  background:
-    radial-gradient(circle at 76% 15%, rgba(185, 205, 255, 0.40) 0%, rgba(120, 140, 230, 0.18) 32%, transparent 62%),
-    radial-gradient(circle at 22% 24%, rgba(135, 115, 225, 0.22) 0%, transparent 52%),
-    linear-gradient(180deg, #151833 0%, #1F234D 26%, #283064 56%, #181C3D 100%) fixed;
-}
+
 
 input, textarea {
   -webkit-user-select: text;
@@ -1255,23 +1244,24 @@ body.home-page.night-page {
   flex-direction: column !important;
   justify-content: center !important;
 }
-#app.is-home-view .header-date,
-#app.is-home-view .header-greeting {
-  text-shadow: 0 1px 1px rgba(255,255,255,0.92), 0 2px 10px rgba(47,72,116,0.22);
+#app.is-home-view .header-date {
+  color: rgba(255, 255, 255, 0.88) !important;
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(15, 30, 65, 0.25);
 }
-#app.is-home-view .header-date { color: var(--color-ink-soft); font-weight: 800; }
 #app.is-home-view .header-greeting {
   font-size: 20px !important;
   font-weight: 800 !important;
   line-height: 1.2 !important;
   margin: 0 !important;
   padding: 0 !important;
-  color: var(--color-ink);
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(15, 30, 65, 0.3);
 }
 #app.is-home-view.is-night-view .header-date,
 #app.is-home-view.is-night-view .header-greeting {
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.42), 0 0 13px rgba(255,255,255,0.25);
+  color: #fff !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 #app.is-home-view .header-actions {
   display: flex !important;
@@ -1283,12 +1273,12 @@ body.home-page.night-page {
   width: 40px !important;
   height: 40px !important;
   margin: 0 !important;
-  background: rgba(255,255,255,0.88);
+  background: rgba(255,255,255,0.92) !important;
   box-shadow: 0 5px 16px rgba(44,66,112,0.13);
 }
 #app.is-home-view .badge-dot { top: 7px; right: 7px; }
 #app.is-home-view .scene-card {
-  min-height: calc(100dvh - var(--safe-top) - 52px - var(--safe-bottom) - 50px - 74px);
+  min-height: calc(100dvh - var(--safe-top) - 52px - var(--safe-bottom) - 50px - 92px);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1375,11 +1365,26 @@ body.home-page.night-page {
   display: none !important;
 }
 #app.is-home-view .figure-slot:not(.is-filled):not(.is-transparent-slot) .figure-thumb {
-  border: 1.5px dashed rgba(44, 66, 112, 0.22) !important;
-  border-radius: 16px !important;
+  min-height: 72px;
+  width: 100%;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 12px !important;
+  border: 1.5px dashed rgba(255, 255, 255, 0.55) !important;
+  border-radius: 18px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+#app.is-home-view .figure-slot:not(.is-filled):not(.is-transparent-slot) .figure-thumb svg {
+  width: 32px !important;
+  height: 32px !important;
+  opacity: 0.85;
 }
 #app.is-home-view.is-night-view .figure-slot:not(.is-filled) .figure-thumb {
-  border-color: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.72) !important;
 }
 #app.is-home-view .figure-slot.is-filled .figure-thumb {
   background-color: transparent !important;
@@ -2084,19 +2089,7 @@ body.home-page.night-page {
 
 /* =========================== Round 10: refined visual system =========================== */
 /* Home header and weather scene share one continuous atmospheric surface. */
-#app.is-home-view::before {
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background:
-    radial-gradient(circle at 18% 14%, rgba(255,255,255,0.40), transparent 28%),
-    linear-gradient(180deg, #8E9FEA 0%, #A8B6EF 30%, #CFDCF6 65%, #E6EEF9 100%);
-}
-#app.is-home-view.is-night-view::before {
-  background:
-    radial-gradient(circle at 78% 18%, rgba(151,170,255,0.25), transparent 24%),
-    linear-gradient(180deg, #1E1B4B 0%, #2A2566 30%, #3C367C 65%, #252250 100%);
-}
+
 #app.is-home-view .scene-card { background: transparent; box-shadow: none; overflow: visible; }
 #app.is-home-view .scene-sky { background: transparent; border-radius: 0 0 28px 28px; }
 #app.is-home-view .scene-sky.is-night,
@@ -2393,8 +2386,7 @@ body.night-page input[type="range"]::-moz-range-track {
 .rack-chip-consumable .rack-chip-thumb { background: rgba(255,255,255,0.76); color: var(--color-coral); }
 #btnResetConsumable:disabled { opacity: 0.58; cursor: default; }
 
-/* Add a small amount of scroll room so the home rack heads can be pulled open deliberately. */
-#app.is-home-view #mainScroll { overscroll-behavior-y: contain; }
+
 
 
 .badge-dot[hidden] { display: none !important; }

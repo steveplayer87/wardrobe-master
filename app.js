@@ -2090,7 +2090,7 @@ function renderHome() {
     }
   });
 
-  const boardScale = state.profile.figureBoardScale || 100;
+  const boardScale = Math.min(140, Math.max(70, Number(state.profile?.figureBoardScale) || 100));
   document.documentElement.style.setProperty('--figure-board-scale', (boardScale / 100).toFixed(2));
 
   const boardEl = document.getElementById('figureBoard');
@@ -8044,7 +8044,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260928f').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20260928g').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
