@@ -943,7 +943,7 @@ function syncHomeThemeColor(isHome, isNight) {
     return;
   }
   // Seamless match with the atmosphere gradient top
-  themeMeta.setAttribute('content', isNight ? '#151833' : '#7BAEF8');
+  themeMeta.setAttribute('content', isNight ? '#0F172A' : '#3A88E9');
 }
 
 function activateView(view) {
@@ -8044,7 +8044,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260928e').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20260928f').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
