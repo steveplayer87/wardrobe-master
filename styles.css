@@ -1307,7 +1307,7 @@ body.home-page.night-page {
 }
 #app.is-home-view .badge-dot { top: 7px; right: 7px; }
 #app.is-home-view .scene-card {
-  min-height: calc(100% - var(--safe-top) - 62px - 50px - var(--safe-bottom) - 48px);
+  min-height: calc(100dvh - var(--safe-top) - 52px - var(--safe-bottom) - 50px - 48px);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1343,6 +1343,10 @@ body.home-page.night-page {
 #app.is-home-view .scene-weather {
   bottom: 12px;
   left: 28px;
+  max-width: calc(50% - 24px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);

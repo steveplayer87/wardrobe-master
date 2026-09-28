@@ -8044,7 +8044,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260928d').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20260928e').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
