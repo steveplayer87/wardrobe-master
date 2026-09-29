@@ -264,6 +264,12 @@ function categoryLabel(id) {
   return c ? c.label : id;
 }
 function categoryIcon(id) { return ICONS[id] || ICONS.custom; }
+function isShortsItem(item) {
+  if (!item || item.category !== 'bottom') return false;
+  const tags = Array.isArray(item.tags) ? item.tags : [];
+  const name = item.name || '';
+  return tags.includes('短') || name.includes('短褲') || name.includes('短');
+}
 
 /* ---------------------------- Utilities ---------------------------- */
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
@@ -2032,13 +2038,15 @@ function renderHome() {
     if (!btn) return;
     const thumb = btn.querySelector('.figure-thumb');
     const itemId = state.today[slot];
-    const layout = (state.profile.outfitLayout && state.profile.outfitLayout[slot]) || OUTFIT_LAYOUT_DEFAULTS[slot];
     const item = itemId ? findItem(itemId) : null;
-    const ratio = HOME_SLOT_RATIOS[slot] || getCategoryAspectRatio(slot);
+    const layout = (state.profile.outfitLayout && state.profile.outfitLayout[slot]) || OUTFIT_LAYOUT_DEFAULTS[slot];
+    const isShorts = slot === 'bottom' && isShortsItem(item);
+    const ratio = isShorts ? 1.15 : (HOME_SLOT_RATIOS[slot] || getCategoryAspectRatio(slot));
     if (item) {
       btn.classList.remove('is-transparent-slot');
       btn.classList.add('is-filled');
       btn.classList.toggle('has-photo', !!item.image);
+      btn.classList.toggle('is-shorts', isShorts);
       const pos = (slot === 'top' || slot === 'hat') ? 'center bottom' : 'center top';
       const cleanImg = transparentCleanCache.get(item.image) || item.image;
       const bgStyle = cleanImg
@@ -2519,13 +2527,15 @@ function renderMonthGrid(grid, y, m) {
     if (dayEntries && dayEntries.length) {
       cell.classList.add('has-ootd');
       const entry = dayEntries[0];
+      const bottomItem = entry.bottom ? findItem(entry.bottom) : null;
+      const isShorts = isShortsItem(bottomItem);
       const thumbItems = [
         { item: entry.top ? findItem(entry.top) : null, className: 'cal-thumb-top' },
-        { item: entry.bottom ? findItem(entry.bottom) : null, className: 'cal-thumb-bottom' },
+        { item: bottomItem, className: isShorts ? 'cal-thumb-bottom is-shorts' : 'cal-thumb-bottom' },
       ].filter(({ item }) => item);
       thumbsHtml = `<span class="cal-thumbs">${thumbItems.map(({ item, className }) => {
         const cleanImg = transparentCleanCache.get(item.image) || item.image;
-        const pos = className === 'cal-thumb-bottom' ? 'center top' : 'center bottom';
+        const pos = className.includes('cal-thumb-bottom') ? 'center top' : 'center bottom';
         const style = cleanImg ? `background-image:url('${cleanImg}');background-repeat:no-repeat;background-position:${pos};background-size:contain;background-color:transparent;` : 'background-color:transparent;';
         return `<span class="cal-thumb ${className}" style="${style}">${cleanImg ? '' : categoryIcon(item.category)}</span>`;
       }).join('')}</span>`;
@@ -2701,12 +2711,16 @@ function openDayDetail(dateStr, entry) {
 
   let figurePreviewHtml = '';
   if (topItem || bottomItem || hatItem || shoesItem) {
+    const isShorts = isShortsItem(bottomItem);
+    const bottomW = isShorts ? '82%' : '96%';
+    const bottomRatio = isShorts ? '1.15' : '0.72';
+    const topMarginBottom = isShorts ? '-24px' : '-20px';
     figurePreviewHtml = `
       <div class="day-detail-figure-preview" style="display:flex;justify-content:center;margin-bottom:14px;">
         <div class="figure-board" style="width:min(144px, 42%);padding:10px 8px;background:rgba(44,66,112,0.06);border:1px solid rgba(44,66,112,0.12);border-radius:22px;display:flex;flex-direction:column;align-items:center;gap:0;">
           ${hatItem ? `<div class="figure-slot figure-hat" style="width:82%;aspect-ratio:2.2;background:transparent;"><span class="figure-thumb" style="aspect-ratio:2.2;background-image:url('${hatItem.image || ''}');background-repeat:no-repeat;background-position:center;background-size:contain;display:flex;align-items:center;justify-content:center;">${hatItem.image ? '' : categoryIcon('hat')}</span></div>` : ''}
-          ${topItem ? `<div class="figure-slot figure-top" style="width:100%;aspect-ratio:1.08;margin-bottom:-18px;z-index:2;position:relative;background:transparent;"><span class="figure-thumb" style="aspect-ratio:1.08;background-image:url('${topItem.image || ''}');background-repeat:no-repeat;background-position:center bottom;background-size:contain;display:flex;align-items:center;justify-content:center;">${topItem.image ? '' : categoryIcon('top')}</span></div>` : ''}
-          ${bottomItem ? `<div class="figure-slot figure-bottom" style="width:98%;aspect-ratio:0.72;margin-top:0;z-index:1;position:relative;background:transparent;"><span class="figure-thumb" style="aspect-ratio:0.72;background-image:url('${bottomItem.image || ''}');background-repeat:no-repeat;background-position:center top;background-size:contain;display:flex;align-items:center;justify-content:center;">${bottomItem.image ? '' : categoryIcon('bottom')}</span></div>` : ''}
+          ${topItem ? `<div class="figure-slot figure-top" style="width:100%;aspect-ratio:1.08;margin-bottom:${topMarginBottom};z-index:2;position:relative;background:transparent;"><span class="figure-thumb" style="aspect-ratio:1.08;background-image:url('${topItem.image || ''}');background-repeat:no-repeat;background-position:center bottom;background-size:contain;display:flex;align-items:center;justify-content:center;">${topItem.image ? '' : categoryIcon('top')}</span></div>` : ''}
+          ${bottomItem ? `<div class="figure-slot figure-bottom ${isShorts ? 'is-shorts' : ''}" style="width:${bottomW};aspect-ratio:${bottomRatio};margin-top:0;z-index:1;position:relative;background:transparent;"><span class="figure-thumb" style="aspect-ratio:${bottomRatio};background-image:url('${bottomItem.image || ''}');background-repeat:no-repeat;background-position:center top;background-size:contain;display:flex;align-items:center;justify-content:center;">${bottomItem.image ? '' : categoryIcon('bottom')}</span></div>` : ''}
           ${shoesItem ? `<div class="figure-slot figure-shoes" style="width:96%;aspect-ratio:2.2;margin-top:2px;background:transparent;"><span class="figure-thumb" style="aspect-ratio:2.2;background-image:url('${shoesItem.image || ''}');background-repeat:no-repeat;background-position:center;background-size:contain;display:flex;align-items:center;justify-content:center;">${shoesItem.image ? '' : categoryIcon('shoes')}</span></div>` : ''}
         </div>
       </div>`;
@@ -8044,7 +8058,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260928g').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20260929a').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });

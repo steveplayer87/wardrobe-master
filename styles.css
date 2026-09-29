@@ -882,15 +882,21 @@ img.notif-thumb { padding: 0; background-color: transparent; }
 .cal-thumbs { gap: 0; width: 84%; align-items: center; }
 .cal-thumb-top {
   aspect-ratio: 1.35;
-  margin-bottom: -6px !important;
+  margin-bottom: -8px !important;
   z-index: 2;
   position: relative;
 }
 .cal-thumb-bottom {
+  width: 96%;
   aspect-ratio: 0.88;
   margin-top: 0 !important;
   z-index: 1;
   position: relative;
+}
+.cal-thumb-bottom.is-shorts {
+  width: 78% !important;
+  aspect-ratio: 1.15 !important;
+  margin-top: -1px !important;
 }
 .cal-dot-laundry { background: var(--color-denim); }
 .cal-dot-towel { background: var(--color-sage); }
@@ -1411,6 +1417,10 @@ body.home-page.night-page {
   margin-top: 0 !important;
   z-index: 1 !important;
   position: relative !important;
+}
+#app.is-home-view .figure-bottom.is-shorts,
+.outfit-studio-overlay .figure-bottom.is-shorts {
+  width: 86% !important;
 }
 #app.is-home-view .figure-hat,
 .outfit-studio-overlay .figure-hat {
