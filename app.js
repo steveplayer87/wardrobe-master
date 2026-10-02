@@ -2404,12 +2404,13 @@ function buildItemCard(item, opts) {
       : '';
 
   let infoHtml = '';
+  const brandMarkup = `<p class="item-brand${item.brand ? '' : ' is-empty'}">${item.brand ? `${brandIconMarkup(item, 'tiny')}<span>${escapeHtml(item.brand)}</span>` : '&nbsp;'}</p>`;
   if (opts && opts.laundryMode) {
     const wornDates = (item.wearHistory || []).filter(d => !item.lastWashedDate || d > item.lastWashedDate);
     const daysWorn = wornDates.length > 0 ? new Set(wornDates).size : (item.wearCount || 1);
     const lastWashStr = item.lastWashedDate ? fmtDate(item.lastWashedDate) : (item.washHistory && item.washHistory[0]?.date ? fmtDate(item.washHistory[0].date) : '無紀錄');
     infoHtml = `
-      ${item.brand ? `<p class="item-brand">${brandIconMarkup(item, 'tiny')}<span>${escapeHtml(item.brand)}</span></p>` : ''}
+      ${brandMarkup}
       <p class="item-name">${escapeHtml(item.name)}</p>
       <div class="laundry-item-meta">
         <span class="lim-days">已穿 ${daysWorn} 天</span>
@@ -2420,16 +2421,31 @@ function buildItemCard(item, opts) {
     `;
   } else {
     infoHtml = `
-      ${item.brand ? `<p class="item-brand">${brandIconMarkup(item, 'tiny')}<span>${escapeHtml(item.brand)}</span></p>` : ''}
+      ${brandMarkup}
       <p class="item-name">${escapeHtml(item.name)}</p>
       <p class="item-wear">穿了 ${item.wearCount||0} 次${activityMeta}</p>
       ${washBoostMarkup(item, opts)}
     `;
   }
 
+  const restingWornCount = (() => {
+    if (item.wearHistory && item.wearHistory.length > 0) {
+      const recentWorn = item.lastWashedDate
+        ? item.wearHistory.filter(d => d > item.lastWashedDate)
+        : item.wearHistory;
+      if (recentWorn.length > 0) return new Set(recentWorn).size;
+    }
+    return item.wearCount || 1;
+  })();
+
+  const restingBadge = item.status === 'resting'
+    ? `<span class="item-resting-badge">已穿 ${restingWornCount} 次</span>`
+    : (item.status === 'dirty' && opts && opts.tryonMode ? `<span class="item-dirty-badge">待洗</span>` : '');
+
   card.innerHTML = `
     <div class="item-photo">${itemPhotoMarkup(item)}</div>
     ${uiSelectMode ? `<span class="item-card-check"></span>` : (item.status !== 'retired' ? `<span class="item-status-dot ${statusClass}"></span>` : '')}
+    ${restingBadge}
     <div class="item-info">
       ${infoHtml}
     </div>`;
@@ -5048,7 +5064,13 @@ function renderTryonGridFor(slot, category) {
   const grid = document.getElementById('tryonPickerGrid');
   const empty = document.getElementById('tryonPickerEmpty');
   grid.innerHTML = '';
-  let options = state.items.filter(i => i.category === category && i.status !== 'dirty' && i.status !== 'retired');
+  const isBackfill = !!backfillDraft;
+  let options = state.items.filter(i => {
+    if (i.category !== category) return false;
+    if (i.status === 'retired') return false;
+    if (isBackfill) return true;
+    return i.status !== 'dirty';
+  });
   options = options.filter(i => itemMatchesSearch(i, tryonSearchQuery));
   options = options.filter(i => itemMatchesFilters(i));
   options = options.slice().sort((a, b) => {
@@ -5091,7 +5113,7 @@ function renderTryonGridFor(slot, category) {
     grid.appendChild(noneCard);
   }
   options.forEach(item => {
-    const card = buildItemCard(item, { onClick: () => selectSlotItem(slot, item.id) });
+    const card = buildItemCard(item, { tryonMode: true, onClick: () => selectSlotItem(slot, item.id) });
     grid.appendChild(card);
   });
 }
@@ -8058,7 +8080,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20260929c').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261002a').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
