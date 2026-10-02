@@ -2342,16 +2342,9 @@ function renderWardrobe() {
   document.getElementById('view-wardrobe').classList.toggle('is-retired-view', retiredView);
   document.getElementById('mainScroll')?.classList.toggle('is-retired-scroll', retiredView && activeView === 'wardrobe');
   document.getElementById('app')?.classList.toggle('is-retired-view', retiredView && activeView === 'wardrobe');
-  const themeMeta = document.querySelector('meta[name="theme-color"]');
-  if (themeMeta) {
-    if (retiredView && activeView === 'wardrobe') {
-      themeMeta.content = '#D8B45B';
-    } else {
-      const current = state.profile.weather?.current;
-      const isNight = current && current.is_day != null ? Number(current.is_day) === 0 : (new Date().getHours() >= 18 || new Date().getHours() < 6);
-      themeMeta.content = isNight ? '#232C48' : '#CFE0F5';
-    }
-  }
+  const current = state.profile.weather?.current;
+  const isNight = current && current.is_day != null ? Number(current.is_day) === 0 : (new Date().getHours() >= 18 || new Date().getHours() < 6);
+  syncHomeThemeColor(activeView === 'home', isNight);
   const retiredBanner = document.getElementById('retiredBanner');
   if (retiredBanner) retiredBanner.hidden = !retiredView;
   document.getElementById('itemCount').textContent = retiredView ? `典藏・${items.length} 件` : `${items.length} 件`;
@@ -8080,7 +8073,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261002a').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261002b').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });

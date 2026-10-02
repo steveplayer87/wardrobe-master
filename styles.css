@@ -47,8 +47,7 @@
 html {
   width: 100%;
   height: 100%;
-  height: 100dvh;
-  min-height: 100dvh;
+  height: -webkit-fill-available;
   margin: 0;
   padding: 0;
   background: var(--color-surface);
@@ -64,10 +63,11 @@ body.home-page.night-page {
 }
 
 body {
+  position: fixed;
+  inset: 0;
   width: 100%;
   height: 100%;
-  height: 100dvh;
-  min-height: 100dvh;
+  height: -webkit-fill-available;
   margin: 0;
   padding: 0;
   background: transparent;
@@ -113,11 +113,10 @@ svg { width: 100%; height: 100%; display: block; }
    DO NOT change .tab-bar to position: absolute! */
 #app {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   width: 100%;
+  height: 100%;
+  height: -webkit-fill-available;
   max-width: var(--app-max-width, 402px);
   margin: 0 auto;
   display: flex;
@@ -177,10 +176,11 @@ svg { width: 100%; height: 100%; display: block; }
   color: var(--color-ink);
   margin: 0 !important;
   padding: 0 !important;
-  transition: color 220ms ease, text-shadow 220ms ease;
+  text-shadow: none !important;
+  transition: color 220ms ease;
 }
 #app.is-night .header-text { padding: 0 !important; background: transparent !important; box-shadow: none !important; }
-#app.is-night .header-date, #app.is-night .header-greeting { color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,0.3), 0 0 7px rgba(255,255,255,0.14); }
+#app.is-night .header-date, #app.is-night .header-greeting { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
 .header-actions {
   display: flex !important;
   align-items: center !important;
@@ -235,8 +235,11 @@ svg { width: 100%; height: 100%; display: block; }
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-top: 1px solid rgba(255,255,255,0.65);
   box-shadow: 0 -8px 26px rgba(28, 44, 84, 0.14), 0 -2px 6px rgba(0, 0, 0, 0.04);
-  padding: 6px 2px max(8px, env(safe-area-inset-bottom, 8px));
+  padding: 6px 2px env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
   z-index: 50;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 /* Under-curtain: seamlessly fills bottom safe area */
 .tab-bar::after {
@@ -1089,17 +1092,17 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
 #app.is-home-view .header-date {
   color: rgba(255, 255, 255, 0.88);
   font-weight: 700;
-  text-shadow: 0 1px 3px rgba(15, 30, 65, 0.25);
+  text-shadow: 0 1px 2px rgba(15, 30, 65, 0.25);
 }
 #app.is-home-view .header-greeting {
   color: #ffffff;
   font-weight: 800;
-  text-shadow: 0 1px 3px rgba(15, 30, 65, 0.3);
+  text-shadow: 0 1px 2px rgba(15, 30, 65, 0.35);
 }
 #app.is-home-view.is-night-view .header-date,
 #app.is-home-view.is-night-view .header-greeting {
   color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 #app.is-home-view .scene-label {
   color: rgba(255, 255, 255, 0.92);
@@ -1279,14 +1282,14 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
 }
 #app.is-home-view .badge-dot { top: 7px; right: 7px; }
 #app.is-home-view .scene-card {
-  min-height: calc(100dvh - var(--safe-top) - 52px - var(--safe-bottom) - 50px - 72px);
+  min-height: auto;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
   gap: 4px;
   margin: 0;
-  padding: 4px 0 6px;
+  padding: 4px 0 10px;
   background: transparent;
   box-shadow: none;
   flex-shrink: 0;
