@@ -8073,7 +8073,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261002b').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261002c').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });

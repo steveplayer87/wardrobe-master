@@ -47,7 +47,6 @@
 html {
   width: 100%;
   height: 100%;
-  height: -webkit-fill-available;
   margin: 0;
   padding: 0;
   background: var(--color-surface);
@@ -64,10 +63,12 @@ body.home-page.night-page {
 
 body {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
   height: 100%;
-  height: -webkit-fill-available;
   margin: 0;
   padding: 0;
   background: transparent;
@@ -113,10 +114,11 @@ svg { width: 100%; height: 100%; display: block; }
    DO NOT change .tab-bar to position: absolute! */
 #app {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
-  height: 100%;
-  height: -webkit-fill-available;
   max-width: var(--app-max-width, 402px);
   margin: 0 auto;
   display: flex;
@@ -238,16 +240,16 @@ svg { width: 100%; height: 100%; display: block; }
   padding: 6px 2px env(safe-area-inset-bottom, 0px);
   box-sizing: border-box;
   z-index: 50;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
 }
-/* Under-curtain: seamlessly fills bottom safe area */
+/* Under-curtain: seamlessly fills bottom safe area and past the edge */
 .tab-bar::after {
   content: "";
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: -60px;
   background: inherit;
-  border-radius: inherit;
   pointer-events: none;
   z-index: -1;
 }
@@ -1107,6 +1109,9 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
 #app.is-home-view .scene-label {
   color: rgba(255, 255, 255, 0.92);
   text-shadow: 0 1px 2px rgba(15, 30, 65, 0.25);
+  position: relative;
+  z-index: 3;
+  margin: 4px 0 2px;
 }
 #app.is-home-view.is-night-view .scene-label {
   color: rgba(255, 255, 255, 0.85);
@@ -2116,14 +2121,14 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
 .scene-art-moon { top: 25px; right: 57px; width: 48px; height: 48px; border-radius: 50%; background: #FFF8D7; box-shadow: 0 0 0 8px rgba(207,217,255,0.18), 0 6px 20px rgba(30,20,112,0.25); }
 .scene-art-moon::after { content: ""; position: absolute; top: -4px; left: 13px; width: 48px; height: 48px; border-radius: 50%; background: #4B3BBA; }
 .scene-art-cloud {
-  top: 48px; left: 50%; width: 96px; height: 30px; border-radius: 20px;
+  top: 14px; right: 48px; left: auto; width: 90px; height: 28px; border-radius: 20px;
   background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(218,230,249,0.83));
-  box-shadow: 0 9px 18px rgba(75,83,151,0.16); transform: translateX(-50%);
+  box-shadow: 0 9px 18px rgba(75,83,151,0.16); transform: none;
 }
 .scene-art-cloud::before,
 .scene-art-cloud::after { content: ""; position: absolute; bottom: 7px; border-radius: 50%; background: inherit; }
-.scene-art-cloud::before { left: 16px; width: 42px; height: 42px; }
-.scene-art-cloud::after { right: 15px; width: 50px; height: 50px; }
+.scene-art-cloud::before { left: 14px; width: 38px; height: 38px; }
+.scene-art-cloud::after { right: 14px; width: 44px; height: 44px; }
 .scene-art-rain { top: 84px; left: 50%; width: 104px; height: 36px; transform: translateX(-50%); background: repeating-linear-gradient(112deg, transparent 0 11px, rgba(91,125,213,0.72) 11px 13px, transparent 13px 24px); opacity: 0.86; }
 .scene-sky.is-clear:not(.is-night) .scene-art-sun { display: block; }
 .scene-sky.is-night:not(.is-rain):not(.is-snow) .scene-art-moon { display: block; }
