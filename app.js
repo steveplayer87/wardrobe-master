@@ -551,6 +551,7 @@ function defaultState() {
     wishlist: [],
     styleGallery: [],
     haircuts: [],
+    skincare: [],
     geminiApiKey: '',
     drafts: { addItem: null, wishlist: null },
     sandboxItems: [],
@@ -980,7 +981,8 @@ function activateView(view) {
   } else if (view === 'wardrobe') {
     renderWardrobe();
   } else if (view === 'more') {
-    renderHaircuts();
+    renderHairstyleSection();
+    renderSkincareSection();
     renderConsumables();
   } else if (view === 'home') {
     renderHome();
@@ -2893,6 +2895,122 @@ function openHaircutModal(editId = null) {
     document.getElementById('fieldHaircutCycle').value = 28;
   }
   openModal('modal-haircut');
+}
+
+/* ---- Skincare / Acne Log ('更多' tab) ---- */
+let editingSkincareId = null;
+
+function renderSkincareSection() {
+  const summaryEl = document.getElementById('skincareSummaryRow');
+  const listEl = document.getElementById('skincareList');
+  if (!summaryEl || !listEl) return;
+
+  const records = (Array.isArray(state.skincare) ? state.skincare : []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  const activeCount = records.filter(r => r.stage === '剛冒出發紅' || r.stage === '紅腫痛/白頭').length;
+  const healingCount = records.filter(r => r.stage === '結痂修復中').length;
+  const totalCount = records.length;
+
+  summaryEl.innerHTML = `
+    <div class="skincare-summary-card">
+      <div class="skincare-summary-num" style="color:${activeCount > 0 ? '#B91C1C' : 'var(--color-ink)'}">${activeCount}</div>
+      <div class="skincare-summary-label">目前發炎/急救中</div>
+    </div>
+    <div class="skincare-summary-card">
+      <div class="skincare-summary-num" style="color:${healingCount > 0 ? '#B45309' : 'var(--color-ink)'}">${healingCount}</div>
+      <div class="skincare-summary-label">修復結痂中</div>
+    </div>
+    <div class="skincare-summary-card">
+      <div class="skincare-summary-num">${totalCount}</div>
+      <div class="skincare-summary-label">累計紀錄筆數</div>
+    </div>
+  `;
+
+  if (!records.length) {
+    listEl.innerHTML = `<div class="skincare-empty">目前尚無保養或長痘紀錄，點選右上角「+ 新增紀錄」建立第一筆備忘。</div>`;
+    return;
+  }
+
+  listEl.innerHTML = '';
+  records.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'skincare-card';
+    let stageClass = 'stage-active';
+    if (r.stage === '結痂修復中') stageClass = 'stage-healing';
+    else if (r.stage === '已消退/防留疤') stageClass = 'stage-done';
+
+    let sevClass = 'sev-mild';
+    let sevLabel = '輕微';
+    if (r.severity === 'moderate') { sevClass = 'sev-moderate'; sevLabel = '中度'; }
+    else if (r.severity === 'severe') { sevClass = 'sev-severe'; sevLabel = '重度'; }
+
+    card.innerHTML = `
+      <div class="skincare-card-head">
+        <div class="skincare-card-area">
+          <span>${escapeHtml(r.area || '面部')}</span>
+          <span class="skincare-badge ${stageClass}">${escapeHtml(r.stage || '觀察中')}</span>
+          <span class="skincare-badge ${sevClass}">${sevLabel}</span>
+        </div>
+        <span class="skincare-card-date">${fmtDate(r.date)}</span>
+      </div>
+      <div class="skincare-card-detail"><strong>對策與藥膏：</strong>${escapeHtml(r.treatment || '無')}</div>
+      ${r.cause ? `<div class="skincare-card-detail"><strong>推測成因：</strong>${escapeHtml(r.cause)}</div>` : ''}
+      ${r.notes ? `<div class="skincare-card-notes">${escapeHtml(r.notes)}</div>` : ''}
+    `;
+    card.addEventListener('click', () => openSkincareModal(r.id));
+    listEl.appendChild(card);
+  });
+}
+
+function openSkincareModal(editId = null) {
+  editingSkincareId = editId;
+  const form = document.getElementById('skincareForm');
+  if (!form) return;
+  form.reset();
+
+  const title = document.getElementById('skincareModalTitle');
+  const submitBtn = document.getElementById('btnSkincareSubmit');
+  const extraActions = document.getElementById('skincareExtraActions');
+
+  let currentArea = '下巴';
+  let currentStage = '剛冒出發紅';
+
+  if (editId) {
+    const r = (state.skincare || []).find(x => x.id === editId);
+    if (!r) return;
+    if (title) title.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-denim);"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 編輯保養紀錄`;
+    if (submitBtn) submitBtn.textContent = '儲存修改';
+    if (extraActions) extraActions.classList.remove('is-hidden');
+
+    document.getElementById('fieldSkincareDate').value = r.date || todayStr();
+    document.getElementById('fieldSkincareSeverity').value = r.severity || 'moderate';
+    document.getElementById('fieldSkincareCause').value = r.cause || '';
+    document.getElementById('fieldSkincareTreatment').value = r.treatment || '';
+    document.getElementById('fieldSkincareNotes').value = r.notes || '';
+    currentArea = r.area || '下巴';
+    currentStage = r.stage || '剛冒出發紅';
+  } else {
+    if (title) title.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-denim);"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 保養與長痘紀錄`;
+    if (submitBtn) submitBtn.textContent = '儲存保養紀錄';
+    if (extraActions) extraActions.classList.add('is-hidden');
+    document.getElementById('fieldSkincareDate').value = todayStr();
+    document.getElementById('fieldSkincareSeverity').value = 'moderate';
+  }
+
+  // Sync chips
+  const areaInput = document.getElementById('fieldSkincareArea');
+  if (areaInput) areaInput.value = currentArea;
+  document.querySelectorAll('#groupSkincareArea .skincare-chip').forEach(btn => {
+    btn.classList.toggle('is-active', btn.dataset.val === currentArea);
+  });
+
+  const stageInput = document.getElementById('fieldSkincareStage');
+  if (stageInput) stageInput.value = currentStage;
+  document.querySelectorAll('#groupSkincareStage .skincare-chip').forEach(btn => {
+    btn.classList.toggle('is-active', btn.dataset.val === currentStage);
+  });
+
+  openModal('modal-skincare');
 }
 
 /* ---- Consumables ('更多' tab) ---- */
@@ -6399,6 +6517,67 @@ function wireEvents() {
       renderHairstyleSection();
       forceCloseModal({ skipPersist: true });
       toast('已刪除髮型記錄');
+    }
+  });
+
+  // skincare tracker events
+  document.getElementById('btnOpenAddSkincare')?.addEventListener('click', () => openSkincareModal());
+
+  document.querySelectorAll('#groupSkincareArea .skincare-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#groupSkincareArea .skincare-chip').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      const hidden = document.getElementById('fieldSkincareArea');
+      if (hidden) hidden.value = btn.dataset.val || '';
+    });
+  });
+
+  document.querySelectorAll('#groupSkincareStage .skincare-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#groupSkincareStage .skincare-chip').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      const hidden = document.getElementById('fieldSkincareStage');
+      if (hidden) hidden.value = btn.dataset.val || '';
+    });
+  });
+
+  document.getElementById('skincareForm')?.addEventListener('submit', e => {
+    e.preventDefault();
+    const date = document.getElementById('fieldSkincareDate').value || todayStr();
+    const area = document.getElementById('fieldSkincareArea').value || '下巴';
+    const stage = document.getElementById('fieldSkincareStage').value || '剛冒出發紅';
+    const severity = document.getElementById('fieldSkincareSeverity').value || 'moderate';
+    const cause = document.getElementById('fieldSkincareCause').value.trim();
+    const treatment = document.getElementById('fieldSkincareTreatment').value.trim();
+    if (!treatment) { toast('請輸入塗抹藥膏或保養對策'); return; }
+    const notes = document.getElementById('fieldSkincareNotes').value.trim();
+
+    state.skincare = Array.isArray(state.skincare) ? state.skincare : [];
+    if (editingSkincareId) {
+      const r = state.skincare.find(x => x.id === editingSkincareId);
+      if (r) {
+        Object.assign(r, { date, area, stage, severity, cause, treatment, notes });
+        toast('已更新保養紀錄');
+      }
+    } else {
+      state.skincare.unshift({
+        id: uid(), date, area, stage, severity, cause, treatment, notes, createdAt: Date.now()
+      });
+      toast('已新增保養紀錄');
+    }
+    saveState();
+    renderSkincareSection();
+    forceCloseModal({ skipPersist: true });
+  });
+
+  document.getElementById('btnDeleteSkincare')?.addEventListener('click', () => {
+    if (!editingSkincareId) return;
+    if (confirm('確定要刪除這筆保養紀錄嗎？')) {
+      state.skincare = (state.skincare || []).filter(x => x.id !== editingSkincareId);
+      saveState();
+      renderSkincareSection();
+      forceCloseModal({ skipPersist: true });
+      toast('已刪除保養紀錄');
     }
   });
 

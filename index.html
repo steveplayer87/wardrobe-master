@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261002c">
+<link rel="stylesheet" href="styles.css?v=20261011">
 </head>
 <body>
 
@@ -300,6 +300,26 @@
         </div>
         <div class="haircut-cycle-summary" id="haircutCycleSummary"></div>
         <div class="haircut-gallery-grid" id="haircutGalleryGrid"></div>
+      </div>
+
+      <hr class="more-section-divider">
+
+      <!-- 臉部保養拯救單元 -->
+      <div class="more-section-block" id="skincareBlock">
+        <div class="more-section-header">
+          <div>
+            <p class="section-title" style="display:inline-flex;align-items:center;gap:6px;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-denim);"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              臉部保養拯救單元
+            </p>
+            <p class="section-intro">紀錄長痘膚況、藥膏備忘與急救追蹤</p>
+          </div>
+          <button type="button" class="btn-primary-sm" id="btnOpenAddSkincare">
+            <span class="btn-icon" data-icon="plus"></span><span>新增紀錄</span>
+          </button>
+        </div>
+        <div class="skincare-summary-row" id="skincareSummaryRow"></div>
+        <div class="skincare-list" id="skincareList"></div>
       </div>
 
       <hr class="more-section-divider">
@@ -1016,6 +1036,74 @@
     </form>
   </div>
 
+  <!-- Skincare / Acne Modal -->
+  <div class="modal-sheet modal-sheet-tall" id="modal-skincare" data-modal>
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <h2 id="skincareModalTitle" style="display:inline-flex;align-items:center;gap:6px;">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-denim);"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        保養與長痘紀錄
+      </h2>
+      <button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <form class="form" id="skincareForm">
+      <label class="field">紀錄日期
+        <input type="date" id="fieldSkincareDate" required>
+      </label>
+
+      <div class="field">
+        <span>長痘或不適部位</span>
+        <div class="skincare-chip-group" id="groupSkincareArea">
+          <button type="button" class="skincare-chip is-active" data-val="下巴">下巴</button>
+          <button type="button" class="skincare-chip" data-val="額頭">額頭</button>
+          <button type="button" class="skincare-chip" data-val="左臉頰">左臉頰</button>
+          <button type="button" class="skincare-chip" data-val="右臉頰">右臉頰</button>
+          <button type="button" class="skincare-chip" data-val="鼻翼">鼻翼</button>
+          <button type="button" class="skincare-chip" data-val="嘴周">嘴周</button>
+          <button type="button" class="skincare-chip" data-val="其他">其他</button>
+        </div>
+        <input type="hidden" id="fieldSkincareArea" value="下巴">
+      </div>
+
+      <div class="field">
+        <span>當前病程階段</span>
+        <div class="skincare-chip-group" id="groupSkincareStage">
+          <button type="button" class="skincare-chip is-active" data-val="剛冒出發紅">剛冒出發紅</button>
+          <button type="button" class="skincare-chip" data-val="紅腫痛/白頭">紅腫痛/白頭</button>
+          <button type="button" class="skincare-chip" data-val="結痂修復中">結痂修復中</button>
+          <button type="button" class="skincare-chip" data-val="已消退/防留疤">已消退/防留疤</button>
+        </div>
+        <input type="hidden" id="fieldSkincareStage" value="剛冒出發紅">
+      </div>
+
+      <div class="field-row">
+        <label class="field">嚴重程度
+          <select id="fieldSkincareSeverity">
+            <option value="mild">輕微（小紅點 / 閉鎖粉刺）</option>
+            <option value="moderate" selected>中度（發炎紅腫 / 有痛感）</option>
+            <option value="severe">重度（大囊腫 / 多顆聚集）</option>
+          </select>
+        </label>
+        <label class="field">推測成因
+          <input type="text" id="fieldSkincareCause" placeholder="例如：熬夜、辛辣、刮鬍刺激、安全帽帶">
+        </label>
+      </div>
+
+      <label class="field">拯救對策與塗抹藥膏／保養品
+        <input type="text" id="fieldSkincareTreatment" placeholder="例如：杜鵑花酸、思麗安、理膚寶水B5、痘痘貼、停止酸類" required>
+      </label>
+
+      <label class="field">備忘筆記與改善紀錄
+        <textarea id="fieldSkincareNotes" rows="3" placeholder="例如：早晚薄擦、切勿用手擠壓、多喝水早點睡…"></textarea>
+      </label>
+
+      <button type="submit" class="btn-primary" id="btnSkincareSubmit">儲存保養紀錄</button>
+      <div class="settings-actions is-hidden" id="skincareExtraActions">
+        <button type="button" class="btn-secondary btn-danger" id="btnDeleteSkincare">刪除這筆紀錄</button>
+      </div>
+    </form>
+  </div>
+
   <!-- Stain Log Modal -->
   <div class="modal-sheet" id="modal-stain" data-modal>
     <div class="modal-handle"></div>
@@ -1301,7 +1389,7 @@
   <img class="photo-viewer-img" id="photoViewerImg" alt="">
 </div>
 
-<script src="seed-items.js?v=20261002c"></script>
-<script src="app.js?v=20261002c"></script>
+<script src="seed-items.js?v=20261011"></script>
+<script src="app.js?v=20261011"></script>
 </body>
 </html>
