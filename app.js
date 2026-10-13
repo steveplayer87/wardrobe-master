@@ -5840,7 +5840,7 @@ function wireEvents() {
       outfitScaleSaveTimer = setTimeout(() => saveState(), 320);
     });
   }
-  document.getElementById('btnOpenOutfitEditor').addEventListener('click', openOutfitStudio);
+  document.getElementById('btnOpenOutfitEditor')?.addEventListener('click', openOutfitStudio);
   wireOutfitStudioEvents();
   document.getElementById('btnCloseOutfitEditor').addEventListener('click', closeModal);
   document.getElementById('outfitScaleSlider').addEventListener('input', e => {
@@ -6719,16 +6719,17 @@ function wireEvents() {
   document.querySelectorAll('.threshold-picker-btn').forEach(btn => {
     btn.addEventListener('click', () => openNumberGridPicker(btn));
   });
-  document.getElementById('btnMoreThresholds').addEventListener('click', () => {
-    document.getElementById('moreThresholdsWrap').classList.toggle('is-hidden');
+  document.getElementById('btnMoreThresholds')?.addEventListener('click', () => {
+    document.getElementById('moreThresholdsWrap')?.classList.toggle('is-hidden');
     saveSettingsDraft();
   });
   ['settingName'].forEach(id => {
     const el = document.getElementById(id);
+    if (!el) return;
     el.addEventListener('input', saveSettingsDraft);
     el.addEventListener('change', saveSettingsDraft);
   });
-  document.getElementById('cardImageScale').addEventListener('input', e => { state.profile.cardImageScale = Number(e.target.value); renderCardImageScale(); saveState(); renderWardrobe(); });
+  document.getElementById('cardImageScale')?.addEventListener('input', e => { state.profile.cardImageScale = Number(e.target.value); renderCardImageScale(); saveState(); renderWardrobe(); });
   document.getElementById('avatarInput').addEventListener('change', async e => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -8049,33 +8050,41 @@ function wireDisplaySimulations() {
    INIT
    ============================================================ */
 async function init() {
-  await loadStateAsync();
-  applyStaticIcons();
-  wireEvents();
-  wirePhotoAdjust();
-  wireDisplaySimulations();
-  renderCategoryChips();
-  ensureNewDay();
-  historySnapshot = cloneState(state);
-  historyReady = true;
-  activateView('home');
-  renderAll();
-  updateHistoryControls();
-  refreshWeather(false);
-  setInterval(() => { ensureNewDay(); renderAll(); }, 5 * 60 * 1000);
+  const dismissSplash = () => {
+    const splash = document.getElementById('splashScreen');
+    if (splash) {
+      setTimeout(() => {
+        splash.classList.add('splash-fade-out');
+        setTimeout(() => splash.remove(), 400);
+      }, 350);
+    }
+  };
 
-  window.addEventListener('pagehide', () => persistStateToDB());
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') persistStateToDB();
-  });
+  try {
+    await loadStateAsync();
+    applyStaticIcons();
+    wireEvents();
+    wirePhotoAdjust();
+    wireDisplaySimulations();
+    renderCategoryChips();
+    ensureNewDay();
+    historySnapshot = cloneState(state);
+    historyReady = true;
+    activateView('home');
+    renderAll();
+    updateHistoryControls();
+    refreshWeather(false);
+    setInterval(() => { ensureNewDay(); renderAll(); }, 5 * 60 * 1000);
 
-  // small minimum splash time so it reads as an intentional launch moment
-  // rather than an imperceptible flash, then fade it out and drop it from the DOM
-  const splash = document.getElementById('splashScreen');
-  setTimeout(() => {
-    splash.classList.add('splash-fade-out');
-    setTimeout(() => splash.remove(), 400);
-  }, 350);
+    window.addEventListener('pagehide', () => persistStateToDB());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') persistStateToDB();
+    });
+  } catch (err) {
+    console.error('App init error:', err);
+  } finally {
+    dismissSplash();
+  }
 
   // Viewport scroll lock for iOS PWA standalone mode
   if (window.navigator && window.navigator.standalone) {
@@ -8137,7 +8146,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261013').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261013c').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
