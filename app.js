@@ -8196,6 +8196,9 @@ async function init() {
   }, 350);
 
   // Viewport scroll lock for iOS PWA standalone mode
+  if (window.navigator && window.navigator.standalone) {
+    document.documentElement.classList.add('is-standalone');
+  }
   function lockViewportScroll() {
     window.scrollTo(0, 0);
     document.body.scrollTop = 0;
@@ -8252,7 +8255,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261002c').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261013').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
