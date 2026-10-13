@@ -1477,52 +1477,86 @@ function cleanTransparentImage(imgUrl, callback) {
       const imgData = ctx.getImageData(0, 0, w, h);
       const data = imgData.data;
 
-      const cornerIndices = [0, (w - 1) * 4, (w * (h - 1)) * 4, (w * h - 1) * 4];
-      let whiteCorners = 0;
-      let transCorners = 0;
-      for (const idx of cornerIndices) {
-        if (data[idx + 3] < 20) transCorners++;
-        else if (data[idx] >= 230 && data[idx + 1] >= 230 && data[idx + 2] >= 230) whiteCorners++;
-      }
-
-      let modified = false;
-      if (!(transCorners === 4 || (transCorners > 0 && whiteCorners === 0))) {
-        const visited = new Uint8Array(w * h);
-        const queue = new Int32Array(w * h);
-        let qHead = 0, qTail = 0;
-        const isWhite = (idx) => {
-          if (data[idx + 3] < 20) return true;
-          return data[idx] >= 230 && data[idx + 1] >= 230 && data[idx + 2] >= 230;
-        };
-        for (let x = 0; x < w; x++) {
-          let p = x;
-          if (isWhite(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-          p = (h - 1) * w + x;
-          if (isWhite(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-        }
-        for (let y = 0; y < h; y++) {
-          let p = y * w;
-          if (!visited[p] && isWhite(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-          p = y * w + (w - 1);
-          if (!visited[p] && isWhite(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-        }
-        while (qHead < qTail) {
-          const p = queue[qHead++];
-          const x = p % w;
-          const y = (p / w) | 0;
-          if (x > 0 && !visited[p - 1] && isWhite((p - 1) * 4)) { visited[p - 1] = 1; queue[qTail++] = p - 1; }
-          if (x < w - 1 && !visited[p + 1] && isWhite((p + 1) * 4)) { visited[p + 1] = 1; queue[qTail++] = p + 1; }
-          if (y > 0 && !visited[p - w] && isWhite((p - w) * 4)) { visited[p - w] = 1; queue[qTail++] = p - w; }
-          if (y < h - 1 && !visited[p + w] && isWhite((p + w) * 4)) { visited[p + w] = 1; queue[qTail++] = p + w; }
-        }
-        for (let i = 0; i < w * h; i++) {
-          if (visited[i]) {
-            if (data[i * 4 + 3] !== 0) { data[i * 4 + 3] = 0; modified = true; }
+      // Sample border pixels to detect studio background color
+      const cornerCoords = [
+        [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1],
+        [Math.floor(w / 2), 0], [Math.floor(w / 2), h - 1],
+        [0, Math.floor(h / 2)], [w - 1, Math.floor(h / 2)]
+      ];
+      let bgRSum = 0, bgGSum = 0, bgBSum = 0, bgSamples = 0;
+      for (const [cx, cy] of cornerCoords) {
+        const idx = (cy * w + cx) * 4;
+        const a = data[idx + 3];
+        if (a >= 25) {
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+          const maxC = Math.max(r, g, b);
+          const minC = Math.min(r, g, b);
+          if (minC >= 180 && (maxC - minC) <= 30) {
+            bgRSum += r;
+            bgGSum += g;
+            bgBSum += b;
+            bgSamples++;
           }
         }
-        if (modified) {
-          ctx.putImageData(imgData, 0, 0);
+      }
+
+      const hasBgColor = bgSamples >= 2;
+      const avgBgR = hasBgColor ? (bgRSum / bgSamples) : 255;
+      const avgBgG = hasBgColor ? (bgGSum / bgSamples) : 255;
+      const avgBgB = hasBgColor ? (bgBSum / bgSamples) : 255;
+
+      let modified = false;
+      const isBackgroundPixel = (idx) => {
+        const a = data[idx + 3];
+        if (a < 25) return true;
+        const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+        if (r >= 225 && g >= 225 && b >= 225) return true;
+        const maxC = Math.max(r, g, b);
+        const minC = Math.min(r, g, b);
+        if (minC >= 190 && (maxC - minC) <= 24) return true;
+        if (hasBgColor) {
+          const dr = r - avgBgR, dg = g - avgBgG, db = b - avgBgB;
+          if ((dr * dr + dg * dg + db * db) <= 1800) return true;
         }
+        return false;
+      };
+
+      // Perform flood fill from borders
+      const visited = new Uint8Array(w * h);
+      const queue = new Int32Array(w * h);
+      let qHead = 0, qTail = 0;
+
+      for (let x = 0; x < w; x++) {
+        let p = x;
+        if (isBackgroundPixel(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
+        p = (h - 1) * w + x;
+        if (isBackgroundPixel(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
+      }
+      for (let y = 0; y < h; y++) {
+        let p = y * w;
+        if (!visited[p] && isBackgroundPixel(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
+        p = y * w + (w - 1);
+        if (!visited[p] && isBackgroundPixel(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
+      }
+      while (qHead < qTail) {
+        const p = queue[qHead++];
+        const x = p % w;
+        const y = (p / w) | 0;
+        if (x > 0 && !visited[p - 1] && isBackgroundPixel((p - 1) * 4)) { visited[p - 1] = 1; queue[qTail++] = p - 1; }
+        if (x < w - 1 && !visited[p + 1] && isBackgroundPixel((p + 1) * 4)) { visited[p + 1] = 1; queue[qTail++] = p + 1; }
+        if (y > 0 && !visited[p - w] && isBackgroundPixel((p - w) * 4)) { visited[p - w] = 1; queue[qTail++] = p - w; }
+        if (y < h - 1 && !visited[p + w] && isBackgroundPixel((p + w) * 4)) { visited[p + w] = 1; queue[qTail++] = p + w; }
+      }
+      for (let i = 0; i < w * h; i++) {
+        if (visited[i]) {
+          if (data[i * 4 + 3] !== 0) {
+            data[i * 4 + 3] = 0;
+            modified = true;
+          }
+        }
+      }
+      if (modified) {
+        ctx.putImageData(imgData, 0, 0);
       }
 
       // Auto-crop / trim transparent borders so cutout clothes have no empty margins
@@ -2575,7 +2609,7 @@ function renderMonthGrid(grid, y, m) {
         const cleanImg = transparentCleanCache.get(item.image) || item.image;
         const pos = className.includes('cal-thumb-bottom') ? 'center top' : 'center bottom';
         const style = cleanImg ? `background-image:url('${cleanImg}');background-repeat:no-repeat;background-position:${pos};background-size:contain;background-color:transparent;` : 'background-color:transparent;';
-        return `<span class="cal-thumb ${className}" style="${style}">${cleanImg ? '' : categoryIcon(item.category)}</span>`;
+        return `<span class="cal-thumb ${className}" data-item-id="${item.id}" style="${style}">${cleanImg ? '' : categoryIcon(item.category)}</span>`;
       }).join('')}</span>`;
     }
     let dotsHtml = '';
@@ -2590,6 +2624,36 @@ function renderMonthGrid(grid, y, m) {
       dotsHtml += `<span class="cal-event-dot cal-dot-skincare" title="膚況紀錄"></span>`;
     }
     cell.innerHTML = `<span class="cal-num">${d}</span>${dotsHtml}${thumbsHtml}`;
+
+    if (dayEntries && dayEntries.length) {
+      const bottomItem = dayEntries[0].bottom ? findItem(dayEntries[0].bottom) : null;
+      const isShorts = isShortsItem(bottomItem);
+      const thumbItems = [
+        { item: dayEntries[0].top ? findItem(dayEntries[0].top) : null, className: 'cal-thumb-top' },
+        { item: bottomItem, className: isShorts ? 'cal-thumb-bottom is-shorts' : 'cal-thumb-bottom' },
+      ].filter(({ item }) => item);
+      thumbItems.forEach(({ item, className }) => {
+        if (item && item.image && !transparentCleanCache.has(item.image)) {
+          cleanTransparentImage(item.image, (cleanUrl, changed) => {
+            if (changed) {
+              item.image = cleanUrl;
+              saveState();
+            }
+            const thumbEl = cell.querySelector(`.cal-thumb[data-item-id="${item.id}"]`);
+            if (thumbEl) {
+              const pos = className.includes('cal-thumb-bottom') ? 'center top' : 'center bottom';
+              thumbEl.style.backgroundImage = `url('${cleanUrl}')`;
+              thumbEl.style.backgroundPosition = pos;
+              thumbEl.style.backgroundRepeat = 'no-repeat';
+              thumbEl.style.backgroundSize = 'contain';
+              thumbEl.style.backgroundColor = 'transparent';
+              thumbEl.innerHTML = '';
+            }
+          });
+        }
+      });
+    }
+
     cell.addEventListener('click', () => openDayDetail(dateStr, dayEntries && dayEntries.length ? dayEntries[0] : null));
     grid.appendChild(cell);
   }
@@ -2752,6 +2816,12 @@ function openDayDetail(dateStr, entry) {
   const shoesItem = entry.shoes ? findItem(entry.shoes) : null;
   const hasOutfit = Boolean(topItem || bottomItem || hatItem || shoesItem || ALL_SLOTS.some(s => entry[s]));
 
+  const getClean = (it) => it && it.image ? (transparentCleanCache.get(it.image) || it.image) : '';
+  const hatImg = getClean(hatItem);
+  const topImg = getClean(topItem);
+  const bottomImg = getClean(bottomItem);
+  const shoesImg = getClean(shoesItem);
+
   let figurePreviewHtml = '';
   if (topItem || bottomItem || hatItem || shoesItem) {
     const isShorts = isShortsItem(bottomItem);
@@ -2761,10 +2831,10 @@ function openDayDetail(dateStr, entry) {
     figurePreviewHtml = `
       <div class="day-detail-figure-preview" style="display:flex;justify-content:center;margin-bottom:14px;">
         <div class="figure-board" style="width:min(144px, 42%);padding:10px 8px;background:rgba(44,66,112,0.06);border:1px solid rgba(44,66,112,0.12);border-radius:22px;display:flex;flex-direction:column;align-items:center;gap:0;">
-          ${hatItem ? `<div class="figure-slot figure-hat" style="width:82%;aspect-ratio:2.2;background:transparent;"><span class="figure-thumb" style="aspect-ratio:2.2;background-image:url('${hatItem.image || ''}');background-repeat:no-repeat;background-position:center;background-size:contain;display:flex;align-items:center;justify-content:center;">${hatItem.image ? '' : categoryIcon('hat')}</span></div>` : ''}
-          ${topItem ? `<div class="figure-slot figure-top" style="width:100%;aspect-ratio:1.08;margin-bottom:${topMarginBottom};z-index:2;position:relative;background:transparent;"><span class="figure-thumb" style="aspect-ratio:1.08;background-image:url('${topItem.image || ''}');background-repeat:no-repeat;background-position:center bottom;background-size:contain;display:flex;align-items:center;justify-content:center;">${topItem.image ? '' : categoryIcon('top')}</span></div>` : ''}
-          ${bottomItem ? `<div class="figure-slot figure-bottom ${isShorts ? 'is-shorts' : ''}" style="width:${bottomW};aspect-ratio:${bottomRatio};margin-top:0;z-index:1;position:relative;background:transparent;"><span class="figure-thumb" style="aspect-ratio:${bottomRatio};background-image:url('${bottomItem.image || ''}');background-repeat:no-repeat;background-position:center top;background-size:contain;display:flex;align-items:center;justify-content:center;">${bottomItem.image ? '' : categoryIcon('bottom')}</span></div>` : ''}
-          ${shoesItem ? `<div class="figure-slot figure-shoes" style="width:96%;aspect-ratio:2.2;margin-top:2px;background:transparent;"><span class="figure-thumb" style="aspect-ratio:2.2;background-image:url('${shoesItem.image || ''}');background-repeat:no-repeat;background-position:center;background-size:contain;display:flex;align-items:center;justify-content:center;">${shoesItem.image ? '' : categoryIcon('shoes')}</span></div>` : ''}
+          ${hatItem ? `<div class="figure-slot figure-hat" style="width:82%;aspect-ratio:2.2;background:transparent;"><span class="figure-thumb" style="aspect-ratio:2.2;background-image:url('${hatImg}');background-repeat:no-repeat;background-position:center;background-size:contain;background-color:transparent;display:flex;align-items:center;justify-content:center;">${hatImg ? '' : categoryIcon('hat')}</span></div>` : ''}
+          ${topItem ? `<div class="figure-slot figure-top" style="width:100%;aspect-ratio:1.08;margin-bottom:${topMarginBottom};z-index:2;position:relative;background:transparent;"><span class="figure-thumb" style="aspect-ratio:1.08;background-image:url('${topImg}');background-repeat:no-repeat;background-position:center bottom;background-size:contain;background-color:transparent;display:flex;align-items:center;justify-content:center;">${topImg ? '' : categoryIcon('top')}</span></div>` : ''}
+          ${bottomItem ? `<div class="figure-slot figure-bottom ${isShorts ? 'is-shorts' : ''}" style="width:${bottomW};aspect-ratio:${bottomRatio};margin-top:0;z-index:1;position:relative;background:transparent;"><span class="figure-thumb" style="aspect-ratio:${bottomRatio};background-image:url('${bottomImg}');background-repeat:no-repeat;background-position:center top;background-size:contain;background-color:transparent;display:flex;align-items:center;justify-content:center;">${bottomImg ? '' : categoryIcon('bottom')}</span></div>` : ''}
+          ${shoesItem ? `<div class="figure-slot figure-shoes" style="width:96%;aspect-ratio:2.2;margin-top:2px;background:transparent;"><span class="figure-thumb" style="aspect-ratio:2.2;background-image:url('${shoesImg}');background-repeat:no-repeat;background-position:center;background-size:contain;background-color:transparent;display:flex;align-items:center;justify-content:center;">${shoesImg ? '' : categoryIcon('shoes')}</span></div>` : ''}
         </div>
       </div>`;
   }
@@ -2772,7 +2842,8 @@ function openDayDetail(dateStr, entry) {
   const rows = ALL_SLOTS.filter(s => entry[s]).map(s => {
     const item = findItem(entry[s]);
     if (!item) return `<div class="day-detail-row"><p class="ddr-name">（已刪除的衣物）</p></div>`;
-    const thumb = item.image ? `<img class="ddr-thumb" src="${item.image}" alt="">` : `<span class="ddr-thumb">${categoryIcon(item.category)}</span>`;
+    const cleanThumb = getClean(item);
+    const thumb = cleanThumb ? `<img class="ddr-thumb" src="${cleanThumb}" alt="" style="background:transparent!important;">` : `<span class="ddr-thumb">${categoryIcon(item.category)}</span>`;
     return `<button type="button" class="day-detail-row" data-item-id="${item.id}">${thumb}
       <div><p class="ddr-cat">${categoryLabel(item.category)}</p><p class="ddr-name">${escapeHtml(item.name)}</p></div></button>`;
   });
@@ -2826,6 +2897,26 @@ function openDayDetail(dateStr, entry) {
     <div class="day-detail-skincare-list">${skincareListHtml}</div>`;
 
   body.innerHTML = outfitContentHtml + skincareSectionHtml;
+
+  [hatItem, topItem, bottomItem, shoesItem].forEach(it => {
+    if (it && it.image && !transparentCleanCache.has(it.image)) {
+      cleanTransparentImage(it.image, (cleanUrl, changed) => {
+        if (changed) {
+          it.image = cleanUrl;
+          saveState();
+        }
+        const previewSlot = body.querySelector(`.figure-slot.figure-${it.category} .figure-thumb`);
+        if (previewSlot) {
+          previewSlot.style.backgroundImage = `url('${cleanUrl}')`;
+          previewSlot.innerHTML = '';
+        }
+        const rowImg = body.querySelector(`.day-detail-row[data-item-id="${it.id}"] .ddr-thumb`);
+        if (rowImg && rowImg.tagName === 'IMG') {
+          rowImg.src = cleanUrl;
+        }
+      });
+    }
+  });
 
   body.querySelectorAll('.day-detail-row[data-item-id]').forEach(row => {
     row.addEventListener('click', () => openItemDetail(row.dataset.itemId));
@@ -8076,6 +8167,25 @@ async function init() {
     refreshWeather(false);
     setInterval(() => { ensureNewDay(); renderAll(); }, 5 * 60 * 1000);
 
+    setTimeout(() => {
+      if (state.items && state.items.length) {
+        let delay = 0;
+        state.items.forEach(it => {
+          if (it.image && !transparentCleanCache.has(it.image)) {
+            setTimeout(() => {
+              cleanTransparentImage(it.image, (cleanUrl, changed) => {
+                if (changed) {
+                  it.image = cleanUrl;
+                  saveState();
+                }
+              });
+            }, delay);
+            delay += 80;
+          }
+        });
+      }
+    }, 600);
+
     window.addEventListener('pagehide', () => persistStateToDB());
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') persistStateToDB();
@@ -8146,7 +8256,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261013c').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261013d').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
