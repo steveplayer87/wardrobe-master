@@ -92,6 +92,7 @@ const COLOR_FAMILIES = [
   { id: 'orange', name: '橘色', hex: '#EA580C' },
   { id: 'brown', name: '棕色', hex: '#78350F' },
   { id: 'beige', name: '米/杏色', hex: '#F5EBE0' },
+  { id: 'multicolor', name: '多色', hex: 'linear-gradient(135deg, #FF595E 0%, #FFCA3A 33%, #8AC926 66%, #1982C4 100%)' },
 ];
 
 const TEN_COLORS = [
@@ -104,7 +105,8 @@ const TEN_COLORS = [
   { name: '黑', hex: '#18181B' },
   { name: '白', hex: '#FFFFFF' },
   { name: '粉紅', hex: '#EC4899' },
-  { name: '灰牛仔', hex: '#5C6B73' }
+  { name: '灰牛仔', hex: '#5C6B73' },
+  { name: '多色', hex: 'linear-gradient(135deg, #FF595E 0%, #FFCA3A 33%, #8AC926 66%, #1982C4 100%)' }
 ];
 
 function getColorHexByName(name) {
@@ -263,7 +265,11 @@ function categoryLabel(id) {
   const c = state.customCategories.find(x => x.id === id);
   return c ? c.label : id;
 }
-function categoryIcon(id) { return ICONS[id] || ICONS.custom; }
+function categoryIcon(id) {
+  if (id === 'all') return ICONS.layers || ICONS.custom;
+  if (id === 'retired') return ICONS.retired || ICONS.custom;
+  return ICONS[id] || ICONS.custom;
+}
 function isShortsItem(item) {
   if (!item || item.category !== 'bottom') return false;
   const tags = Array.isArray(item.tags) ? item.tags : [];
@@ -2143,7 +2149,9 @@ function renderHome() {
   const rack = state.items.filter(i => i.status === 'resting');
   const basket = state.items.filter(i => i.status === 'dirty');
   const pendingConsumables = getPendingLaundryConsumables();
-  renderChipList('tempRackList', 'tempRackEmpty', rack, { pinActiveTowel: false });
+  const towel = state.consumables.find(c => c.id === state.activeTowel) || state.consumables.find(c => isTowelId(c.id));
+  const towelDays = towel ? daysUsed(towel) : 0;
+  renderChipList('tempRackList', 'tempRackEmpty', rack, { pinActiveTowel: true });
   renderChipList('basketList', 'basketEmpty', basket, { pendingConsumables, isLaundry: true });
   const daysSinceWash = Math.max(0, daysBetween(state.laundry.lastWashDate, todayStr()));
   const totalBasketCount = basket.length + pendingConsumables.length;
@@ -2155,7 +2163,7 @@ function renderHome() {
   }
   const rackCount = rack.length;
   const rackTitle = document.getElementById('rackTitle') || document.querySelector('#card-rack .rack-title');
-  if (rackTitle) rackTitle.textContent = '暫存衣架';
+  if (rackTitle) rackTitle.textContent = `暫存衣架・浴巾 ${towelDays} 天`;
   const rackBadge = document.getElementById('rackBadge');
   if (rackBadge) {
     rackBadge.textContent = rackCount > 0 ? String(rackCount) : '';
@@ -2227,10 +2235,27 @@ function openRackOverview() {
   grid.innerHTML = '';
   empty.hidden = items.length !== 0;
 
+  const towel = state.consumables.find(c => c.id === state.activeTowel) || state.consumables.find(c => isTowelId(c.id));
+  const towelDays = towel ? daysUsed(towel) : 0;
+  const titleEl = document.querySelector('#modal-rack-overview .modal-head h2');
+  if (titleEl) titleEl.textContent = `暫存衣架・浴巾 ${towelDays} 天`;
+
   const pinnedWrap = document.getElementById('rackOverviewPinnedTowel');
   if (pinnedWrap) {
     pinnedWrap.innerHTML = '';
-    pinnedWrap.hidden = true;
+    if (towel) {
+      pinnedWrap.hidden = false;
+      const chip = document.createElement('div');
+      chip.className = 'rack-pinned-towel-card';
+      chip.style.cssText = 'margin:12px 16px 4px;padding:12px 14px;border-radius:14px;background:var(--card-bg, #fff);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;gap:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.04);';
+      const towelImg = consumableImage(towel);
+      const thumbHtml = towelImg ? `<img src="${towelImg}" alt="" style="width:38px;height:38px;object-fit:cover;border-radius:10px;">` : `<span style="width:38px;height:38px;border-radius:10px;background:var(--subtle-bg,#f1f5f9);display:flex;align-items:center;justify-content:center;">${ICONS[towel.icon] || ''}</span>`;
+      chip.innerHTML = `${thumbHtml}<div style="flex:1"><div style="font-weight:600;font-size:14px;color:var(--text-main,#0f172a);">${escapeHtml(towel.name)}</div><div style="font-size:12px;color:var(--text-muted,#64748b);">浴巾已使用 ${daysUsed(towel)} 天・置頂使用中</div></div>`;
+      chip.addEventListener('click', () => openConsumableDetail(towel.id));
+      pinnedWrap.appendChild(chip);
+    } else {
+      pinnedWrap.hidden = true;
+    }
   }
 
   items.forEach(item => grid.appendChild(buildItemCard(item, { rackMode: true, returnTo: 'modal-rack-overview' })));
@@ -2275,6 +2300,7 @@ function itemMatchesSearch(item, q) {
 
 function renderCategoryChips() {
   const row = document.getElementById('categoryChips');
+  if (!row) return;
   row.innerHTML = '';
   const defs = [{ id: 'all', label: '全部' }]
     .concat(allCategoryIds().map(id => ({ id, label: categoryLabel(id) })))
@@ -2283,14 +2309,15 @@ function renderCategoryChips() {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'chip' + (uiWardrobeCat === d.id ? ' is-active' : '');
-    chip.textContent = d.label;
+    const iconSvg = categoryIcon(d.id);
+    chip.innerHTML = (iconSvg ? `<span class="chip-icon">${iconSvg}</span>` : '') + `<span>${escapeHtml(d.label)}</span>`;
     chip.addEventListener('click', () => { uiWardrobeCat = d.id; renderCategoryChips(); renderWardrobe(); });
     row.appendChild(chip);
   });
   const addChip = document.createElement('button');
   addChip.type = 'button';
   addChip.className = 'chip chip-add';
-  addChip.textContent = '+ 新增分類';
+  addChip.innerHTML = `<span class="chip-icon">${ICONS.plus || '+'}</span><span>新增分類</span>`;
   addChip.addEventListener('click', () => openModal('modal-category'));
   row.appendChild(addChip);
 }
@@ -2558,9 +2585,12 @@ function renderMonthGrid(grid, y, m) {
       const towelRight = laundryDays.has(dateStr) ? (extraWashDays.has(dateStr) ? '24px' : '14px') : '';
       dotsHtml += `<span class="cal-event-dot cal-dot-towel" style="${towelRight ? `right:${towelRight}` : ''}"></span>`;
     }
+    const hasSkincare = (state.skincare || []).some(s => s.date === dateStr);
+    if (hasSkincare) {
+      dotsHtml += `<span class="cal-event-dot cal-dot-skincare" title="膚況紀錄"></span>`;
+    }
     cell.innerHTML = `<span class="cal-num">${d}</span>${dotsHtml}${thumbsHtml}`;
-    if (dayEntries && dayEntries.length) cell.addEventListener('click', () => openDayDetail(dateStr, dayEntries[0]));
-    else cell.addEventListener('click', () => openBackfillModal(dateStr));
+    cell.addEventListener('click', () => openDayDetail(dateStr, dayEntries && dayEntries.length ? dayEntries[0] : null));
     grid.appendChild(cell);
   }
 }
@@ -2712,13 +2742,15 @@ function renderRank() {
 }
 
 function openDayDetail(dateStr, entry) {
-  document.getElementById('dayDetailTitle').textContent = `${formatDayWithWeekday(dateStr)} 的穿搭`;
+  document.getElementById('dayDetailTitle').textContent = `${formatDayWithWeekday(dateStr)} 的紀錄`;
   const body = document.getElementById('dayDetailBody');
   const isToday = dateStr === todayStr();
+  entry = entry || {};
   const topItem = entry.top ? findItem(entry.top) : null;
   const bottomItem = entry.bottom ? findItem(entry.bottom) : null;
   const hatItem = entry.hat ? findItem(entry.hat) : null;
   const shoesItem = entry.shoes ? findItem(entry.shoes) : null;
+  const hasOutfit = Boolean(topItem || bottomItem || hatItem || shoesItem || ALL_SLOTS.some(s => entry[s]));
 
   let figurePreviewHtml = '';
   if (topItem || bottomItem || hatItem || shoesItem) {
@@ -2744,14 +2776,62 @@ function openDayDetail(dateStr, entry) {
     return `<button type="button" class="day-detail-row" data-item-id="${item.id}">${thumb}
       <div><p class="ddr-cat">${categoryLabel(item.category)}</p><p class="ddr-name">${escapeHtml(item.name)}</p></div></button>`;
   });
-  body.innerHTML = figurePreviewHtml + (rows.join('') || `<p class="empty-hint">這天沒有穿搭紀錄</p>`) + `
-    <div class="settings-actions" style="margin-top:14px">
-      <button class="btn-secondary" id="btnDayEdit">編輯這天</button>
-      ${isToday ? '' : '<button class="btn-secondary btn-danger" id="btnDayDelete">刪除這天</button>'}
-    </div>`;
+
+  let outfitContentHtml = '';
+  if (hasOutfit) {
+    outfitContentHtml = figurePreviewHtml + rows.join('') + `
+      <div class="settings-actions" style="margin-top:14px">
+        <button class="btn-secondary" id="btnDayEdit">編輯這天穿搭</button>
+        ${isToday ? '' : '<button class="btn-secondary btn-danger" id="btnDayDelete">刪除這天穿搭</button>'}
+      </div>`;
+  } else {
+    outfitContentHtml = `
+      <p class="empty-hint" style="margin:8px 0 14px;">這天尚無穿搭紀錄</p>
+      <div style="display:flex;justify-content:center;margin-bottom:14px;">
+        <button type="button" class="btn-secondary" id="btnDayAddOutfit" style="font-size:13px;padding:6px 16px;">+ 補登穿搭</button>
+      </div>`;
+  }
+
+  const daySkincareRecords = (state.skincare || []).filter(x => x.date === dateStr);
+  let skincareListHtml = '';
+  if (daySkincareRecords.length) {
+    skincareListHtml = daySkincareRecords.map(r => {
+      const stageClass = r.stage === '發炎化膿' ? 'stage-inflamed' : (r.stage === '修復結痂' ? 'stage-healing' : '');
+      const sevClass = `sev-${r.severity || 'moderate'}`;
+      const sevLabel = r.severity === 'mild' ? '輕度' : (r.severity === 'severe' ? '嚴重' : '中度');
+      return `
+        <div class="skincare-card" data-skincare-id="${r.id}" style="margin-bottom:10px;cursor:pointer;">
+          <div class="skincare-card-head">
+            <div class="skincare-card-area">
+              <strong>${escapeHtml(r.area || '臉部')}</strong>
+              <span class="skincare-badge ${stageClass}">${escapeHtml(r.stage || '觀察中')}</span>
+              <span class="skincare-badge ${sevClass}">${sevLabel}</span>
+            </div>
+          </div>
+          <div class="skincare-card-detail"><strong>對策與藥膏：</strong>${escapeHtml(r.treatment || '無')}</div>
+          ${r.cause ? `<div class="skincare-card-detail"><strong>推測成因：</strong>${escapeHtml(r.cause)}</div>` : ''}
+          ${r.notes ? `<div class="skincare-card-notes">${escapeHtml(r.notes)}</div>` : ''}
+        </div>`;
+    }).join('');
+  } else {
+    skincareListHtml = `<p class="empty-hint" style="margin:8px 0 14px;">這天尚無臉部膚況紀錄</p>`;
+  }
+
+  const skincareSectionHtml = `
+    <div class="day-detail-divider" style="margin:24px 0 18px;border-top:1px solid var(--border,#e2e8f0);"></div>
+    <div class="day-detail-skincare-head" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <h3 style="font-size:15px;font-weight:700;margin:0;">臉部膚況紀錄</h3>
+      <button type="button" class="btn-secondary" id="btnDayAddSkincare" style="font-size:13px;padding:5px 12px;">+ 新增紀錄</button>
+    </div>
+    <div class="day-detail-skincare-list">${skincareListHtml}</div>`;
+
+  body.innerHTML = outfitContentHtml + skincareSectionHtml;
+
   body.querySelectorAll('.day-detail-row[data-item-id]').forEach(row => {
     row.addEventListener('click', () => openItemDetail(row.dataset.itemId));
   });
+  const addOutfitBtn = document.getElementById('btnDayAddOutfit');
+  if (addOutfitBtn) addOutfitBtn.addEventListener('click', () => openBackfillModal(dateStr));
   const editBtn = document.getElementById('btnDayEdit');
   if (editBtn) editBtn.addEventListener('click', () => openBackfillModal(dateStr));
   const delBtn = document.getElementById('btnDayDelete');
@@ -2771,6 +2851,13 @@ function openDayDetail(dateStr, entry) {
       } },
     ]);
   });
+
+  const addSkincareBtn = document.getElementById('btnDayAddSkincare');
+  if (addSkincareBtn) addSkincareBtn.addEventListener('click', () => openSkincareModal(null, dateStr));
+  body.querySelectorAll('.skincare-card[data-skincare-id]').forEach(card => {
+    card.addEventListener('click', () => openSkincareModal(card.dataset.skincareId));
+  });
+
   openModal('modal-day');
 }
 
@@ -2962,7 +3049,7 @@ function renderSkincareSection() {
   });
 }
 
-function openSkincareModal(editId = null) {
+function openSkincareModal(editId = null, defaultDate = null) {
   editingSkincareId = editId;
   const form = document.getElementById('skincareForm');
   if (!form) return;
@@ -2993,7 +3080,7 @@ function openSkincareModal(editId = null) {
     if (title) title.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-denim);"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> 保養與長痘紀錄`;
     if (submitBtn) submitBtn.textContent = '儲存保養紀錄';
     if (extraActions) extraActions.classList.add('is-hidden');
-    document.getElementById('fieldSkincareDate').value = todayStr();
+    document.getElementById('fieldSkincareDate').value = defaultDate || todayStr();
     document.getElementById('fieldSkincareSeverity').value = 'moderate';
   }
 
@@ -4046,27 +4133,22 @@ function autoSaveAddItemDraft() {
   saveState();
 }
 function readSettingsDraft() {
-  const readPicker = id => {
-    const el = document.getElementById(id);
-    if (!el) return null;
-    const v = el.dataset.value;
-    return v === 'none' ? null : Number(v);
-  };
   if (!document.getElementById('settingName')) return;
   state.profile.name = document.getElementById('settingName').value.trim();
-  const keyInput = document.getElementById('settingGeminiApiKey');
-  if (keyInput) {
-    state.geminiApiKey = keyInput.value.trim();
-    if (state.geminiApiKey) localStorage.setItem('gemini_api_key', state.geminiApiKey);
-  }
-  state.profile.washThresholds = {
-    bottom: readPicker('pickThresholdBottom'),
-    outer: readPicker('pickThresholdOuter'),
-    shoes: readPicker('pickThresholdShoes'),
-    hat: readPicker('pickThresholdHat'),
-    accessory: readPicker('pickThresholdAccessory'),
+  const readVal = (id, fallback) => {
+    const el = document.getElementById(id);
+    if (!el) return fallback;
+    const n = parseInt(el.textContent, 10);
+    return isNaN(n) ? fallback : n;
   };
-  const towelDays = readPicker('pickThresholdTowel');
+  state.profile.washThresholds = {
+    bottom: readVal('valThresholdBottom', state.profile.washThresholds?.bottom ?? 3),
+    outer: readVal('valThresholdOuter', state.profile.washThresholds?.outer ?? 5),
+    shoes: readVal('valThresholdShoes', state.profile.washThresholds?.shoes ?? 8),
+    hat: readVal('valThresholdHat', state.profile.washThresholds?.hat ?? 8),
+    accessory: readVal('valThresholdAccessory', state.profile.washThresholds?.accessory ?? 8),
+  };
+  const towelDays = readVal('valThresholdTowel', 7);
   state.consumables.forEach(c => { if (isTowelId(c.id)) c.cycleDays = towelDays; });
 }
 function saveSettingsDraft() {
@@ -4163,7 +4245,7 @@ function renderColorForm() {
     btn.setAttribute('data-color', c.name);
     btn.setAttribute('data-hex', c.hex);
     btn.title = c.name;
-    btn.style.backgroundColor = c.hex;
+    btn.style.background = c.hex;
     btn.addEventListener('click', () => {
       if (pendingColor.hex === c.hex || pendingColor.name === c.name) {
         pendingColor = { hex: '', name: '', family: '' };
@@ -5736,31 +5818,10 @@ function wireEvents() {
 
   document.getElementById('btnNotifications').addEventListener('click', () => { renderNotifications(); openModal('modal-notif'); });
   document.getElementById('mainScroll').addEventListener('scroll', syncHomeRackExpansion, { passive: true });
-  function setPickerBtn(id, value) {
-    const el = document.getElementById(id);
-    if (value === null) { el.textContent = '無'; el.dataset.value = 'none'; }
-    else { el.textContent = String(value); el.dataset.value = String(value); }
-  }
   document.getElementById('btnSettings').addEventListener('click', () => {
     document.getElementById('settingName').value = state.profile.name || '';
-    const keyEl = document.getElementById('settingGeminiApiKey');
-    if (keyEl) keyEl.value = state.geminiApiKey || '';
-    setPickerBtn('pickThresholdBottom', state.profile.washThresholds.bottom);
-    setPickerBtn('pickThresholdOuter', state.profile.washThresholds.outer);
-    setPickerBtn('pickThresholdShoes', state.profile.washThresholds.shoes);
-    setPickerBtn('pickThresholdHat', state.profile.washThresholds.hat);
-    setPickerBtn('pickThresholdAccessory', state.profile.washThresholds.accessory);
-    const towel = state.consumables.find(c => isTowelId(c.id));
-    setPickerBtn('pickThresholdTowel', towel ? towel.cycleDays : 7);
-    document.getElementById('moreThresholdsWrap').classList.add('is-hidden');
+    syncThresholdCardsUI();
     renderAvatar();
-    const boardScaleSlider = document.getElementById('figureBoardScaleSlider');
-    const boardScaleVal = document.getElementById('figureBoardScaleValue');
-    if (boardScaleSlider) {
-      const curVal = state.profile.figureBoardScale || 100;
-      boardScaleSlider.value = String(curVal);
-      if (boardScaleVal) boardScaleVal.textContent = `${curVal}%`;
-    }
     renderCardImageScale();
     syncWeatherSettings();
     document.getElementById('weatherSearchResults').innerHTML = '';
@@ -6522,6 +6583,7 @@ function wireEvents() {
 
   // skincare tracker events
   document.getElementById('btnOpenAddSkincare')?.addEventListener('click', () => openSkincareModal());
+  document.getElementById('btnCalAddSkincare')?.addEventListener('click', () => openSkincareModal(null, todayStr()));
 
   document.querySelectorAll('#groupSkincareArea .skincare-chip').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -6567,6 +6629,7 @@ function wireEvents() {
     }
     saveState();
     renderSkincareSection();
+    renderHistory();
     forceCloseModal({ skipPersist: true });
   });
 
@@ -6576,6 +6639,7 @@ function wireEvents() {
       state.skincare = (state.skincare || []).filter(x => x.id !== editingSkincareId);
       saveState();
       renderSkincareSection();
+      renderHistory();
       forceCloseModal({ skipPersist: true });
       toast('已刪除保養紀錄');
     }
@@ -6860,20 +6924,7 @@ function wireEvents() {
 
   document.getElementById('settingsForm').addEventListener('submit', e => {
     e.preventDefault();
-    const readPicker = id => {
-      const v = document.getElementById(id).dataset.value;
-      return v === 'none' ? null : Number(v);
-    };
-    state.profile.name = document.getElementById('settingName').value.trim();
-    state.profile.washThresholds = {
-      bottom: readPicker('pickThresholdBottom'),
-      outer: readPicker('pickThresholdOuter'),
-      shoes: readPicker('pickThresholdShoes'),
-      hat: readPicker('pickThresholdHat'),
-      accessory: readPicker('pickThresholdAccessory'),
-    };
-    const towelDays = readPicker('pickThresholdTowel');
-    state.consumables.forEach(c => { if (isTowelId(c.id)) c.cycleDays = towelDays; });
+    readSettingsDraft();
     saveSettingsDraft();
     renderAll();
     renderAvatar();
@@ -7810,358 +7861,189 @@ function addCustomImageToSandbox(base64) {
 }
 
 /* ============================================================
-   GEMINI AI STUDIO & PHOTO RETOUCH
+   SETTINGS DISPLAY SIMULATIONS & THRESHOLD STEPPERS
    ============================================================ */
-let aiOriginalPhoto = null;
-let aiProcessedPhoto = null;
 
-function studioCutoutCanvas(dataUrl) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
+function syncThresholdCardsUI() {
+  const t = state.profile.washThresholds || {};
+  const setCardVal = (id, val, unit = '次') => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = `${val} ${unit}`;
+  };
+  setCardVal('valThresholdBottom', t.bottom ?? 3, '次');
+  setCardVal('valThresholdOuter', t.outer ?? 5, '次');
+  setCardVal('valThresholdShoes', t.shoes ?? 8, '次');
+  setCardVal('valThresholdHat', t.hat ?? 8, '次');
+  setCardVal('valThresholdAccessory', t.accessory ?? 8, '次');
+  const towel = state.consumables.find(c => isTowelId(c.id));
+  setCardVal('valThresholdTowel', towel ? towel.cycleDays : 7, '天');
+}
 
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imgData.data;
-        const w = canvas.width;
-        const h = canvas.height;
-
-        const samplePoints = [
-          [4, 4], [w - 5, 4], [4, h - 5], [w - 5, h - 5],
-          [Math.floor(w / 2), 4], [Math.floor(w / 2), h - 5],
-          [4, Math.floor(h / 2)], [w - 5, Math.floor(h / 2)],
-        ];
-        let bgR = 0, bgG = 0, bgB = 0;
-        samplePoints.forEach(([x, y]) => {
-          const idx = (y * w + x) * 4;
-          bgR += data[idx];
-          bgG += data[idx + 1];
-          bgB += data[idx + 2];
-        });
-        bgR /= samplePoints.length;
-        bgG /= samplePoints.length;
-        bgB /= samplePoints.length;
-
-        const tolerance = 46;
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i], g = data[i + 1], b = data[i + 2];
-          const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
-          if (dist < tolerance) {
-            data[i + 3] = 0;
-          } else if (dist < tolerance + 18) {
-            const ratio = (dist - tolerance) / 18;
-            data[i + 3] = Math.round(data[i + 3] * ratio);
-          }
-        }
-        ctx.putImageData(imgData, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      } catch (err) {
-        reject(err);
+function wireThresholdSteppers() {
+  document.querySelectorAll('.tc-step-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      const key = btn.dataset.key;
+      const isPlus = btn.classList.contains('tc-plus');
+      const step = isPlus ? 1 : -1;
+      if (key === 'towel') {
+        const towel = state.consumables.find(c => isTowelId(c.id));
+        let cur = towel ? (towel.cycleDays || 7) : 7;
+        cur = Math.min(30, Math.max(1, cur + step));
+        state.consumables.forEach(c => { if (isTowelId(c.id)) c.cycleDays = cur; });
+      } else {
+        state.profile.washThresholds = state.profile.washThresholds || {};
+        let cur = state.profile.washThresholds[key] ?? 3;
+        cur = Math.min(30, Math.max(1, cur + step));
+        state.profile.washThresholds[key] = cur;
       }
-    };
-    img.onerror = reject;
-    img.src = dataUrl;
+      syncThresholdCardsUI();
+      saveSettingsDraft();
+    });
   });
 }
 
-function enhanceLightingCanvas(dataUrl) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
+function applyGlobalDisplayStyles() {
+  const opacity = typeof state.profile.figureGlassOpacity === 'number' ? state.profile.figureGlassOpacity : 85;
+  document.documentElement.style.setProperty('--figure-glass-opacity', (opacity / 100).toFixed(2));
+  document.documentElement.style.setProperty('--card-img-scale', `${state.profile.cardImageScale || 72}%`);
+  const figureScale = state.profile.figureBoardScale || 100;
+  document.documentElement.style.setProperty('--figure-board-scale', (figureScale / 100).toFixed(2));
+}
 
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imgData.data;
+function openDisplayFigureSim() {
+  const weatherLabel = document.getElementById('simWeatherLabel');
+  if (weatherLabel) {
+    const w = state.profile.weather;
+    const city = w?.city || '台北';
+    const temp = w?.current?.temp !== undefined ? `${w.current.temp}°` : '26°';
+    const text = w?.current?.text || '晴時多雲';
+    weatherLabel.textContent = `${city} · ${text} ${temp}`;
+  }
 
-        for (let i = 0; i < data.length; i += 4) {
-          let r = data[i], g = data[i + 1], b = data[i + 2];
-
-          // Lift shadow
-          if (r < 110) r = Math.min(255, r * 1.15);
-          if (g < 110) g = Math.min(255, g * 1.15);
-          if (b < 110) b = Math.min(255, b * 1.15);
-
-          // Contrast curve
-          r = ((r - 128) * 1.10) + 128;
-          g = ((g - 128) * 1.10) + 128;
-          b = ((b - 128) * 1.10) + 128;
-
-          // Saturation
-          const avg = (r + g + b) / 3;
-          r = avg + (r - avg) * 1.14;
-          g = avg + (g - avg) * 1.14;
-          b = avg + (b - avg) * 1.14;
-
-          data[i] = Math.max(0, Math.min(255, Math.round(r)));
-          data[i + 1] = Math.max(0, Math.min(255, Math.round(g)));
-          data[i + 2] = Math.max(0, Math.min(255, Math.round(b)));
-        }
-        ctx.putImageData(imgData, 0, 0);
-        resolve(canvas.toDataURL('image/jpeg', 0.88));
-      } catch (err) {
-        reject(err);
+  const slots = ['hat', 'top', 'bottom', 'shoes'];
+  slots.forEach(slot => {
+    const el = document.getElementById(`simSlot${slot.charAt(0).toUpperCase() + slot.slice(1)}`);
+    if (!el) return;
+    const itemId = state.today[slot];
+    const item = itemId ? findItem(itemId) : null;
+    const thumb = el.querySelector('.figure-thumb');
+    if (thumb) {
+      if (item && item.image) {
+        thumb.style.backgroundImage = `url('${item.image}')`;
+        thumb.style.backgroundRepeat = 'no-repeat';
+        thumb.style.backgroundPosition = slot === 'bottom' ? 'center top' : (slot === 'top' ? 'center bottom' : 'center');
+        thumb.style.backgroundSize = 'contain';
+        thumb.innerHTML = '';
+      } else {
+        thumb.style.backgroundImage = '';
+        thumb.innerHTML = categoryIcon(slot);
       }
-    };
-    img.onerror = reject;
-    img.src = dataUrl;
+    }
   });
+
+  const scaleSlider = document.getElementById('sliderFigureBoardScale');
+  const scaleVal = document.getElementById('valFigureBoardScale');
+  const opacitySlider = document.getElementById('sliderFigureGlassOpacity');
+  const opacityVal = document.getElementById('valFigureGlassOpacity');
+  const simBoard = document.getElementById('simFigureBoard');
+
+  const curScale = state.profile.figureBoardScale || 100;
+  const curOpacity = state.profile.figureGlassOpacity !== undefined ? state.profile.figureGlassOpacity : 85;
+
+  if (scaleSlider) scaleSlider.value = String(curScale);
+  if (scaleVal) scaleVal.textContent = `${curScale}%`;
+  if (opacitySlider) opacitySlider.value = String(curOpacity);
+  if (opacityVal) opacityVal.textContent = `${curOpacity}%`;
+
+  if (simBoard) {
+    simBoard.style.transform = `scale(${(curScale / 100).toFixed(2)})`;
+    simBoard.style.transformOrigin = 'center top';
+  }
+
+  openModal('modal-display-figure');
 }
 
-async function callGeminiVision(dataUrl, apiKey) {
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  if (!match) throw new Error('圖片格式無效');
-  const mimeType = match[1];
-  const base64Data = match[2];
-
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
-  let lastErr = null;
-
-  for (const model of models) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inline_data: { mime_type: mimeType, data: base64Data } },
-              {
-                text: '你是一個專業的衣物分析師。請分析這張衣物照片，並只輸出 JSON 格式（嚴格不要包含 markdown 標籤或程式碼區塊符號，不要輸出其他文字）：\n' +
-                      '{\n' +
-                      '  "name": "適當且生活化的繁體中文品名，例如：純白重磅短袖T恤、深藍微破直筒牛仔褲",\n' +
-                      '  "category": "必須是以下六種之一：top、bottom、outer、shoes、hat、accessory",\n' +
-                      '  "material": "衣服材質標籤，例如：純棉、棉麻、牛仔丹寧、羊毛、聚酯纖維、防風機能布",\n' +
-                      '  "tags": ["2至4個標籤，例如：休閒, 重磅, 寬版, 短"],\n' +
-                      '  "brand": "若有可清楚辨識的品牌LOGO請填寫（例如 UNIQLO、Nike、GU、ZARA），若無請填空字串",\n' +
-                      '  "length": "若為上衣或褲子請填長或短，若非則填空字串"\n' +
-                      '}'
-              }
-            ]
-          }]
-        })
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Gemini API 回應錯誤 (${res.status}): ${errText}`);
-      }
-      const data = await res.json();
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      return JSON.parse(cleanJson);
-    } catch (e) {
-      lastErr = e;
-    }
+function openDisplayCardSim() {
+  const stage = document.getElementById('displaySimCardStage');
+  if (stage) {
+    stage.innerHTML = '';
+    const sampleItems = (state.items && state.items.length) ? state.items.slice(0, 2) : [
+      { id: 'sim1', name: '經典丹寧外套', category: 'outer', brand: 'LEVIS', image: '' },
+      { id: 'sim2', name: '重磅純棉短T', category: 'top', brand: 'UNIQLO', image: '' }
+    ];
+    sampleItems.forEach(item => {
+      stage.appendChild(buildItemCard(item, { readOnly: true }));
+    });
   }
-  throw lastErr;
+
+  const slider = document.getElementById('sliderCardImageScale');
+  const valOut = document.getElementById('valCardImageScale');
+  const curScale = state.profile.cardImageScale || 72;
+  if (slider) slider.value = String(curScale);
+  if (valOut) valOut.textContent = `${curScale}%`;
+
+  openModal('modal-display-card');
 }
 
-function wireGeminiAiStudio() {
-  const modalId = 'modal-gemini-ai';
-  const previewImg = document.getElementById('aiProcessedPreviewImg');
-  const loadingOverlay = document.getElementById('aiLoadingOverlay');
-  const loadingText = document.getElementById('aiLoadingText');
-  const keyBanner = document.getElementById('aiKeyBanner');
-  const inlineKeyInput = document.getElementById('inlineGeminiKey');
+function wireDisplaySimulations() {
+  wireThresholdSteppers();
+  applyGlobalDisplayStyles();
 
-  function openGeminiStudio() {
-    if (!pendingPhoto) {
-      toast('請先上傳衣物照片');
-      document.getElementById('photoInput').click();
-      return;
-    }
-    aiOriginalPhoto = pendingPhoto;
-    aiProcessedPhoto = pendingPhoto;
-    previewImg.src = aiProcessedPhoto;
-    document.getElementById('btnShowProcessed').classList.add('is-active');
-    document.getElementById('btnShowOriginal').classList.remove('is-active');
-    if (!state.geminiApiKey) {
-      keyBanner.classList.remove('is-hidden');
-    } else {
-      keyBanner.classList.add('is-hidden');
-    }
-    modalReturnTo = 'modal-add';
-    openModal(modalId);
-  }
+  document.getElementById('btnOpenDisplayFigure')?.addEventListener('click', openDisplayFigureSim);
+  document.getElementById('btnOpenDisplayCard')?.addEventListener('click', openDisplayCardSim);
+  document.getElementById('btnOpenWeatherSettings')?.addEventListener('click', () => openModal('modal-weather-settings'));
 
-  const openBtn = document.getElementById('btnOpenAiRetouch');
-  if (openBtn) openBtn.addEventListener('click', openGeminiStudio);
-
-  const quickCutoutBtn = document.getElementById('btnQuickStudioCutout');
-  if (quickCutoutBtn) {
-    quickCutoutBtn.addEventListener('click', async () => {
-      if (!pendingPhoto) {
-        toast('請先上傳衣物照片');
-        document.getElementById('photoInput').click();
-        return;
+  const scaleSlider = document.getElementById('sliderFigureBoardScale');
+  const scaleVal = document.getElementById('valFigureBoardScale');
+  const simBoard = document.getElementById('simFigureBoard');
+  if (scaleSlider) {
+    scaleSlider.addEventListener('input', e => {
+      const val = Math.min(140, Math.max(70, Number(e.target.value) || 100));
+      state.profile.figureBoardScale = val;
+      if (scaleVal) scaleVal.textContent = `${val}%`;
+      if (simBoard) {
+        simBoard.style.transform = `scale(${(val / 100).toFixed(2)})`;
+        simBoard.style.transformOrigin = 'center top';
       }
-      toast('正在進行白底棚拍處理…');
-      try {
-        const cutout = await studioCutoutCanvas(pendingPhoto);
-        pendingPhoto = cutout;
-        const wrap = document.getElementById('photoPreviewWrap');
-        wrap.setAttribute('style', `background-color:#fff;background-image:url('${pendingPhoto}')`);
-        wrap.classList.add('has-photo');
-        wrap.innerHTML = '';
-        autoSaveAddItemDraft();
-        formDirty = true;
-        toast('已完成白底棚拍');
-      } catch (e) {
-        toast('修圖失敗，請重試');
-      }
+      document.documentElement.style.setProperty('--figure-board-scale', (val / 100).toFixed(2));
+      clearTimeout(outfitScaleSaveTimer);
+      outfitScaleSaveTimer = setTimeout(() => saveState(), 320);
     });
   }
 
-  const saveKeyBtn = document.getElementById('btnSaveInlineKey');
-  if (saveKeyBtn) {
-    saveKeyBtn.addEventListener('click', () => {
-      const val = inlineKeyInput.value.trim();
-      if (val) {
-        state.geminiApiKey = val;
-        localStorage.setItem('gemini_api_key', val);
-        saveState();
-        keyBanner.classList.add('is-hidden');
-        toast('已儲存 Gemini API Key');
-      }
+  const opacitySlider = document.getElementById('sliderFigureGlassOpacity');
+  const opacityVal = document.getElementById('valFigureGlassOpacity');
+  if (opacitySlider) {
+    opacitySlider.addEventListener('input', e => {
+      const val = Math.min(100, Math.max(0, Number(e.target.value) || 85));
+      state.profile.figureGlassOpacity = val;
+      if (opacityVal) opacityVal.textContent = `${val}%`;
+      document.documentElement.style.setProperty('--figure-glass-opacity', (val / 100).toFixed(2));
+      clearTimeout(outfitScaleSaveTimer);
+      outfitScaleSaveTimer = setTimeout(() => saveState(), 320);
     });
   }
 
-  const toggleProcessed = document.getElementById('btnShowProcessed');
-  const toggleOriginal = document.getElementById('btnShowOriginal');
-  if (toggleProcessed && toggleOriginal) {
-    toggleProcessed.addEventListener('click', () => {
-      toggleProcessed.classList.add('is-active');
-      toggleOriginal.classList.remove('is-active');
-      previewImg.src = aiProcessedPhoto;
-    });
+  document.getElementById('btnOpenOutfitEditorFromSim')?.addEventListener('click', () => {
+    closeModal();
+    openOutfitStudio();
+  });
 
-    toggleOriginal.addEventListener('click', () => {
-      toggleOriginal.classList.add('is-active');
-      toggleProcessed.classList.remove('is-active');
-      previewImg.src = aiOriginalPhoto;
-    });
-  }
-
-  const studioCutoutBtn = document.getElementById('btnAiStudioCutout');
-  if (studioCutoutBtn) {
-    studioCutoutBtn.addEventListener('click', async () => {
-      loadingText.textContent = '智慧白底棚拍處理中…';
-      loadingOverlay.classList.remove('is-hidden');
-      try {
-        const result = await studioCutoutCanvas(aiOriginalPhoto);
-        aiProcessedPhoto = result;
-        previewImg.src = aiProcessedPhoto;
-        toggleProcessed.classList.add('is-active');
-        toggleOriginal.classList.remove('is-active');
-        toast('智慧白底棚拍完成');
-      } catch (err) {
-        toast('修圖處理失敗');
-      } finally {
-        loadingOverlay.classList.add('is-hidden');
-      }
-    });
-  }
-
-  const enhanceLightingBtn = document.getElementById('btnAiEnhanceLighting');
-  if (enhanceLightingBtn) {
-    enhanceLightingBtn.addEventListener('click', async () => {
-      loadingText.textContent = '光影與色彩校正中…';
-      loadingOverlay.classList.remove('is-hidden');
-      try {
-        const result = await enhanceLightingCanvas(aiProcessedPhoto || aiOriginalPhoto);
-        aiProcessedPhoto = result;
-        previewImg.src = aiProcessedPhoto;
-        toggleProcessed.classList.add('is-active');
-        toggleOriginal.classList.remove('is-active');
-        toast('光影與色彩已增強');
-      } catch (err) {
-        toast('處理失敗');
-      } finally {
-        loadingOverlay.classList.add('is-hidden');
-      }
-    });
-  }
-
-  const autoDetectBtn = document.getElementById('btnAiAutoDetect');
-  if (autoDetectBtn) {
-    autoDetectBtn.addEventListener('click', async () => {
-      if (!state.geminiApiKey) {
-        keyBanner.classList.remove('is-hidden');
-        inlineKeyInput.focus();
-        toast('請先填寫 Gemini API Key 才能使用自動辨識');
-        return;
-      }
-      loadingText.textContent = 'Gemini 正在分析衣物品名、分類與材質…';
-      loadingOverlay.classList.remove('is-hidden');
-      try {
-        const info = await callGeminiVision(aiOriginalPhoto, state.geminiApiKey);
-        if (info.name) document.getElementById('fieldName').value = info.name;
-        if (info.category && FIXED_CATEGORIES.includes(info.category)) {
-          pendingCategory = info.category;
-          renderCategoryPickerChips();
-          renderLengthToggle();
-        }
-        if (info.material) {
-          pendingMaterial = info.material;
-          document.getElementById('fieldMaterialCustom').value = pendingMaterial;
-          renderMaterialPickerChips();
-        }
-        if (Array.isArray(info.tags) && info.tags.length) {
-          pendingTags = Array.from(new Set(pendingTags.concat(info.tags.map(t => String(t).trim()))));
-          renderTagPickerChips();
-        }
-        if (info.length && (pendingCategory === 'top' || pendingCategory === 'bottom')) {
-          if (!pendingTags.includes(info.length)) {
-            pendingTags = pendingTags.filter(t => !LENGTH_TAGS.includes(t)).concat([info.length]);
-            renderLengthToggle();
-            renderTagPickerChips();
-          }
-        }
-        if (info.brand) {
-          document.getElementById('fieldBrand').value = info.brand;
-          syncBrandForm(info.brand, null);
-        }
-        formDirty = true;
-        autoSaveAddItemDraft();
-        toast(`Gemini 已辨識：${info.name || '已自動填入資料'}`);
-      } catch (err) {
-        toast('Gemini 辨識失敗，請檢查 API Key 或網路連線');
-      } finally {
-        loadingOverlay.classList.add('is-hidden');
-      }
-    });
-  }
-
-  const applyBtn = document.getElementById('btnApplyAiPhoto');
-  if (applyBtn) {
-    applyBtn.addEventListener('click', () => {
-      if (aiProcessedPhoto) {
-        pendingPhoto = aiProcessedPhoto;
-        const wrap = document.getElementById('photoPreviewWrap');
-        wrap.setAttribute('style', `background-color:#fff;background-image:url('${pendingPhoto}')`);
-        wrap.classList.add('has-photo');
-        wrap.innerHTML = '';
-        autoSaveAddItemDraft();
-        formDirty = true;
-        toast('已套用修圖照片');
-      }
-      closeModal();
+  const cardScaleSlider = document.getElementById('sliderCardImageScale');
+  const cardScaleVal = document.getElementById('valCardImageScale');
+  if (cardScaleSlider) {
+    cardScaleSlider.addEventListener('input', e => {
+      const val = Math.min(100, Math.max(45, Number(e.target.value) || 72));
+      state.profile.cardImageScale = val;
+      if (cardScaleVal) cardScaleVal.textContent = `${val}%`;
+      document.documentElement.style.setProperty('--card-img-scale', `${val}%`);
+      clearTimeout(outfitScaleSaveTimer);
+      outfitScaleSaveTimer = setTimeout(() => { saveState(); renderWardrobe(); }, 320);
     });
   }
 }
+
 
 /* ============================================================
    INIT
@@ -8171,7 +8053,7 @@ async function init() {
   applyStaticIcons();
   wireEvents();
   wirePhotoAdjust();
-  wireGeminiAiStudio();
+  wireDisplaySimulations();
   renderCategoryChips();
   ensureNewDay();
   historySnapshot = cloneState(state);

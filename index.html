@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261013">
+<link rel="stylesheet" href="styles.css?v=20261013b">
 </head>
 <body>
 
@@ -120,6 +120,7 @@
           <button class="cal-title" id="calTitle">—</button>
           <button class="cal-nav" id="calNext" aria-label="下個月">›</button>
           <button class="cal-jump-btn" id="calJumpBtn" aria-label="跳轉至指定日期"><span data-icon="jump"></span></button>
+          <button class="cal-jump-btn" id="btnCalAddSkincare" aria-label="新增臉部膚況紀錄" title="新增臉部膚況紀錄"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
         </div>
         <div class="cal-weekdays">
           <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
@@ -425,17 +426,6 @@
       <div class="photo-back-hint-wrap" id="photoBackHintWrap" hidden>
         <p class="photo-back-hint" id="photoBackHint">已加入背面照片</p>
         <button type="button" class="photo-swap-btn" id="btnSwapPhotos">交換正反</button>
-      </div>
-      <div class="photo-tools-row" id="photoAiToolsRow">
-        <button type="button" class="btn-ai-magic" id="btnOpenAiRetouch">
-          <span class="icon-inline" data-icon="sparkles"></span>
-          <span>Gemini AI 智慧修圖</span>
-        </button>
-        <button type="button" class="btn-ai-secondary" id="btnQuickStudioCutout">
-          <span class="icon-inline" data-icon="wind"></span>
-          <span>白底棚拍</span>
-        </button>
-      </div>
       <button type="button" class="link-more-btn is-hidden" id="btnReadjustPhoto">重新調整照片裁切／縮放</button>
 
       <label class="field">名稱
@@ -631,67 +621,118 @@
         </div>
       </div>
 
+      <!-- 顯示與視覺設定專區 -->
       <div class="settings-section">
-        <div class="settings-label-row"><p class="field-label-standalone">衣櫥卡片圖片大小</p><output id="cardImageScaleValue">72%</output></div>
-        <input type="range" id="cardImageScale" min="45" max="100" value="72">
-        <p class="settings-helper">只調整圖片在卡片白色框內的佔比，不會改動原始照片。</p>
+        <p class="field-label-standalone" style="margin-bottom:4px;">顯示與版面設定</p>
+        <p class="settings-helper" style="margin-bottom:10px;">點選進入各項目的獨立全真模擬環境進行即時預覽調整。</p>
+        <div class="settings-display-grid">
+          <button type="button" class="settings-display-card-btn" id="btnOpenDisplayFigure">
+            <span class="sdb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></span>
+            <div class="sdb-info">
+              <span class="sdb-title">今日穿搭試穿區</span>
+              <span class="sdb-sub">毛玻璃透明度、試穿版面大小、物件排版</span>
+            </div>
+            <span class="sdb-arrow">›</span>
+          </button>
+
+          <button type="button" class="settings-display-card-btn" id="btnOpenWeatherSettings">
+            <span class="sdb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></span>
+            <div class="sdb-info">
+              <span class="sdb-title">天氣與景觀場景</span>
+              <span class="sdb-sub" id="settingsWeatherSummary">桃園市中壢區 · 晴天 26°</span>
+            </div>
+            <span class="sdb-arrow">›</span>
+          </button>
+
+          <button type="button" class="settings-display-card-btn" id="btnOpenDisplayCard">
+            <span class="sdb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M12 3.5v17"/></svg></span>
+            <div class="sdb-info">
+              <span class="sdb-title">衣櫥卡片圖片大小</span>
+              <span class="sdb-sub">目前縮放佔比：<strong id="cardImageScaleSummary">72%</strong></span>
+            </div>
+            <span class="sdb-arrow">›</span>
+          </button>
+        </div>
       </div>
 
-      <div class="settings-section outfit-layout-settings">
-        <div class="settings-label-row"><p class="field-label-standalone">今日穿搭版面</p><output id="figureBoardScaleValue">100%</output></div>
-        <input type="range" id="figureBoardScaleSlider" min="70" max="140" value="100">
-        <p class="settings-helper">調整主頁毛玻璃試穿區佔比大小。</p>
-        <button type="button" class="btn-secondary settings-wide-btn" id="btnOpenOutfitEditor" style="margin-top:8px"><span data-icon="edit"></span>調整試穿區衣物物件大小與位置</button>
-      </div>
-
+      <!-- 清洗週期設定：垂直堆疊卡片 (Stacked Cards) -->
       <div class="settings-section">
-        <div class="settings-label-row">
-          <p class="field-label-standalone">天氣與景觀設定</p>
-          <span class="settings-helper" id="settingsWeatherSummary">桃園市中壢區 · 晴天 26°</span>
-        </div>
-        <button type="button" class="btn-secondary settings-wide-btn" id="btnOpenWeatherSettings">
-          <span data-icon="cloud"></span>天氣設定
-        </button>
-        <p class="settings-helper" style="margin-top:6px;">自訂顯示地點、GPS 定位、切換不同日夜與氣候場景預覽。</p>
-      </div>
+        <p class="field-label-standalone" style="margin-bottom:4px;">清洗與更換週期</p>
+        <p class="settings-helper" style="margin-bottom:12px;">設定各類單品穿著或使用幾次／幾天後提醒洗滌。</p>
+        <div class="threshold-stacked-cards">
+          <div class="threshold-card" data-cat="bottom">
+            <div class="tc-left">
+              <span class="tc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12l1 6.5-1.8 11a1 1 0 0 1-1 .8h-2a1 1 0 0 1-1-.8L12 12l-1.2 9a1 1 0 0 1-1 .8H7.8a1 1 0 0 1-1-.8L5 10l1-6.5Z"/><path d="M6 7.5h12"/></svg></span>
+              <span class="tc-label">褲子</span>
+            </div>
+            <div class="tc-stepper">
+              <button type="button" class="tc-step-btn tc-minus" data-cat="bottom" aria-label="減少">−</button>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdBottom">3</strong> 次</span>
+              <button type="button" class="tc-step-btn tc-plus" data-cat="bottom" aria-label="增加">+</button>
+            </div>
+          </div>
 
-      <div class="threshold-row">
-        <p class="field-label-standalone">褲子幾次該洗？</p>
-        <button type="button" class="threshold-picker-btn" id="pickThresholdBottom" data-cat="bottom">3</button>
-      </div>
-      <div class="threshold-row">
-        <p class="field-label-standalone">外套幾次該洗？</p>
-        <button type="button" class="threshold-picker-btn" id="pickThresholdOuter" data-cat="outer">5</button>
-      </div>
-      <div class="threshold-row">
-        <p class="field-label-standalone">浴巾幾天該洗？</p>
-        <button type="button" class="threshold-picker-btn" id="pickThresholdTowel" data-cat="towel">7</button>
-      </div>
-      <button type="button" class="link-more-btn" id="btnMoreThresholds">⋯ 展開其他分類（鞋子／帽子／配件）</button>
-      <div class="is-hidden" id="moreThresholdsWrap">
-        <div class="threshold-row">
-          <p class="field-label-standalone">鞋子幾次該洗？</p>
-          <button type="button" class="threshold-picker-btn" id="pickThresholdShoes" data-cat="shoes">8</button>
-        </div>
-        <div class="threshold-row">
-          <p class="field-label-standalone">帽子幾次該洗？</p>
-          <button type="button" class="threshold-picker-btn" id="pickThresholdHat" data-cat="hat">8</button>
-        </div>
-        <div class="threshold-row">
-          <p class="field-label-standalone">配件幾次該洗？</p>
-          <button type="button" class="threshold-picker-btn" id="pickThresholdAccessory" data-cat="accessory">8</button>
-        </div>
-      </div>
-      <div class="settings-section">
-        <div class="settings-label-row">
-          <p class="field-label-standalone">Google Gemini API Key</p>
-          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="link-more-btn" style="padding:0">免費取得 Key</a>
-        </div>
-        <input type="password" id="settingGeminiApiKey" placeholder="貼上 AI Studio API Key（選填，保存在本地）" autocomplete="off">
-        <p class="settings-helper">設定後即可在新增單品時使用 Gemini 智慧修圖、去背棚拍與衣物自動辨識。</p>
-      </div>
+          <div class="threshold-card" data-cat="outer">
+            <div class="tc-left">
+              <span class="tc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 4.5 16 3a4 4 0 0 0-8 0L3.6 4.5A2 2 0 0 0 2 6.5V10c0 .6.4 1 1 1h2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9h2c.6 0 1-.4 1-1V6.5a2 2 0 0 0-1.6-2z"/><path d="M12 7v15"/><path d="M8 3v4.5l4 2.5 4-2.5V3"/></svg></span>
+              <span class="tc-label">外套</span>
+            </div>
+            <div class="tc-stepper">
+              <button type="button" class="tc-step-btn tc-minus" data-cat="outer" aria-label="減少">−</button>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdOuter">5</strong> 次</span>
+              <button type="button" class="tc-step-btn tc-plus" data-cat="outer" aria-label="增加">+</button>
+            </div>
+          </div>
 
-      <button type="submit" class="btn-primary">儲存設定</button>
+          <div class="threshold-card" data-cat="towel">
+            <div class="tc-left">
+              <span class="tc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 0 1 1 1V17H5V4.5a1 1 0 0 1 1-1Z"/><path d="M7 17v3M11 17v3.5M13 17v3M17 17v3"/></svg></span>
+              <span class="tc-label">浴巾</span>
+            </div>
+            <div class="tc-stepper">
+              <button type="button" class="tc-step-btn tc-minus" data-cat="towel" aria-label="減少">−</button>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdTowel">7</strong> 天</span>
+              <button type="button" class="tc-step-btn tc-plus" data-cat="towel" aria-label="增加">+</button>
+            </div>
+          </div>
+
+          <div class="threshold-card" data-cat="shoes">
+            <div class="tc-left">
+              <span class="tc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8c0-3.5 1.5-4.5 3-4.5s3 1 3 4.5c0 3-.8 6-.8 8.5 0 2.5-.7 3.5-2.2 3.5S5.8 19 5.8 16.5C5.8 14 5 11.5 5 8Z"/><path d="M5.2 8.5h5.6M5.1 11.5h5.8"/><path d="M13 8c0-3.5 1.5-4.5 3-4.5s3 1 3 4.5c0 3-.8 6-.8 8.5 0 2.5-.7 3.5-2.2 3.5s-2.2-1-2.2-3.5c0-2.5-.8-5-.8-8.5Z"/><path d="M13.2 8.5h5.6M13.1 11.5h5.8"/></svg></span>
+              <span class="tc-label">鞋子</span>
+            </div>
+            <div class="tc-stepper">
+              <button type="button" class="tc-step-btn tc-minus" data-cat="shoes" aria-label="減少">−</button>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdShoes">8</strong> 次</span>
+              <button type="button" class="tc-step-btn tc-plus" data-cat="shoes" aria-label="增加">+</button>
+            </div>
+          </div>
+
+          <div class="threshold-card" data-cat="hat">
+            <div class="tc-left">
+              <span class="tc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 15.5c0-4.5 3.3-8 7.5-8s7.5 3.5 7.5 8"/><path d="M2.5 15.5h19"/></svg></span>
+              <span class="tc-label">帽子</span>
+            </div>
+            <div class="tc-stepper">
+              <button type="button" class="tc-step-btn tc-minus" data-cat="hat" aria-label="減少">−</button>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdHat">8</strong> 次</span>
+              <button type="button" class="tc-step-btn tc-plus" data-cat="hat" aria-label="增加">+</button>
+            </div>
+          </div>
+
+          <div class="threshold-card" data-cat="accessory">
+            <div class="tc-left">
+              <span class="tc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M12 12v8.5M9.5 20.5h5"/></svg></span>
+              <span class="tc-label">配件</span>
+            </div>
+            <div class="tc-stepper">
+              <button type="button" class="tc-step-btn tc-minus" data-cat="accessory" aria-label="減少">−</button>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdAccessory">8</strong> 次</span>
+              <button type="button" class="tc-step-btn tc-plus" data-cat="accessory" aria-label="增加">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </form>
     <div class="settings-footer">
       <p class="settings-note">資料儲存在這台裝置的瀏覽器裡，換裝置或清除瀏覽器資料會遺失，建議定期匯出備份。</p>
@@ -1119,78 +1160,65 @@
     </form>
   </div>
 
-  <!-- Gemini AI Studio Modal -->
-  <div class="modal-sheet modal-sheet-tall" id="modal-gemini-ai" data-modal>
+  <!-- Display Simulation: Figure Board & Glass Opacity -->
+  <div class="modal-sheet modal-sheet-tall" id="modal-display-figure" data-modal>
     <div class="modal-handle"></div>
     <div class="modal-head">
-      <div class="modal-title-with-badge">
-        <h2>Gemini AI 影像工作室</h2>
-        <span class="ai-badge"><span class="icon-inline" data-icon="sparkles"></span> AI</span>
-      </div>
+      <h2>今日穿搭試穿區顯示</h2>
       <button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
-    <div class="ai-studio-body">
-      <div class="ai-preview-container" id="aiPreviewContainer">
-        <div class="ai-preview-card" id="aiPreviewCard">
-          <img id="aiProcessedPreviewImg" src="" alt="AI 修圖預覽">
-          <div class="ai-loading-overlay is-hidden" id="aiLoadingOverlay">
-            <div class="ai-spinner"></div>
-            <p id="aiLoadingText">Gemini 運算中…</p>
-          </div>
-        </div>
-        <div class="ai-view-toggle">
-          <button type="button" class="ai-toggle-btn is-active" id="btnShowProcessed">修圖後</button>
-          <button type="button" class="ai-toggle-btn" id="btnShowOriginal">原圖</button>
+    <div class="display-sim-stage-wrap">
+      <div class="display-sim-stage" id="displaySimFigureStage">
+        <div class="figure-board" id="simFigureBoard">
+          <div class="figure-slot figure-hat" id="simSlotHat"><span class="figure-thumb"></span></div>
+          <div class="figure-slot figure-top" id="simSlotTop"><span class="figure-thumb"></span></div>
+          <div class="figure-slot figure-bottom" id="simSlotBottom"><span class="figure-thumb"></span></div>
+          <div class="figure-slot figure-shoes" id="simSlotShoes"><span class="figure-thumb"></span></div>
         </div>
       </div>
-
-      <div class="ai-tools-grid">
-        <button type="button" class="ai-tool-card" id="btnAiStudioCutout">
-          <span class="ai-tool-icon" data-icon="sparkles"></span>
-          <div class="ai-tool-text">
-            <b>智慧白底棚拍</b>
-            <small>清除雜亂背景，平整純白並保留衣服邊緣</small>
-          </div>
-        </button>
-
-        <button type="button" class="ai-tool-card" id="btnAiAutoDetect">
-          <span class="ai-tool-icon" data-icon="wand"></span>
-          <div class="ai-tool-text">
-            <b>Gemini 辨識自動填寫</b>
-            <small>分析衣服外觀，自動填寫名稱、分類、材質與標籤</small>
-          </div>
-        </button>
-
-        <button type="button" class="ai-tool-card" id="btnAiEnhanceLighting">
-          <span class="ai-tool-icon" data-icon="wind"></span>
-          <div class="ai-tool-text">
-            <b>光影校正與色彩增強</b>
-            <small>消除色偏陰影，還原織物真實飽和度與立體感</small>
-          </div>
-        </button>
-      </div>
-
-      <!-- Key notice / quick input if not set -->
-      <div class="ai-key-banner is-hidden" id="aiKeyBanner">
-        <div class="ai-key-banner-head">
-          <span class="icon-inline" data-icon="sparkles"></span>
-          <span>設定 Gemini API Key 啟用深度視覺辨識</span>
+      <div class="display-sim-controls">
+        <div class="settings-label-row">
+          <label for="sliderFigureBoardScale">試穿區版面大小</label>
+          <output id="valFigureBoardScale">100%</output>
         </div>
-        <div class="ai-key-input-row">
-          <input type="password" id="inlineGeminiKey" placeholder="貼上 Gemini API Key">
-          <button type="button" class="btn-primary-sm" id="btnSaveInlineKey">儲存</button>
-        </div>
-        <div class="ai-key-banner-help">
-          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">免費領取 Google AI Studio Key</a>
-        </div>
-      </div>
+        <input type="range" id="sliderFigureBoardScale" min="70" max="140" value="100">
 
-      <div class="ai-action-buttons">
-        <button type="button" class="btn-primary" id="btnApplyAiPhoto">套用此修圖照片</button>
-        <button type="button" class="btn-secondary" id="btnDiscardAiPhoto" data-close>取消</button>
+        <div class="settings-label-row" style="margin-top:14px;">
+          <label for="sliderFigureGlassOpacity">毛玻璃底透明度</label>
+          <output id="valFigureGlassOpacity">85%</output>
+        </div>
+        <input type="range" id="sliderFigureGlassOpacity" min="0" max="100" value="85">
+
+        <button type="button" class="btn-secondary settings-wide-btn" id="btnOpenOutfitEditorFromSim" style="margin-top:14px;">
+          <span data-icon="edit"></span>微調試穿區衣物物件大小與位置
+        </button>
       </div>
     </div>
   </div>
+
+  <!-- Display Simulation: Wardrobe Card Image Scale -->
+  <div class="modal-sheet modal-sheet-tall" id="modal-display-card" data-modal>
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <h2>衣櫥卡片圖片大小</h2>
+      <button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="display-sim-stage-wrap">
+      <div class="display-sim-card-stage" id="displaySimCardStage">
+        <!-- Rendered sample wardrobe cards live -->
+      </div>
+      <div class="display-sim-controls">
+        <div class="settings-label-row">
+          <label for="sliderCardImageScale">卡片圖片佔比大小</label>
+          <output id="valCardImageScale">72%</output>
+        </div>
+        <input type="range" id="sliderCardImageScale" min="45" max="100" value="72">
+        <p class="settings-helper" style="margin-top:6px;">調整單品照片在卡片邊框內的顯示佔比，不會更動原始圖片。</p>
+      </div>
+    </div>
+  </div>
+
+
 
   <!-- Generic confirm (used by notification row taps) -->
   <div class="modal-sheet" id="modal-confirm" data-modal>
@@ -1389,7 +1417,7 @@
   <img class="photo-viewer-img" id="photoViewerImg" alt="">
 </div>
 
-<script src="seed-items.js?v=20261013"></script>
-<script src="app.js?v=20261013"></script>
+<script src="seed-items.js?v=20261013b"></script>
+<script src="app.js?v=20261013b"></script>
 </body>
 </html>
