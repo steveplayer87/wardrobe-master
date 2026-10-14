@@ -1451,162 +1451,7 @@ function itemPhotoStyle(item) {
 
 const transparentCleanCache = new Map();
 function cleanTransparentImage(imgUrl, callback) {
-  if (!imgUrl || typeof imgUrl !== 'string') {
-    if (callback) callback(imgUrl, false);
-    return;
-  }
-  if (transparentCleanCache.has(imgUrl)) {
-    if (callback) callback(transparentCleanCache.get(imgUrl), false);
-    return;
-  }
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.onload = () => {
-    try {
-      const w = img.naturalWidth || img.width;
-      const h = img.naturalHeight || img.height;
-      if (!w || !h) {
-        transparentCleanCache.set(imgUrl, imgUrl);
-        if (callback) callback(imgUrl, false);
-        return;
-      }
-      const cvs = document.createElement('canvas');
-      cvs.width = w; cvs.height = h;
-      const ctx = cvs.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      const imgData = ctx.getImageData(0, 0, w, h);
-      const data = imgData.data;
-
-      // Sample border pixels to detect studio background color
-      const cornerCoords = [
-        [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1],
-        [Math.floor(w / 2), 0], [Math.floor(w / 2), h - 1],
-        [0, Math.floor(h / 2)], [w - 1, Math.floor(h / 2)]
-      ];
-      let bgRSum = 0, bgGSum = 0, bgBSum = 0, bgSamples = 0;
-      for (const [cx, cy] of cornerCoords) {
-        const idx = (cy * w + cx) * 4;
-        const a = data[idx + 3];
-        if (a >= 25) {
-          const r = data[idx], g = data[idx + 1], b = data[idx + 2];
-          const maxC = Math.max(r, g, b);
-          const minC = Math.min(r, g, b);
-          if (minC >= 180 && (maxC - minC) <= 30) {
-            bgRSum += r;
-            bgGSum += g;
-            bgBSum += b;
-            bgSamples++;
-          }
-        }
-      }
-
-      const hasBgColor = bgSamples >= 2;
-      const avgBgR = hasBgColor ? (bgRSum / bgSamples) : 255;
-      const avgBgG = hasBgColor ? (bgGSum / bgSamples) : 255;
-      const avgBgB = hasBgColor ? (bgBSum / bgSamples) : 255;
-
-      let modified = false;
-      const isBackgroundPixel = (idx) => {
-        const a = data[idx + 3];
-        if (a < 25) return true;
-        const r = data[idx], g = data[idx + 1], b = data[idx + 2];
-        if (r >= 225 && g >= 225 && b >= 225) return true;
-        const maxC = Math.max(r, g, b);
-        const minC = Math.min(r, g, b);
-        if (minC >= 190 && (maxC - minC) <= 24) return true;
-        if (hasBgColor) {
-          const dr = r - avgBgR, dg = g - avgBgG, db = b - avgBgB;
-          if ((dr * dr + dg * dg + db * db) <= 1800) return true;
-        }
-        return false;
-      };
-
-      // Perform flood fill from borders
-      const visited = new Uint8Array(w * h);
-      const queue = new Int32Array(w * h);
-      let qHead = 0, qTail = 0;
-
-      for (let x = 0; x < w; x++) {
-        let p = x;
-        if (isBackgroundPixel(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-        p = (h - 1) * w + x;
-        if (isBackgroundPixel(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-      }
-      for (let y = 0; y < h; y++) {
-        let p = y * w;
-        if (!visited[p] && isBackgroundPixel(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-        p = y * w + (w - 1);
-        if (!visited[p] && isBackgroundPixel(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-      }
-      while (qHead < qTail) {
-        const p = queue[qHead++];
-        const x = p % w;
-        const y = (p / w) | 0;
-        if (x > 0 && !visited[p - 1] && isBackgroundPixel((p - 1) * 4)) { visited[p - 1] = 1; queue[qTail++] = p - 1; }
-        if (x < w - 1 && !visited[p + 1] && isBackgroundPixel((p + 1) * 4)) { visited[p + 1] = 1; queue[qTail++] = p + 1; }
-        if (y > 0 && !visited[p - w] && isBackgroundPixel((p - w) * 4)) { visited[p - w] = 1; queue[qTail++] = p - w; }
-        if (y < h - 1 && !visited[p + w] && isBackgroundPixel((p + w) * 4)) { visited[p + w] = 1; queue[qTail++] = p + w; }
-      }
-      for (let i = 0; i < w * h; i++) {
-        if (visited[i]) {
-          if (data[i * 4 + 3] !== 0) {
-            data[i * 4 + 3] = 0;
-            modified = true;
-          }
-        }
-      }
-      if (modified) {
-        ctx.putImageData(imgData, 0, 0);
-      }
-
-      // Auto-crop / trim transparent borders so cutout clothes have no empty margins
-      let minX = w, maxX = -1, minY = h, maxY = -1;
-      const latestData = ctx.getImageData(0, 0, w, h).data;
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          const a = latestData[(y * w + x) * 4 + 3];
-          if (a > 20) {
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-          }
-        }
-      }
-      if (maxX >= minX && maxY >= minY) {
-        const cropW = maxX - minX + 1;
-        const cropH = maxY - minY + 1;
-        if (minX > 3 || minY > 3 || maxX < w - 4 || maxY < h - 4) {
-          const trimCvs = document.createElement('canvas');
-          trimCvs.width = cropW;
-          trimCvs.height = cropH;
-          const trimCtx = trimCvs.getContext('2d');
-          trimCtx.drawImage(cvs, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
-          const cleanUrl = trimCvs.toDataURL('image/png');
-          transparentCleanCache.set(imgUrl, cleanUrl);
-          if (callback) callback(cleanUrl, true);
-          return;
-        }
-      }
-
-      if (modified) {
-        const cleanUrl = cvs.toDataURL('image/png');
-        transparentCleanCache.set(imgUrl, cleanUrl);
-        if (callback) callback(cleanUrl, true);
-      } else {
-        transparentCleanCache.set(imgUrl, imgUrl);
-        if (callback) callback(imgUrl, false);
-      }
-    } catch(e) {
-      transparentCleanCache.set(imgUrl, imgUrl);
-      if (callback) callback(imgUrl, false);
-    }
-  };
-  img.onerror = () => {
-    transparentCleanCache.set(imgUrl, imgUrl);
-    if (callback) callback(imgUrl, false);
-  };
-  img.src = imgUrl;
+  if (callback) callback(imgUrl, false);
 }
 
 const trimBoundsCache = new Map();
@@ -2100,16 +1945,6 @@ function renderHome() {
       thumb.innerHTML = thumbInner(item);
       btn.setAttribute('aria-label', item.name);
 
-      if (item.image) {
-        cleanTransparentImage(item.image, (cleanUrl, changed) => {
-          if (changed) {
-            item.image = cleanUrl;
-            saveState();
-          }
-          thumb.style.backgroundImage = `url('${cleanUrl}')`;
-          thumb.style.backgroundColor = 'transparent';
-        });
-      }
 
       if (item.image && (slot === 'top' || slot === 'bottom')) {
         getImageTrimBounds(item.image, bounds => {
@@ -2625,35 +2460,6 @@ function renderMonthGrid(grid, y, m) {
     }
     cell.innerHTML = `<span class="cal-num">${d}</span>${dotsHtml}${thumbsHtml}`;
 
-    if (dayEntries && dayEntries.length) {
-      const bottomItem = dayEntries[0].bottom ? findItem(dayEntries[0].bottom) : null;
-      const isShorts = isShortsItem(bottomItem);
-      const thumbItems = [
-        { item: dayEntries[0].top ? findItem(dayEntries[0].top) : null, className: 'cal-thumb-top' },
-        { item: bottomItem, className: isShorts ? 'cal-thumb-bottom is-shorts' : 'cal-thumb-bottom' },
-      ].filter(({ item }) => item);
-      thumbItems.forEach(({ item, className }) => {
-        if (item && item.image && !transparentCleanCache.has(item.image)) {
-          cleanTransparentImage(item.image, (cleanUrl, changed) => {
-            if (changed) {
-              item.image = cleanUrl;
-              saveState();
-            }
-            const thumbEl = cell.querySelector(`.cal-thumb[data-item-id="${item.id}"]`);
-            if (thumbEl) {
-              const pos = className.includes('cal-thumb-bottom') ? 'center top' : 'center bottom';
-              thumbEl.style.backgroundImage = `url('${cleanUrl}')`;
-              thumbEl.style.backgroundPosition = pos;
-              thumbEl.style.backgroundRepeat = 'no-repeat';
-              thumbEl.style.backgroundSize = 'contain';
-              thumbEl.style.backgroundColor = 'transparent';
-              thumbEl.innerHTML = '';
-            }
-          });
-        }
-      });
-    }
-
     cell.addEventListener('click', () => openDayDetail(dateStr, dayEntries && dayEntries.length ? dayEntries[0] : null));
     grid.appendChild(cell);
   }
@@ -2816,11 +2622,10 @@ function openDayDetail(dateStr, entry) {
   const shoesItem = entry.shoes ? findItem(entry.shoes) : null;
   const hasOutfit = Boolean(topItem || bottomItem || hatItem || shoesItem || ALL_SLOTS.some(s => entry[s]));
 
-  const getClean = (it) => it && it.image ? (transparentCleanCache.get(it.image) || it.image) : '';
-  const hatImg = getClean(hatItem);
-  const topImg = getClean(topItem);
-  const bottomImg = getClean(bottomItem);
-  const shoesImg = getClean(shoesItem);
+  const hatImg = hatItem?.image || '';
+  const topImg = topItem?.image || '';
+  const bottomImg = bottomItem?.image || '';
+  const shoesImg = shoesItem?.image || '';
 
   let figurePreviewHtml = '';
   if (topItem || bottomItem || hatItem || shoesItem) {
@@ -2842,8 +2647,7 @@ function openDayDetail(dateStr, entry) {
   const rows = ALL_SLOTS.filter(s => entry[s]).map(s => {
     const item = findItem(entry[s]);
     if (!item) return `<div class="day-detail-row"><p class="ddr-name">（已刪除的衣物）</p></div>`;
-    const cleanThumb = getClean(item);
-    const thumb = cleanThumb ? `<img class="ddr-thumb" src="${cleanThumb}" alt="" style="background:transparent!important;">` : `<span class="ddr-thumb">${categoryIcon(item.category)}</span>`;
+    const thumb = item.image ? `<img class="ddr-thumb" src="${item.image}" alt="" style="background:transparent!important;">` : `<span class="ddr-thumb">${categoryIcon(item.category)}</span>`;
     return `<button type="button" class="day-detail-row" data-item-id="${item.id}">${thumb}
       <div><p class="ddr-cat">${categoryLabel(item.category)}</p><p class="ddr-name">${escapeHtml(item.name)}</p></div></button>`;
   });
@@ -2897,26 +2701,6 @@ function openDayDetail(dateStr, entry) {
     <div class="day-detail-skincare-list">${skincareListHtml}</div>`;
 
   body.innerHTML = outfitContentHtml + skincareSectionHtml;
-
-  [hatItem, topItem, bottomItem, shoesItem].forEach(it => {
-    if (it && it.image && !transparentCleanCache.has(it.image)) {
-      cleanTransparentImage(it.image, (cleanUrl, changed) => {
-        if (changed) {
-          it.image = cleanUrl;
-          saveState();
-        }
-        const previewSlot = body.querySelector(`.figure-slot.figure-${it.category} .figure-thumb`);
-        if (previewSlot) {
-          previewSlot.style.backgroundImage = `url('${cleanUrl}')`;
-          previewSlot.innerHTML = '';
-        }
-        const rowImg = body.querySelector(`.day-detail-row[data-item-id="${it.id}"] .ddr-thumb`);
-        if (rowImg && rowImg.tagName === 'IMG') {
-          rowImg.src = cleanUrl;
-        }
-      });
-    }
-  });
 
   body.querySelectorAll('.day-detail-row[data-item-id]').forEach(row => {
     row.addEventListener('click', () => openItemDetail(row.dataset.itemId));
@@ -4459,16 +4243,8 @@ function renderOutfitStudio() {
     const pos = (slot === 'top' || slot === 'hat') ? 'center bottom' : 'center top';
 
     if (item && item.image) {
-      const cleanImg = transparentCleanCache.get(item.image) || item.image;
-      thumb.setAttribute('style', `background-image:url('${cleanImg}');background-repeat:no-repeat;background-position:${pos};background-size:contain;background-color:transparent;aspect-ratio:${ratio};`);
+      thumb.setAttribute('style', `background-image:url('${item.image}');background-repeat:no-repeat;background-position:${pos};background-size:contain;background-color:transparent;aspect-ratio:${ratio};`);
       thumb.innerHTML = '';
-      cleanTransparentImage(item.image, (cleanUrl, changed) => {
-        if (changed) {
-          item.image = cleanUrl;
-          saveState();
-        }
-        thumb.style.backgroundImage = `url('${cleanUrl}')`;
-      });
     } else if (item) {
       thumb.setAttribute('style', `aspect-ratio:${ratio};background-color:transparent;`);
       thumb.innerHTML = thumbInner(item);
@@ -4748,40 +4524,37 @@ function openModal(id, opts = {}) {
   }
   document.querySelectorAll('.modal-sheet').forEach(s => {
     if (s.id !== id && !modalStack.some(m => m.id === s.id)) {
-      s.classList.remove('is-active', 'is-shown', 'is-behind');
+      s.classList.remove('is-active', 'is-shown', 'is-behind', 'is-dragging');
       s.style.transform = '';
+      s.style.transition = '';
       s.style.zIndex = '';
     }
   });
   const sheet = document.getElementById(id);
   if (!sheet) return;
   sheet.scrollTop = 0;
-  sheet.classList.remove('is-behind');
+  sheet.classList.remove('is-behind', 'is-dragging');
+  sheet.style.transform = '';
+  sheet.style.transition = '';
   sheet.classList.add('is-active');
   sheet.style.zIndex = String(610 + modalStack.length * 10);
-  document.getElementById('modalOverlay').classList.add('is-open');
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) overlay.classList.add('is-open');
   void sheet.offsetHeight;
   requestAnimationFrame(() => {
     sheet.classList.add('is-shown');
+    sheet.style.transform = '';
     sheet.scrollTop = 0;
   });
 }
 function forceCloseModal(options = {}) {
   if (!options.skipPersist) persistTransientForms();
-  document.getElementById('modalOverlay').classList.remove('is-open');
-  const sheet = document.querySelector('.modal-sheet.is-active:not(.is-behind)') || document.querySelector('.modal-sheet.is-active');
-  if (sheet) {
-    sheet.classList.remove('is-shown');
-    const finish = () => {
-      sheet.classList.remove('is-active', 'is-behind');
-      sheet.style.zIndex = '';
-      sheet.removeEventListener('transitionend', finish);
-    };
-    sheet.addEventListener('transitionend', finish);
-    setTimeout(finish, 360);
-  }
-  document.querySelectorAll('.modal-sheet.is-behind').forEach(s => {
-    s.classList.remove('is-active', 'is-shown', 'is-behind');
+  const overlay = document.getElementById('modalOverlay');
+  if (overlay) overlay.classList.remove('is-open');
+  document.querySelectorAll('.modal-sheet').forEach(s => {
+    s.classList.remove('is-active', 'is-shown', 'is-behind', 'is-dragging');
+    s.style.transform = '';
+    s.style.transition = '';
     s.style.zIndex = '';
   });
   modalStack = [];
@@ -5910,12 +5683,18 @@ function wireEvents() {
   document.getElementById('btnNotifications').addEventListener('click', () => { renderNotifications(); openModal('modal-notif'); });
   document.getElementById('mainScroll').addEventListener('scroll', syncHomeRackExpansion, { passive: true });
   document.getElementById('btnSettings').addEventListener('click', () => {
-    document.getElementById('settingName').value = state.profile.name || '';
-    syncThresholdCardsUI();
-    renderAvatar();
-    renderCardImageScale();
-    syncWeatherSettings();
-    document.getElementById('weatherSearchResults').innerHTML = '';
+    try {
+      const nameEl = document.getElementById('settingName');
+      if (nameEl) nameEl.value = state.profile.name || '';
+      if (typeof syncThresholdCardsUI === 'function') syncThresholdCardsUI();
+      if (typeof renderAvatar === 'function') renderAvatar();
+      if (typeof renderCardImageScale === 'function') renderCardImageScale();
+      if (typeof syncWeatherSettings === 'function') syncWeatherSettings();
+      const res = document.getElementById('weatherSearchResults');
+      if (res) res.innerHTML = '';
+    } catch (e) {
+      console.warn('Settings prefill warning:', e);
+    }
     modalReturnTo = null;
     openModal('modal-settings');
   });
@@ -8141,6 +7920,22 @@ function wireDisplaySimulations() {
    INIT
    ============================================================ */
 async function init() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('reset') || urlParams.has('clear')) {
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+    } catch (e) {}
+    window.location.href = window.location.pathname;
+    return;
+  }
+
   const dismissSplash = () => {
     const splash = document.getElementById('splashScreen');
     if (splash) {
@@ -8167,24 +7962,6 @@ async function init() {
     refreshWeather(false);
     setInterval(() => { ensureNewDay(); renderAll(); }, 5 * 60 * 1000);
 
-    setTimeout(() => {
-      if (state.items && state.items.length) {
-        let delay = 0;
-        state.items.forEach(it => {
-          if (it.image && !transparentCleanCache.has(it.image)) {
-            setTimeout(() => {
-              cleanTransparentImage(it.image, (cleanUrl, changed) => {
-                if (changed) {
-                  it.image = cleanUrl;
-                  saveState();
-                }
-              });
-            }, delay);
-            delay += 80;
-          }
-        });
-      }
-    }, 600);
 
     window.addEventListener('pagehide', () => persistStateToDB());
     document.addEventListener('visibilitychange', () => {
@@ -8256,7 +8033,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261013d').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261014a').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
