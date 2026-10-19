@@ -239,9 +239,9 @@ function normalizeOutfitLayout(layout) {
 const CONSUMABLE_DEFS = [
   { id: 'towelA', name: '浴巾 A', cycleDays: 7, icon: 'towel' },
   { id: 'towelB', name: '浴巾 B', cycleDays: 7, icon: 'towel' },
-  { id: 'sheets', name: '床單枕頭套', cycleDays: 20, icon: 'sheets' },
-  { id: 'toothbrush', name: '電動牙刷刷頭', cycleDays: 180, icon: 'toothbrush' },
-  { id: 'razor', name: '刮鬍刀片', cycleDays: 120, icon: 'razor' },
+  { id: 'sheets', name: '洗床單枕頭套/棉被', cycleDays: 14, icon: 'sheets' },
+  { id: 'toothbrush', name: '換電動牙刷頭', cycleDays: 180, icon: 'toothbrush' },
+  { id: 'razor', name: '換刮鬍刀片', cycleDays: 120, icon: 'razor' },
 ];
 const LENGTH_TAGS = ['長', '短'];
 const CONSUMABLE_IMAGES = {
@@ -731,6 +731,9 @@ function normalizeLoadedState() {
     c.history = Array.isArray(c.history) ? c.history : [];
     c.laundryPending = !!c.laundryPending;
     c.laundryAt = c.laundryAt || null;
+    if (c.id === 'sheets') c.name = '洗床單枕頭套/棉被';
+    if (c.id === 'toothbrush') c.name = '換電動牙刷頭';
+    if (c.id === 'razor') c.name = '換刮鬍刀片';
     if (c.id === 'towelA' && (!c.image || c.image === 'assets/c-towel.jpg')) c.image = 'assets/c-towel-a.jpg';
     if (c.id === 'towelB' && (!c.image || c.image === 'assets/c-towel.jpg')) c.image = 'assets/c-towel-b.jpg';
   });
