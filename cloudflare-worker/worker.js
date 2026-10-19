@@ -125,10 +125,70 @@ export default {
         // 需同步之生活項目映射
         const trackKeys = ["洗衣服", "洗床單枕頭套/棉被", "換電動牙刷頭", "換刮鬍刀片"];
 
+        // 亦掃描日記資料庫最新「註記」欄位，實現日記更新後生活標籤自動跟著更新
+        const diaryDbId = env.NOTION_DIARY_DB_ID || "50adbc0959024715a90484ddc73b62d6";
+        const diaryDates = {};
+        try {
+          const diaryRes = await fetch(`https://api.notion.com/v1/databases/${diaryDbId}/query`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+              "Notion-Version": "2022-06-28",
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              sorts: [{ property: "Date", direction: "descending" }],
+              page_size: 30
+            })
+          });
+          if (diaryRes.ok) {
+            const diaryJson = await diaryRes.json();
+            for (const page of diaryJson.results || []) {
+              const d = page.properties?.["Date"]?.date?.start;
+              const notes = (page.properties?.["註記"]?.multi_select || []).map(m => m.name);
+              if (d && notes.length) {
+                for (const note of notes) {
+                  for (const key of trackKeys) {
+                    if (note === key || note.includes(key)) {
+                      if (!diaryDates[key] || d > diaryDates[key]) {
+                        diaryDates[key] = d;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Diary query error:", e);
+        }
+
         for (const key of trackKeys) {
           const notionInfo = notionItems[key];
           const cDate = clientDates[key] || null;
-          const nDate = notionInfo?.date || null;
+          let nDate = notionInfo?.date || null;
+          const dDate = diaryDates[key] || null;
+
+          // 若日記日期比生活標籤新，以日記日期更新生活標籤
+          if (dDate && (!nDate || dDate > nDate)) {
+            nDate = dDate;
+            if (notionInfo?.pageId) {
+              await fetch(`https://api.notion.com/v1/pages/${notionInfo.pageId}`, {
+                method: "PATCH",
+                headers: {
+                  "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+                  "Notion-Version": "2022-06-28",
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  properties: {
+                    "上次日期": { "date": { "start": dDate } }
+                  }
+                })
+              });
+              updatedNotion.push(key);
+            }
+          }
 
           if (cDate && (!nDate || cDate > nDate)) {
             // App 端日期較新，反向更新 Notion
@@ -150,7 +210,7 @@ export default {
               updatedNotion.push(key);
             }
           } else if (nDate && (!cDate || nDate > cDate)) {
-            // Notion 日期較新（例如日記中已標記），指示 App 端更新
+            // Notion (或日記) 日期較新，指示 App 端更新
             resolved[key] = nDate;
             updatedClient.push(key);
           } else {
@@ -221,10 +281,68 @@ export default {
         const resolved = {};
         const trackKeys = ["洗阿鵝", "遛阿鵝", "阿鵝剪指甲"];
 
+        // 亦掃描日記資料庫中的阿鵝項目
+        const diaryDbId = env.NOTION_DIARY_DB_ID || "50adbc0959024715a90484ddc73b62d6";
+        const diaryDates = {};
+        try {
+          const diaryRes = await fetch(`https://api.notion.com/v1/databases/${diaryDbId}/query`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+              "Notion-Version": "2022-06-28",
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              sorts: [{ property: "Date", direction: "descending" }],
+              page_size: 30
+            })
+          });
+          if (diaryRes.ok) {
+            const diaryJson = await diaryRes.json();
+            for (const page of diaryJson.results || []) {
+              const d = page.properties?.["Date"]?.date?.start;
+              const notes = (page.properties?.["註記"]?.multi_select || []).map(m => m.name);
+              if (d && notes.length) {
+                for (const note of notes) {
+                  for (const key of trackKeys) {
+                    if (note === key || note.includes(key)) {
+                      if (!diaryDates[key] || d > diaryDates[key]) {
+                        diaryDates[key] = d;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Diary query error in goose:", e);
+        }
+
         for (const key of trackKeys) {
           const notionInfo = gooseItems[key];
           const cDate = clientDates[key];
-          const nDate = notionInfo?.date;
+          let nDate = notionInfo?.date;
+          const dDate = diaryDates[key];
+
+          if (dDate && (!nDate || dDate > nDate)) {
+            nDate = dDate;
+            if (notionInfo?.pageId) {
+              await fetch(`https://api.notion.com/v1/pages/${notionInfo.pageId}`, {
+                method: "PATCH",
+                headers: {
+                  "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+                  "Notion-Version": "2022-06-28",
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  properties: {
+                    "上次日期": { "date": { "start": dDate } }
+                  }
+                })
+              });
+            }
+          }
 
           if (cDate && (!nDate || cDate > nDate)) {
             resolved[key] = cDate;
@@ -251,7 +369,7 @@ export default {
         return new Response(JSON.stringify({
           success: true,
           syncedAt: Date.now(),
-          bath: resolved["洗阿鵝"] || "2026-10-09",
+          bath: resolved["洗阿鵝"] || "2026-10-17",
           walk: resolved["遛阿鵝"] || "2026-10-10",
           nails: resolved["阿鵝剪指甲"] || "2026-10-01"
         }), {
