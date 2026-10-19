@@ -5550,9 +5550,9 @@ async function syncLifeConsumablesWithCloud() {
   try {
     const clientItems = {
       '洗衣服': state.laundry?.lastWashDate || null,
-      '洗床單枕頭套/棉被': state.consumables?.find(c => c.id === 'sheets')?.history?.[0]?.date || state.consumables?.find(c => c.id === 'sheets')?.startDate || null,
-      '換電動牙刷頭': state.consumables?.find(c => c.id === 'toothbrush')?.history?.[0]?.date || state.consumables?.find(c => c.id === 'toothbrush')?.startDate || null,
-      '換刮鬍刀片': state.consumables?.find(c => c.id === 'razor')?.history?.[0]?.date || state.consumables?.find(c => c.id === 'razor')?.startDate || null,
+      '洗床單枕頭套/棉被': state.consumables?.find(c => c.id === 'sheets')?.startDate || state.consumables?.find(c => c.id === 'sheets')?.history?.[0]?.date || null,
+      '換電動牙刷頭': state.consumables?.find(c => c.id === 'toothbrush')?.startDate || state.consumables?.find(c => c.id === 'toothbrush')?.history?.[0]?.date || null,
+      '換刮鬍刀片': state.consumables?.find(c => c.id === 'razor')?.startDate || state.consumables?.find(c => c.id === 'razor')?.history?.[0]?.date || null,
     };
 
     const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/sync-consumables`, {
@@ -5582,11 +5582,12 @@ async function syncLifeConsumablesWithCloud() {
     // 2. 洗床單枕頭套/棉被
     const cSheets = state.consumables?.find(c => c.id === 'sheets');
     if (cSheets && resolved['洗床單枕頭套/棉被']) {
-      const cur = cSheets.history?.[0]?.date || cSheets.startDate;
-      if (cur !== resolved['洗床單枕頭套/棉被']) {
+      if (cSheets.startDate !== resolved['洗床單枕頭套/棉被']) {
         cSheets.startDate = resolved['洗床單枕頭套/棉被'];
         if (!cSheets.history) cSheets.history = [];
-        cSheets.history.unshift({ date: resolved['洗床單枕頭套/棉被'], cycleDays: cSheets.cycleDays });
+        if (!cSheets.history.some(h => (typeof h === 'string' ? h : h.date) === resolved['洗床單枕頭套/棉被'])) {
+          cSheets.history.unshift({ date: resolved['洗床單枕頭套/棉被'], cycleDays: cSheets.cycleDays });
+        }
         changed = true;
       }
     }
@@ -5594,11 +5595,12 @@ async function syncLifeConsumablesWithCloud() {
     // 3. 換電動牙刷頭
     const cToothbrush = state.consumables?.find(c => c.id === 'toothbrush');
     if (cToothbrush && resolved['換電動牙刷頭']) {
-      const cur = cToothbrush.history?.[0]?.date || cToothbrush.startDate;
-      if (cur !== resolved['換電動牙刷頭']) {
+      if (cToothbrush.startDate !== resolved['換電動牙刷頭']) {
         cToothbrush.startDate = resolved['換電動牙刷頭'];
         if (!cToothbrush.history) cToothbrush.history = [];
-        cToothbrush.history.unshift({ date: resolved['換電動牙刷頭'], cycleDays: cToothbrush.cycleDays });
+        if (!cToothbrush.history.some(h => (typeof h === 'string' ? h : h.date) === resolved['換電動牙刷頭'])) {
+          cToothbrush.history.unshift({ date: resolved['換電動牙刷頭'], cycleDays: cToothbrush.cycleDays });
+        }
         changed = true;
       }
     }
@@ -5606,11 +5608,12 @@ async function syncLifeConsumablesWithCloud() {
     // 4. 換刮鬍刀片
     const cRazor = state.consumables?.find(c => c.id === 'razor');
     if (cRazor && resolved['換刮鬍刀片']) {
-      const cur = cRazor.history?.[0]?.date || cRazor.startDate;
-      if (cur !== resolved['換刮鬍刀片']) {
+      if (cRazor.startDate !== resolved['換刮鬍刀片']) {
         cRazor.startDate = resolved['換刮鬍刀片'];
         if (!cRazor.history) cRazor.history = [];
-        cRazor.history.unshift({ date: resolved['換刮鬍刀片'], cycleDays: cRazor.cycleDays });
+        if (!cRazor.history.some(h => (typeof h === 'string' ? h : h.date) === resolved['換刮鬍刀片'])) {
+          cRazor.history.unshift({ date: resolved['換刮鬍刀片'], cycleDays: cRazor.cycleDays });
+        }
         changed = true;
       }
     }
