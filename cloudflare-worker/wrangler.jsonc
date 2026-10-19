@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wardrobe-sync",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-19",
+  "kv_namespaces": [
+    {
+      "binding": "WARDROBE_STORE",
+      "id": "bedab3754d0b43f8b3035c7e57f455c1"
+    }
+  ]
+}

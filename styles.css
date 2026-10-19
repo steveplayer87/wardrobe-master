@@ -2975,6 +2975,9 @@ body.night-page input[type="range"]::-moz-range-track {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+.spinning {
+  animation: spin 0.8s linear infinite;
+}
 #aiLoadingText {
   font-size: 13px;
   font-weight: 600;

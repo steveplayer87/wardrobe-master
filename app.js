@@ -5539,6 +5539,179 @@ function openManagePropsModal(propType) {
 }
 
 /* ============================================================
+   CLOUDFLARE SYNC & NOTION TWO-WAY LIFE TRACKING
+   ============================================================ */
+const CLOUDFLARE_WORKER_URL = 'https://wardrobe-sync.jispig28.workers.dev';
+
+async function syncLifeConsumablesWithCloud() {
+  const spinIcon = document.getElementById('iconSyncLifeSpin');
+  if (spinIcon) spinIcon.classList.add('spinning');
+
+  try {
+    const clientItems = {
+      '洗衣服': state.laundry?.lastWashDate || null,
+      '洗床單枕頭套/棉被': state.consumables?.find(c => c.id === 'sheets')?.history?.[0]?.date || state.consumables?.find(c => c.id === 'sheets')?.startDate || null,
+      '換電動牙刷頭': state.consumables?.find(c => c.id === 'toothbrush')?.history?.[0]?.date || state.consumables?.find(c => c.id === 'toothbrush')?.startDate || null,
+      '換刮鬍刀片': state.consumables?.find(c => c.id === 'razor')?.history?.[0]?.date || state.consumables?.find(c => c.id === 'razor')?.startDate || null,
+    };
+
+    const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/sync-consumables`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: clientItems })
+    });
+
+    if (!res.ok) throw new Error('雲端回應失敗: ' + res.status);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || '同步失敗');
+
+    const resolved = data.resolved || {};
+    let changed = false;
+
+    // 1. 洗衣服
+    if (resolved['洗衣服'] && resolved['洗衣服'] !== state.laundry?.lastWashDate) {
+      if (!state.laundry) state.laundry = { lastWashDate: todayStr(), cycleDays: 2, snoozedUntil: null, history: [] };
+      state.laundry.lastWashDate = resolved['洗衣服'];
+      if (!state.laundry.history) state.laundry.history = [];
+      if (!state.laundry.history.some(h => (typeof h === 'string' ? h : h.date) === resolved['洗衣服'])) {
+        state.laundry.history.unshift(resolved['洗衣服']);
+      }
+      changed = true;
+    }
+
+    // 2. 洗床單枕頭套/棉被
+    const cSheets = state.consumables?.find(c => c.id === 'sheets');
+    if (cSheets && resolved['洗床單枕頭套/棉被']) {
+      const cur = cSheets.history?.[0]?.date || cSheets.startDate;
+      if (cur !== resolved['洗床單枕頭套/棉被']) {
+        cSheets.startDate = resolved['洗床單枕頭套/棉被'];
+        if (!cSheets.history) cSheets.history = [];
+        cSheets.history.unshift({ date: resolved['洗床單枕頭套/棉被'], cycleDays: cSheets.cycleDays });
+        changed = true;
+      }
+    }
+
+    // 3. 換電動牙刷頭
+    const cToothbrush = state.consumables?.find(c => c.id === 'toothbrush');
+    if (cToothbrush && resolved['換電動牙刷頭']) {
+      const cur = cToothbrush.history?.[0]?.date || cToothbrush.startDate;
+      if (cur !== resolved['換電動牙刷頭']) {
+        cToothbrush.startDate = resolved['換電動牙刷頭'];
+        if (!cToothbrush.history) cToothbrush.history = [];
+        cToothbrush.history.unshift({ date: resolved['換電動牙刷頭'], cycleDays: cToothbrush.cycleDays });
+        changed = true;
+      }
+    }
+
+    // 4. 換刮鬍刀片
+    const cRazor = state.consumables?.find(c => c.id === 'razor');
+    if (cRazor && resolved['換刮鬍刀片']) {
+      const cur = cRazor.history?.[0]?.date || cRazor.startDate;
+      if (cur !== resolved['換刮鬍刀片']) {
+        cRazor.startDate = resolved['換刮鬍刀片'];
+        if (!cRazor.history) cRazor.history = [];
+        cRazor.history.unshift({ date: resolved['換刮鬍刀片'], cycleDays: cRazor.cycleDays });
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      saveState();
+      renderConsumables();
+      if (typeof renderHome === 'function') renderHome();
+      if (typeof renderLaundryOverview === 'function') renderLaundryOverview();
+    }
+
+    const updatedNotionText = data.updatedNotion?.length ? `已更新 Notion：${data.updatedNotion.join('、')}` : '';
+    const updatedClientText = data.updatedClient?.length ? `已自 Notion 更新：${data.updatedClient.join('、')}` : '';
+    const msg = [updatedNotionText, updatedClientText].filter(Boolean).join('；') || '生活耗材狀態已同步（最新狀態）';
+    toast(msg);
+  } catch (err) {
+    console.error('生活耗材同步失敗:', err);
+    toast('同步失敗，請檢查網路連線');
+  } finally {
+    if (spinIcon) spinIcon.classList.remove('spinning');
+  }
+}
+
+async function backupWardrobeToCloud() {
+  toast('正在同步備份至 Cloudflare...');
+  try {
+    const textData = JSON.parse(JSON.stringify(state));
+    const imagesToUpload = [];
+
+    textData.items.forEach(it => {
+      if (it.image && it.image.startsWith('data:')) {
+        imagesToUpload.push({ id: it.id, data: it.image });
+        it.image = `/api/image/${it.id}`;
+      }
+      if (it.imageBack && it.imageBack.startsWith('data:')) {
+        imagesToUpload.push({ id: `${it.id}_back`, data: it.imageBack });
+        it.imageBack = `/api/image/${it.id}_back`;
+      }
+    });
+
+    const stateRes = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(textData)
+    });
+    if (!stateRes.ok) throw new Error('文字狀態儲存失敗');
+
+    if (imagesToUpload.length > 0) {
+      await Promise.all(imagesToUpload.map(img =>
+        fetch(`${CLOUDFLARE_WORKER_URL}/api/image/${img.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: img.data
+        }).catch(e => console.warn('圖片上傳失敗:', img.id, e))
+      ));
+    }
+
+    toast('雲端備份成功！已同步至 Cloudflare');
+  } catch (err) {
+    console.error('雲端備份失敗:', err);
+    toast('雲端備份失敗：' + err.message);
+  }
+}
+
+async function restoreWardrobeFromCloud() {
+  openConfirm(
+    '從雲端還原',
+    '確定要從 Cloudflare 雲端還原所有衣櫥資料與生活設定嗎？目前的本地資料將被雲端版本覆蓋。',
+    async () => {
+      toast('正在自 Cloudflare 下載雲端狀態...');
+      try {
+        const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`);
+        if (!res.ok) throw new Error('無法讀取雲端狀態');
+        const cloudState = await res.json();
+        if (!cloudState || !Array.isArray(cloudState.items)) throw new Error('雲端尚無備份資料');
+
+        cloudState.items.forEach(it => {
+          if (it.image && it.image.startsWith('/api/image/')) {
+            it.image = `${CLOUDFLARE_WORKER_URL}${it.image}`;
+          }
+          if (it.imageBack && it.imageBack.startsWith('/api/image/')) {
+            it.imageBack = `${CLOUDFLARE_WORKER_URL}${it.imageBack}`;
+          }
+        });
+
+        Object.keys(state).forEach(k => delete state[k]);
+        Object.assign(state, defaultState(), cloudState);
+        normalizeLoadedState();
+        saveState();
+        renderAll();
+        toast('雲端還原完成！');
+        closeModal();
+      } catch (err) {
+        console.error('雲端還原失敗:', err);
+        toast('還原失敗：' + err.message);
+      }
+    }
+  );
+}
+
+/* ============================================================
    EVENT WIRING
    ============================================================ */
 function wireEvents() {
@@ -5782,6 +5955,9 @@ function wireEvents() {
     e.target.value = '';
   });
   document.getElementById('btnImportSeedList').addEventListener('click', () => { importSeedItems(); closeModal(); });
+  document.getElementById('btnSyncLifeConsumables')?.addEventListener('click', syncLifeConsumablesWithCloud);
+  document.getElementById('btnCloudBackup')?.addEventListener('click', backupWardrobeToCloud);
+  document.getElementById('btnCloudRestore')?.addEventListener('click', restoreWardrobeFromCloud);
 
   // wardrobe: sort + filter + search + select mode
   document.getElementById('sortSelect').addEventListener('change', e => { uiWardrobeSort = e.target.value; renderWardrobe(); });

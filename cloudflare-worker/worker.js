@@ -1,6 +1,7 @@
 /**
  * Wardrobe Master & Life Sync - Cloudflare Worker
  * 具備「動靜分離」極致瘦身架構的雲端同步後端
+ * 整合 Notion 生活標籤追蹤雙向同步
  */
 
 const corsHeaders = {
@@ -21,12 +22,16 @@ export default {
     try {
       // 1. 健康檢查
       if (path === "/" || path === "/api/health") {
-        return new Response(JSON.stringify({ status: "ok", service: "wardrobe-sync-worker" }), {
+        return new Response(JSON.stringify({
+          status: "ok",
+          service: "wardrobe-sync-worker",
+          notionConfigured: Boolean(env.NOTION_TOKEN && env.NOTION_LIFE_DB_ID)
+        }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       }
 
-      // 2. 日常輕量狀態同步（純文字資料：衣服清單、洗滌狀態、穿搭紀錄、耗材，~800KB 或單次增量 <10KB）
+      // 2. 日常輕量狀態同步（純文字資料：衣服清單、洗滌狀態、穿搭紀錄、耗材，~120KB）
       if (path === "/api/state") {
         if (request.method === "GET") {
           const state = await env.WARDROBE_STORE.get("app_state_text", "json");
@@ -72,21 +77,101 @@ export default {
         }
       }
 
-      // 4. 全量完整備份端點（包含全量 JSON，用於一次性搬移與匯出）
-      if (path === "/api/backup") {
-        if (request.method === "GET") {
-          const backup = await env.WARDROBE_STORE.get("full_backup", "json");
-          return new Response(JSON.stringify(backup || {}), {
+      // 4. 生活耗材雙向同步（與 Notion 生活標籤追蹤資料庫雙向對齊）
+      if (path === "/api/sync-consumables") {
+        if (!env.NOTION_TOKEN || !env.NOTION_LIFE_DB_ID) {
+          return new Response(JSON.stringify({ error: "Notion credentials not configured on Worker" }), {
+            status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
-        if (request.method === "POST") {
-          const body = await request.json();
-          await env.WARDROBE_STORE.put("full_backup", JSON.stringify(body));
-          return new Response(JSON.stringify({ success: true, size: JSON.stringify(body).length }), {
+
+        // 查詢 Notion 生活標籤追蹤資料庫
+        const notionRes = await fetch(`https://api.notion.com/v1/databases/${env.NOTION_LIFE_DB_ID}/query`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ page_size: 20 })
+        });
+
+        if (!notionRes.ok) {
+          const errText = await notionRes.text();
+          return new Response(JSON.stringify({ error: "Failed to query Notion", detail: errText }), {
+            status: 502,
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
         }
+
+        const notionJson = await notionRes.json();
+        const notionItems = {};
+        for (const page of notionJson.results || []) {
+          const title = page.properties?.["項目"]?.title?.[0]?.plain_text;
+          const date = page.properties?.["上次日期"]?.date?.start;
+          if (title) {
+            notionItems[title] = { pageId: page.id, date: date || null };
+          }
+        }
+
+        const clientPayload = request.method === "POST" ? await request.json() : {};
+        const clientDates = clientPayload.items || {};
+
+        const resolved = {};
+        const updatedNotion = [];
+        const updatedClient = [];
+
+        // 需同步之生活項目映射
+        const trackKeys = ["洗衣服", "洗床單枕頭套/棉被", "換電動牙刷頭", "換刮鬍刀片"];
+
+        for (const key of trackKeys) {
+          const notionInfo = notionItems[key];
+          const cDate = clientDates[key] || null;
+          const nDate = notionInfo?.date || null;
+
+          if (cDate && (!nDate || cDate > nDate)) {
+            // App 端日期較新，反向更新 Notion
+            resolved[key] = cDate;
+            if (notionInfo?.pageId) {
+              await fetch(`https://api.notion.com/v1/pages/${notionInfo.pageId}`, {
+                method: "PATCH",
+                headers: {
+                  "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+                  "Notion-Version": "2022-06-28",
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  properties: {
+                    "上次日期": { "date": { "start": cDate } }
+                  }
+                })
+              });
+              updatedNotion.push(key);
+            }
+          } else if (nDate && (!cDate || nDate > cDate)) {
+            // Notion 日期較新（例如日記中已標記），指示 App 端更新
+            resolved[key] = nDate;
+            updatedClient.push(key);
+          } else {
+            resolved[key] = nDate || cDate || null;
+          }
+        }
+
+        const result = {
+          success: true,
+          syncedAt: Date.now(),
+          resolved,
+          updatedNotion,
+          updatedClient
+        };
+
+        // 存入 KV 供超級儀表板與離線快取使用
+        await env.WARDROBE_STORE.put("last_consumables_sync", JSON.stringify(result));
+
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
       }
 
       return new Response("Not Found", { status: 404, headers: corsHeaders });

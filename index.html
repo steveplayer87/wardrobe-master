@@ -327,8 +327,21 @@
 
       <!-- 生活耗材 -->
       <div class="more-section-block">
-        <p class="section-title">生活耗材</p>
-        <p class="section-intro">固定週期用品，到期會提醒你更換</p>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+          <div>
+            <p class="section-title">生活耗材</p>
+            <p class="section-intro">固定週期用品，到期會提醒你更換</p>
+          </div>
+          <button type="button" class="btn-secondary btn-with-icon" id="btnSyncLifeConsumables" style="font-size:12px; padding:6px 12px; border-radius:8px; display:inline-flex; align-items:center; gap:5px;">
+            <svg id="iconSyncLifeSpin" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+              <path d="M16 21h5v-5"/>
+            </svg>
+            雙向同步
+          </button>
+        </div>
         <div class="consumable-grid" id="consumableGrid"></div>
       </div>
     </section>
@@ -741,6 +754,10 @@
         <button class="btn-secondary btn-with-icon" id="btnExportData"><span data-icon="download"></span>匯出備份</button>
         <button class="btn-secondary" id="btnImportData">匯入備份</button>
         <input type="file" accept="application/json" id="importFileInput" hidden>
+      </div>
+      <div class="settings-actions" style="margin-top:8px">
+        <button type="button" class="btn-secondary btn-with-icon" id="btnCloudBackup"><span data-icon="upload"></span>雲端備份至 Cloudflare</button>
+        <button type="button" class="btn-secondary btn-with-icon" id="btnCloudRestore"><span data-icon="download"></span>從雲端還原</button>
       </div>
       <div class="settings-actions" style="margin-top:8px">
         <button type="button" class="btn-secondary" id="btnImportSeedList">匯入我的舊衣物清單</button>
