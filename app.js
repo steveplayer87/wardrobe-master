@@ -5625,9 +5625,12 @@ async function syncLifeConsumablesWithCloud() {
       if (typeof renderLaundryOverview === 'function') renderLaundryOverview();
     }
 
+    // 自動連帶將全量衣櫥狀態同步至 Cloudflare（真正一鍵全域雙向同步）
+    backupWardrobeToCloud({ silent: true }).catch(e => console.warn('雲端備份警告:', e));
+
     const updatedNotionText = data.updatedNotion?.length ? `已更新 Notion：${data.updatedNotion.join('、')}` : '';
     const updatedClientText = data.updatedClient?.length ? `已自 Notion 更新：${data.updatedClient.join('、')}` : '';
-    const msg = [updatedNotionText, updatedClientText].filter(Boolean).join('；') || '生活耗材狀態已同步（最新狀態）';
+    const msg = [updatedNotionText, updatedClientText].filter(Boolean).join('；') || '雙向同步完成！已連動 Notion 與 Cloudflare';
     toast(msg);
   } catch (err) {
     console.error('生活耗材同步失敗:', err);
@@ -5637,8 +5640,9 @@ async function syncLifeConsumablesWithCloud() {
   }
 }
 
-async function backupWardrobeToCloud() {
-  toast('正在同步備份至 Cloudflare...');
+async function backupWardrobeToCloud(options = {}) {
+  const silent = !!options.silent;
+  if (!silent) toast('正在同步備份至 Cloudflare...');
   try {
     const textData = JSON.parse(JSON.stringify(state));
     const imagesToUpload = [];
@@ -5671,10 +5675,10 @@ async function backupWardrobeToCloud() {
       ));
     }
 
-    toast('雲端備份成功！已同步至 Cloudflare');
+    if (!silent) toast('雲端備份成功！已同步至 Cloudflare');
   } catch (err) {
     console.error('雲端備份失敗:', err);
-    toast('雲端備份失敗：' + err.message);
+    if (!silent) toast('雲端備份失敗：' + err.message);
   }
 }
 
@@ -7919,31 +7923,32 @@ function addCustomImageToSandbox(base64) {
 
 function syncThresholdCardsUI() {
   const t = state.profile.washThresholds || {};
-  const setCardVal = (id, val, unit = '次') => {
+  const setCardVal = (id, val) => {
     const el = document.getElementById(id);
-    if (el) el.textContent = `${val} ${unit}`;
+    if (el) el.textContent = String(val);
   };
-  setCardVal('valThresholdBottom', t.bottom ?? 3, '次');
-  setCardVal('valThresholdOuter', t.outer ?? 5, '次');
-  setCardVal('valThresholdShoes', t.shoes ?? 8, '次');
-  setCardVal('valThresholdHat', t.hat ?? 8, '次');
-  setCardVal('valThresholdAccessory', t.accessory ?? 8, '次');
-  const towel = state.consumables.find(c => isTowelId(c.id));
-  setCardVal('valThresholdTowel', towel ? towel.cycleDays : 7, '天');
+  setCardVal('valThresholdBottom', t.bottom ?? 3);
+  setCardVal('valThresholdOuter', t.outer ?? 5);
+  setCardVal('valThresholdShoes', t.shoes ?? 8);
+  setCardVal('valThresholdHat', t.hat ?? 8);
+  setCardVal('valThresholdAccessory', t.accessory ?? 8);
+  const towel = state.consumables?.find(c => isTowelId(c.id));
+  setCardVal('valThresholdTowel', towel ? towel.cycleDays : 7);
 }
 
 function wireThresholdSteppers() {
   document.querySelectorAll('.tc-step-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.preventDefault();
-      const key = btn.dataset.key;
+      const key = btn.dataset.key || btn.dataset.cat;
+      if (!key) return;
       const isPlus = btn.classList.contains('tc-plus');
       const step = isPlus ? 1 : -1;
       if (key === 'towel') {
-        const towel = state.consumables.find(c => isTowelId(c.id));
+        const towel = state.consumables?.find(c => isTowelId(c.id));
         let cur = towel ? (towel.cycleDays || 7) : 7;
         cur = Math.min(30, Math.max(1, cur + step));
-        state.consumables.forEach(c => { if (isTowelId(c.id)) c.cycleDays = cur; });
+        state.consumables?.forEach(c => { if (isTowelId(c.id)) c.cycleDays = cur; });
       } else {
         state.profile.washThresholds = state.profile.washThresholds || {};
         let cur = state.profile.washThresholds[key] ?? 3;
@@ -8179,19 +8184,34 @@ async function init() {
   if (btnForceRefresh) {
     btnForceRefresh.addEventListener('click', async () => {
       btnForceRefresh.textContent = '正在重新整理...';
-      if ('serviceWorker' in navigator) {
-        try {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          for (const reg of regs) await reg.unregister();
-        } catch (e) {}
+      btnForceRefresh.disabled = true;
+
+      // 600ms 安全計時器，防護 iOS PWA 卡死，逾時直接重載
+      const safetyReload = setTimeout(() => {
+        window.location.reload();
+      }, 600);
+
+      try {
+        if ('caches' in window) {
+          const keys = await Promise.race([
+            caches.keys(),
+            new Promise(res => setTimeout(() => res([]), 250))
+          ]);
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+        if ('serviceWorker' in navigator) {
+          const regs = await Promise.race([
+            navigator.serviceWorker.getRegistrations(),
+            new Promise(res => setTimeout(() => res([]), 250))
+          ]);
+          await Promise.all(regs.map(r => r.unregister()));
+        }
+      } catch (e) {
+        console.warn('Force refresh cleanup warning:', e);
       }
-      if ('caches' in window) {
-        try {
-          const keys = await caches.keys();
-          for (const key of keys) await caches.delete(key);
-        } catch (e) {}
-      }
-      window.location.href = window.location.pathname + '?v=' + Date.now();
+
+      clearTimeout(safetyReload);
+      window.location.reload();
     });
   }
 
@@ -8215,7 +8235,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261014b').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261019').then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
