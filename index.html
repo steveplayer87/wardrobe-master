@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261019">
+<link rel="stylesheet" href="styles.css?v=20261019_72">
 </head>
 <body>
 
@@ -120,7 +120,6 @@
           <button class="cal-title" id="calTitle">—</button>
           <button class="cal-nav" id="calNext" aria-label="下個月">›</button>
           <button class="cal-jump-btn" id="calJumpBtn" aria-label="跳轉至指定日期"><span data-icon="jump"></span></button>
-          <button class="cal-jump-btn" id="btnCalAddSkincare" aria-label="新增臉部膚況紀錄" title="新增臉部膚況紀錄"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></button>
         </div>
         <div class="cal-weekdays">
           <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
@@ -681,7 +680,7 @@
             </div>
             <div class="tc-stepper">
               <button type="button" class="tc-step-btn tc-minus" data-cat="bottom" aria-label="減少">−</button>
-              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdBottom">3</strong> 次</span>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdBottom">3</strong><span class="tc-unit"> 次</span></span>
               <button type="button" class="tc-step-btn tc-plus" data-cat="bottom" aria-label="增加">+</button>
             </div>
           </div>
@@ -693,7 +692,7 @@
             </div>
             <div class="tc-stepper">
               <button type="button" class="tc-step-btn tc-minus" data-cat="outer" aria-label="減少">−</button>
-              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdOuter">5</strong> 次</span>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdOuter">5</strong><span class="tc-unit"> 次</span></span>
               <button type="button" class="tc-step-btn tc-plus" data-cat="outer" aria-label="增加">+</button>
             </div>
           </div>
@@ -705,7 +704,7 @@
             </div>
             <div class="tc-stepper">
               <button type="button" class="tc-step-btn tc-minus" data-cat="towel" aria-label="減少">−</button>
-              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdTowel">7</strong> 天</span>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdTowel">7</strong><span class="tc-unit"> 天</span></span>
               <button type="button" class="tc-step-btn tc-plus" data-cat="towel" aria-label="增加">+</button>
             </div>
           </div>
@@ -717,7 +716,7 @@
             </div>
             <div class="tc-stepper">
               <button type="button" class="tc-step-btn tc-minus" data-cat="shoes" aria-label="減少">−</button>
-              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdShoes">8</strong> 次</span>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdShoes">8</strong><span class="tc-unit"> 次</span></span>
               <button type="button" class="tc-step-btn tc-plus" data-cat="shoes" aria-label="增加">+</button>
             </div>
           </div>
@@ -729,7 +728,7 @@
             </div>
             <div class="tc-stepper">
               <button type="button" class="tc-step-btn tc-minus" data-cat="hat" aria-label="減少">−</button>
-              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdHat">8</strong> 次</span>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdHat">8</strong><span class="tc-unit"> 次</span></span>
               <button type="button" class="tc-step-btn tc-plus" data-cat="hat" aria-label="增加">+</button>
             </div>
           </div>
@@ -741,7 +740,7 @@
             </div>
             <div class="tc-stepper">
               <button type="button" class="tc-step-btn tc-minus" data-cat="accessory" aria-label="減少">−</button>
-              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdAccessory">8</strong> 次</span>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdAccessory">8</strong><span class="tc-unit"> 次</span></span>
               <button type="button" class="tc-step-btn tc-plus" data-cat="accessory" aria-label="增加">+</button>
             </div>
           </div>
@@ -756,8 +755,7 @@
         <input type="file" accept="application/json" id="importFileInput" hidden>
       </div>
       <div class="settings-actions" style="margin-top:8px">
-        <button type="button" class="btn-secondary btn-with-icon" id="btnCloudBackup"><span data-icon="upload"></span>雲端備份至 Cloudflare</button>
-        <button type="button" class="btn-secondary btn-with-icon" id="btnCloudRestore"><span data-icon="download"></span>從雲端還原</button>
+        <button type="button" class="btn-secondary btn-with-icon" id="btnCloudRestore"><span data-icon="download"></span>從雲端還原資料</button>
       </div>
       <div class="settings-actions" style="margin-top:8px">
         <button type="button" class="btn-secondary" id="btnImportSeedList">匯入我的舊衣物清單</button>
@@ -934,15 +932,84 @@
     <button class="btn-primary" id="btnJumpGo">前往</button>
   </div>
 
-  <!-- Backfill a past day's OOTD -->
+  <!-- Backfill a past day's OOTD or skincare -->
   <div class="modal-sheet modal-sheet-tall" id="modal-backfill" data-modal>
     <div class="modal-handle"></div>
-    <div class="modal-head"><h2>補登穿搭紀錄</h2><button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
-    <label class="field">日期
-      <input type="date" id="backfillDate">
-    </label>
-    <div class="day-detail-body" id="backfillRows" style="margin-top:12px"></div>
-    <button class="btn-primary" id="btnSaveBackfill" style="margin-top:14px">儲存這天的穿搭</button>
+    <div class="modal-head">
+      <h2 id="backfillModalHeading">補登紀錄</h2>
+      <button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+
+    <div class="segment" id="backfillSegment" style="margin: 4px 0 14px;">
+      <button type="button" class="segment-btn is-active" id="segBackfillOutfit" data-seg="outfit">穿搭紀錄</button>
+      <button type="button" class="segment-btn" id="segBackfillSkincare" data-seg="skincare">保養紀錄</button>
+    </div>
+
+    <!-- 穿搭補登面板 -->
+    <div class="backfill-panel" id="panelBackfillOutfit">
+      <label class="field">日期
+        <input type="date" id="backfillDate">
+      </label>
+      <div class="day-detail-body" id="backfillRows" style="margin-top:12px"></div>
+      <button class="btn-primary" id="btnSaveBackfill" style="margin-top:14px">儲存這天的穿搭</button>
+    </div>
+
+    <!-- 保養補登面板 -->
+    <div class="backfill-panel is-hidden" id="panelBackfillSkincare">
+      <form class="form" id="skincareBackfillForm">
+        <label class="field">紀錄日期
+          <input type="date" id="fieldSkincareBackfillDate" required>
+        </label>
+
+        <div class="field">
+          <span>長痘或不適部位</span>
+          <div class="skincare-chip-group" id="groupSkincareBackfillArea">
+            <button type="button" class="skincare-chip is-active" data-val="下巴">下巴</button>
+            <button type="button" class="skincare-chip" data-val="額頭">額頭</button>
+            <button type="button" class="skincare-chip" data-val="左臉頰">左臉頰</button>
+            <button type="button" class="skincare-chip" data-val="右臉頰">右臉頰</button>
+            <button type="button" class="skincare-chip" data-val="鼻翼">鼻翼</button>
+            <button type="button" class="skincare-chip" data-val="嘴周">嘴周</button>
+            <button type="button" class="skincare-chip" data-val="其他">其他</button>
+          </div>
+          <input type="hidden" id="fieldSkincareBackfillArea" value="下巴">
+        </div>
+
+        <div class="field">
+          <span>當前病程階段</span>
+          <div class="skincare-chip-group" id="groupSkincareBackfillStage">
+            <button type="button" class="skincare-chip is-active" data-val="剛冒出發紅">剛冒出發紅</button>
+            <button type="button" class="skincare-chip" data-val="紅腫痛/白頭">紅腫痛/白頭</button>
+            <button type="button" class="skincare-chip" data-val="結痂修復中">結痂修復中</button>
+            <button type="button" class="skincare-chip" data-val="已消退/防留疤">已消退/防留疤</button>
+          </div>
+          <input type="hidden" id="fieldSkincareBackfillStage" value="剛冒出發紅">
+        </div>
+
+        <div class="field-row">
+          <label class="field">嚴重程度
+            <select id="fieldSkincareBackfillSeverity">
+              <option value="mild">輕微（小紅點 / 閉鎖粉刺）</option>
+              <option value="moderate" selected>中度（發炎紅腫 / 有痛感）</option>
+              <option value="severe">重度（大囊腫 / 多顆聚集）</option>
+            </select>
+          </label>
+          <label class="field">推測成因
+            <input type="text" id="fieldSkincareBackfillCause" placeholder="例如：熬夜、辛辣、刮鬍刺激、安全帽帶">
+          </label>
+        </div>
+
+        <label class="field">拯救對策與塗抹藥膏／保養品
+          <input type="text" id="fieldSkincareBackfillTreatment" placeholder="例如：杜鵑花酸、思麗安、理膚寶水B5、痘痘貼、停止酸類" required>
+        </label>
+
+        <label class="field">備忘筆記與改善紀錄
+          <textarea id="fieldSkincareBackfillNotes" rows="3" placeholder="例如：早晚薄擦、切勿用手擠壓、多喝水早點睡…"></textarea>
+        </label>
+
+        <button type="submit" class="btn-primary" id="btnSkincareBackfillSubmit" style="margin-top:14px">儲存保養紀錄</button>
+      </form>
+    </div>
   </div>
 
   <!-- Consumable detail -->
@@ -1435,7 +1502,7 @@
   <img class="photo-viewer-img" id="photoViewerImg" alt="">
 </div>
 
-<script src="seed-items.js?v=20261019"></script>
-<script src="app.js?v=20261019"></script>
+<script src="seed-items.js?v=20261019_72"></script>
+<script src="app.js?v=20261019_72"></script>
 </body>
 </html>

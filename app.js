@@ -1064,7 +1064,7 @@ function findItem(id) { return state.items.find(i => i.id === id); }
 function getThreshold(category) {
   const t = state.profile.washThresholds || {};
   const v = t[category];
-  if (v === null) return Infinity; // "無" — never mark dirty from wear count alone
+  if (v === null || v === 0) return Infinity; // 0 or null: never mark dirty from wear count alone
   return v ?? 5;
 }
 function computeStatusAfterWear(item) {
@@ -1276,7 +1276,7 @@ function importSeedItems() {
 
 /* ---------------------------- Consumables logic ---------------------------- */
 function daysUsed(c) { return Math.max(0, daysBetween(c.startDate, todayStr())); }
-function isOverdue(c) { return c.cycleDays !== null && daysUsed(c) >= c.cycleDays; }
+function isOverdue(c) { return c.cycleDays !== null && c.cycleDays > 0 && daysUsed(c) >= c.cycleDays; }
 function isTowelId(id) { return id === 'towelA' || id === 'towelB'; }
 function isLaundryConsumable(c) { return !!c && (isTowelId(c.id) || c.id === 'sheets'); }
 function getPendingLaundryConsumables() {
@@ -2437,17 +2437,22 @@ function renderMonthGrid(grid, y, m) {
     if (dayEntries && dayEntries.length) {
       cell.classList.add('has-ootd');
       const entry = dayEntries[0];
+      const topItem = (entry.top ? findItem(entry.top) : null) || (entry.outer ? findItem(entry.outer) : null);
       const bottomItem = entry.bottom ? findItem(entry.bottom) : null;
       const isShorts = isShortsItem(bottomItem);
+      const otherItem = (!topItem && !bottomItem) ? (entry.shoes ? findItem(entry.shoes) : (entry.hat ? findItem(entry.hat) : null)) : null;
       const thumbItems = [
-        { item: entry.top ? findItem(entry.top) : null, className: 'cal-thumb-top' },
+        { item: topItem, className: 'cal-thumb-top' },
         { item: bottomItem, className: isShorts ? 'cal-thumb-bottom is-shorts' : 'cal-thumb-bottom' },
+        { item: otherItem, className: 'cal-thumb-top' },
       ].filter(({ item }) => item);
       thumbsHtml = `<span class="cal-thumbs">${thumbItems.map(({ item, className }) => {
         const cleanImg = transparentCleanCache.get(item.image) || item.image;
         const pos = className.includes('cal-thumb-bottom') ? 'center top' : 'center bottom';
-        const style = cleanImg ? `background-image:url('${cleanImg}');background-repeat:no-repeat;background-position:${pos};background-size:contain;background-color:transparent;` : 'background-color:transparent;';
-        return `<span class="cal-thumb ${className}" data-item-id="${item.id}" style="${style}">${cleanImg ? '' : categoryIcon(item.category)}</span>`;
+        const imgTag = cleanImg
+          ? `<img src="${escapeHtml(cleanImg)}" class="cal-thumb-img" alt="" style="object-position:${pos};" />`
+          : categoryIcon(item.category);
+        return `<span class="cal-thumb ${className}" data-item-id="${item.id}">${imgTag}</span>`;
       }).join('')}</span>`;
     }
     let dotsHtml = '';
@@ -4016,7 +4021,9 @@ function readSettingsDraft() {
   const readVal = (id, fallback) => {
     const el = document.getElementById(id);
     if (!el) return fallback;
-    const n = parseInt(el.textContent, 10);
+    const txt = el.textContent.trim();
+    if (txt === '不提醒' || txt === '無') return 0;
+    const n = parseInt(txt, 10);
     return isNaN(n) ? fallback : n;
   };
   state.profile.washThresholds = {
@@ -5235,7 +5242,28 @@ function openExtrasPicker() {
    Writes straight into ootdHistory; does not touch live wear counts,
    except it does bump totalWearCount so 常穿排行 stays consistent.
    ============================================================ */
-function openBackfillModal(presetDate) {
+function switchBackfillTab(tab) {
+  const isOutfit = tab === 'outfit';
+  const segOutfit = document.getElementById('segBackfillOutfit');
+  const segSkincare = document.getElementById('segBackfillSkincare');
+  const panelOutfit = document.getElementById('panelBackfillOutfit');
+  const panelSkincare = document.getElementById('panelBackfillSkincare');
+  const heading = document.getElementById('backfillModalHeading');
+
+  if (segOutfit) segOutfit.classList.toggle('is-active', isOutfit);
+  if (segSkincare) segSkincare.classList.toggle('is-active', !isOutfit);
+  if (panelOutfit) panelOutfit.classList.toggle('is-hidden', !isOutfit);
+  if (panelSkincare) panelSkincare.classList.toggle('is-hidden', isOutfit);
+  if (heading) heading.textContent = isOutfit ? '補登穿搭紀錄' : '補登保養紀錄';
+
+  if (!isOutfit) {
+    const curDate = document.getElementById('backfillDate')?.value || todayStr();
+    const skinDate = document.getElementById('fieldSkincareBackfillDate');
+    if (skinDate) skinDate.value = curDate;
+  }
+}
+
+function openBackfillModal(presetDate, initialTab = 'outfit') {
   const date = presetDate || todayStr();
   const isToday = date === todayStr();
   let existing = state.ootdHistory.find(e => e.date === date);
@@ -5245,6 +5273,7 @@ function openBackfillModal(presetDate) {
   backfillDraft = { date };
   ALL_SLOTS.forEach(s => { backfillDraft[s] = existing ? (existing[s] || null) : null; });
   renderBackfillModal();
+  switchBackfillTab(initialTab);
   openModal('modal-backfill');
 }
 function renderBackfillModal() {
@@ -5761,9 +5790,61 @@ function wireEvents() {
     toast('已清空今日穿搭');
   });
   document.getElementById('btnBackfill').addEventListener('click', () => openBackfillModal());
+  document.getElementById('segBackfillOutfit')?.addEventListener('click', () => switchBackfillTab('outfit'));
+  document.getElementById('segBackfillSkincare')?.addEventListener('click', () => switchBackfillTab('skincare'));
+
+  document.querySelectorAll('#groupSkincareBackfillArea .skincare-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#groupSkincareBackfillArea .skincare-chip').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      const hidden = document.getElementById('fieldSkincareBackfillArea');
+      if (hidden) hidden.value = btn.dataset.val || '';
+    });
+  });
+
+  document.querySelectorAll('#groupSkincareBackfillStage .skincare-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#groupSkincareBackfillStage .skincare-chip').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      const hidden = document.getElementById('fieldSkincareBackfillStage');
+      if (hidden) hidden.value = btn.dataset.val || '';
+    });
+  });
+
+  document.getElementById('skincareBackfillForm')?.addEventListener('submit', e => {
+    e.preventDefault();
+    const date = document.getElementById('fieldSkincareBackfillDate')?.value || todayStr();
+    const area = document.getElementById('fieldSkincareBackfillArea')?.value || '下巴';
+    const stage = document.getElementById('fieldSkincareBackfillStage')?.value || '剛冒出發紅';
+    const severity = document.getElementById('fieldSkincareBackfillSeverity')?.value || 'moderate';
+    const cause = (document.getElementById('fieldSkincareBackfillCause')?.value || '').trim();
+    const treatment = (document.getElementById('fieldSkincareBackfillTreatment')?.value || '').trim();
+    const notes = (document.getElementById('fieldSkincareBackfillNotes')?.value || '').trim();
+
+    state.skincare = state.skincare || [];
+    const newRecord = {
+      id: 'skin_' + Date.now(),
+      date,
+      area,
+      stage,
+      severity,
+      cause,
+      treatment,
+      notes,
+      createdAt: Date.now()
+    };
+    state.skincare.unshift(newRecord);
+    saveState({ action: `新增 ${formatDayWithWeekday(date)} 保養紀錄` });
+    renderHistory();
+    closeModal();
+    toast('已儲存保養紀錄');
+  });
+
   document.getElementById('backfillDate').addEventListener('change', e => {
     if (!backfillDraft) return;
     backfillDraft.date = e.target.value || todayStr();
+    const skinDate = document.getElementById('fieldSkincareBackfillDate');
+    if (skinDate) skinDate.value = backfillDraft.date;
   });
   document.getElementById('btnSaveBackfill').addEventListener('click', () => {
     if (!backfillDraft) return;
@@ -7925,7 +8006,15 @@ function syncThresholdCardsUI() {
   const t = state.profile.washThresholds || {};
   const setCardVal = (id, val) => {
     const el = document.getElementById(id);
-    if (el) el.textContent = String(val);
+    if (!el) return;
+    const unitEl = el.nextElementSibling;
+    if (val === 0) {
+      el.textContent = '不提醒';
+      if (unitEl && unitEl.classList.contains('tc-unit')) unitEl.style.display = 'none';
+    } else {
+      el.textContent = String(val);
+      if (unitEl && unitEl.classList.contains('tc-unit')) unitEl.style.display = '';
+    }
   };
   setCardVal('valThresholdBottom', t.bottom ?? 3);
   setCardVal('valThresholdOuter', t.outer ?? 5);
@@ -7947,12 +8036,12 @@ function wireThresholdSteppers() {
       if (key === 'towel') {
         const towel = state.consumables?.find(c => isTowelId(c.id));
         let cur = towel ? (towel.cycleDays || 7) : 7;
-        cur = Math.min(30, Math.max(1, cur + step));
+        cur = Math.min(30, Math.max(0, cur + step));
         state.consumables?.forEach(c => { if (isTowelId(c.id)) c.cycleDays = cur; });
       } else {
         state.profile.washThresholds = state.profile.washThresholds || {};
         let cur = state.profile.washThresholds[key] ?? 3;
-        cur = Math.min(30, Math.max(1, cur + step));
+        cur = Math.min(30, Math.max(0, cur + step));
         state.profile.washThresholds[key] = cur;
       }
       syncThresholdCardsUI();
