@@ -377,6 +377,14 @@ export default {
         });
       }
 
+      // 6. 手動/外部觸發全量自動同步日記至生活標籤
+      if (path === "/api/cron-sync") {
+        const result = await syncAllDiaryToNotion(env);
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
       return new Response("Not Found", { status: 404, headers: corsHeaders });
     } catch (err) {
       return new Response(JSON.stringify({ error: err.message }), {
@@ -384,5 +392,112 @@ export default {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
+  },
+
+  // Cloudflare 雲端定時排程（Cron Triggers 每 5 分鐘全自動觸發）
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(syncAllDiaryToNotion(env));
   }
 };
+
+/**
+ * 全自動同步日記「註記」至「生活標籤追蹤」資料庫核心邏輯
+ */
+async function syncAllDiaryToNotion(env) {
+  if (!env.NOTION_TOKEN || !env.NOTION_LIFE_DB_ID) {
+    return { success: false, error: "Missing Notion credentials" };
+  }
+
+  const diaryDbId = env.NOTION_DIARY_DB_ID || "50adbc0959024715a90484ddc73b62d6";
+  const lifeDbId = env.NOTION_LIFE_DB_ID;
+
+  // 1. 取得生活標籤追蹤資料庫中現有項目
+  const lifeRes = await fetch(`https://api.notion.com/v1/databases/${lifeDbId}/query`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+      "Notion-Version": "2022-06-28",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ page_size: 50 })
+  });
+  if (!lifeRes.ok) return { success: false, error: "Failed to query life database" };
+  const lifeJson = await lifeRes.json();
+  const lifeItems = {};
+  for (const page of lifeJson.results || []) {
+    const title = page.properties?.["項目"]?.title?.[0]?.plain_text;
+    const date = page.properties?.["上次日期"]?.date?.start;
+    if (title) {
+      lifeItems[title] = { pageId: page.id, date: date || null };
+    }
+  }
+
+  // 2. 取得日記資料庫最近 30 天的所有紀錄
+  const diaryRes = await fetch(`https://api.notion.com/v1/databases/${diaryDbId}/query`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+      "Notion-Version": "2022-06-28",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      sorts: [{ property: "Date", direction: "descending" }],
+      page_size: 30
+    })
+  });
+  if (!diaryRes.ok) return { success: false, error: "Failed to query diary database" };
+  const diaryJson = await diaryRes.json();
+
+  const allTrackKeys = Object.keys(lifeItems);
+  const diaryLatest = {};
+  for (const page of diaryJson.results || []) {
+    const d = page.properties?.["Date"]?.date?.start;
+    const notes = (page.properties?.["註記"]?.multi_select || []).map(m => m.name);
+    if (d && notes.length) {
+      for (const note of notes) {
+        for (const key of allTrackKeys) {
+          if (note === key || note.includes(key)) {
+            if (!diaryLatest[key] || d > diaryLatest[key]) {
+              diaryLatest[key] = d;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 3. 比對並自動回寫生活標籤追蹤
+  const updated = [];
+  for (const key of allTrackKeys) {
+    const item = lifeItems[key];
+    const dDate = diaryLatest[key];
+    const nDate = item?.date;
+    if (dDate && (!nDate || dDate > nDate)) {
+      if (item?.pageId) {
+        await fetch(`https://api.notion.com/v1/pages/${item.pageId}`, {
+          method: "PATCH",
+          headers: {
+            "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            properties: {
+              "上次日期": { "date": { "start": dDate } }
+            }
+          })
+        });
+        updated.push({ key, oldDate: nDate, newDate: dDate });
+      }
+    }
+  }
+
+  const result = {
+    success: true,
+    timestamp: Date.now(),
+    updatedCount: updated.length,
+    updated
+  };
+  await env.WARDROBE_STORE.put("last_cron_sync_result", JSON.stringify(result));
+  return result;
+}

@@ -8,5 +8,8 @@
       "binding": "WARDROBE_STORE",
       "id": "bedab3754d0b43f8b3035c7e57f455c1"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  }
 }
