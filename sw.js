@@ -3,13 +3,13 @@
 // (styles.css / seed-items.js / app.js). Mismatched versions just mean an
 // extra network fetch on first load, not breakage — but keeping them in sync
 // avoids stale duplicate entries piling up in the cache.
-const CACHE_NAME = 'wardrobe-master-v72';
+const CACHE_NAME = 'wardrobe-master-v73';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=20261019_72',
-  './seed-items.js?v=20261019_72',
-  './app.js?v=20261019_72',
+  './styles.css?v=20261020_73',
+  './seed-items.js?v=20261020_73',
+  './app.js?v=20261020_73',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -35,6 +35,12 @@ self.addEventListener('activate', event => {
       .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Network-first: always try to get the live version when online

@@ -8275,10 +8275,12 @@ async function init() {
       btnForceRefresh.textContent = '正在重新整理...';
       btnForceRefresh.disabled = true;
 
-      // 600ms 安全計時器，防護 iOS PWA 卡死，逾時直接重載
-      const safetyReload = setTimeout(() => {
-        window.location.reload();
-      }, 600);
+      // 600ms 安全計時器，防護 iOS PWA 卡死，帶時間戳穿透 iOS 快取
+      const triggerReload = () => {
+        const cleanPath = window.location.pathname;
+        window.location.replace(`${cleanPath}?_t=${Date.now()}`);
+      };
+      const safetyReload = setTimeout(triggerReload, 600);
 
       try {
         if ('caches' in window) {
@@ -8300,7 +8302,7 @@ async function init() {
       }
 
       clearTimeout(safetyReload);
-      window.location.reload();
+      triggerReload();
     });
   }
 
@@ -8324,8 +8326,20 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261019').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261020_73').then(reg => {
         reg.update().catch(() => {});
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              newWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
       }).catch(() => {});
     });
   }
