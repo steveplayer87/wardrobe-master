@@ -960,17 +960,13 @@ function replaceStateFromSnapshot(snapshot) {
 
 function syncHomeThemeColor(isHome, isNight) {
   const themeMeta = document.querySelector('meta[name="theme-color"]');
-  if (!themeMeta) return;
-  if (!isHome) {
-    themeMeta.setAttribute('content', '#ffffff');
-    return;
-  }
-  if (activeView === 'wardrobe' && uiWardrobeCat === 'retired') {
-    themeMeta.setAttribute('content', '#D8B45B');
-    return;
-  }
-  // Seamless match with the atmosphere gradient top
-  themeMeta.setAttribute('content', isNight ? '#0F172A' : '#3A88E9');
+  let color;
+  if (!isHome) color = '#ffffff';
+  else if (activeView === 'wardrobe' && uiWardrobeCat === 'retired') color = '#D8B45B';
+  else color = isNight ? '#0F172A' : '#3A88E9';   // seamless match with the atmosphere gradient top
+  if (themeMeta) themeMeta.setAttribute('content', color);
+  // solid colour on <html> is what iOS paints into the dynamic-island band
+  document.documentElement.style.setProperty('background-color', color, 'important');
 }
 
 function activateView(view) {
@@ -1954,11 +1950,12 @@ function layoutHomePeek() {
   if (!main || !view || !tab || !scene || !head || !view.classList.contains('is-active')) return;
   const tabH = tab.offsetHeight;
   if (tabH) document.documentElement.style.setProperty('--tab-h', tabH + 'px');
-  const cs = getComputedStyle(card);
-  const collapsedH = (parseFloat(cs.paddingTop) || 12) + head.offsetHeight + (parseFloat(cs.paddingBottom) || 12) + 2;
-  const GAP = 22; // empty space between the collapsed rack cards and the tab bar
+  const padTop = parseFloat(getComputedStyle(card).paddingTop) || 12;
+  const blank = parseFloat(getComputedStyle(head).marginBottom) || 0; // empty band under the title row
+  const SAFETY = 10;                                  // item names start this far BEHIND the tab bar at rest
+  const visible = padTop + head.offsetHeight + Math.max(0, blank - SAFETY);
   const rowMarginTop = parseFloat(getComputedStyle(row).marginTop) || 0;
-  const rackTop = main.clientHeight - tabH - GAP - collapsedH;
+  const rackTop = main.clientHeight - tabH - visible;
   scene.style.minHeight = Math.max(0, Math.round(rackTop - rowMarginTop)) + 'px';
 }
 function renderHome() {

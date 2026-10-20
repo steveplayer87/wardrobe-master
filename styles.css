@@ -1084,7 +1084,7 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
   flex: 1 1 0;
   min-height: 0;
   min-width: 0;
-  padding: 0 16px calc(var(--tab-h, 83px) + 110px);
+  padding: 0 16px calc(var(--tab-h, 83px) + 24px);
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
@@ -1548,7 +1548,7 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0;
+  margin: 0 0 36px; /* blank band: item names start 36px below the title row (layoutHomePeek hides them behind the tab bar at rest) */
   min-height: 26px;
   width: 100%;
   flex-shrink: 0;
@@ -4781,10 +4781,6 @@ body.night-page .studio-drag-tip {
 #app.is-home-view .rack-card {
   padding: 12px 14px 12px;
 }
-/* at rest only the title row is shown; the item list appears once the user scrolls (class set in syncHomeRackExpansion) */
-#app.is-home-view:not(.home-racks-expanded) .rack-card .rack-items,
-#app.is-home-view:not(.home-racks-expanded) .rack-card .rack-empty { display: none !important; }
-#app.is-home-view:not(.home-racks-expanded) .rack-card-head { margin-bottom: 0 !important; }
 .rack-chip img.rack-chip-thumb {
   padding: 0;
   width: 22px;
