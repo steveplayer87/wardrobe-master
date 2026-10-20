@@ -28,7 +28,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261020_80">
+<link rel="stylesheet" href="styles.css?v=20261020_81">
 </head>
 <body>
 
@@ -1531,7 +1531,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v80', K='wm_seen_version', seen=null;
+  var V='v81', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1541,7 +1541,49 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261020_80"></script>
-<script src="app.js?v=20261020_80"></script>
+
+<!-- BAND-DIAG:START (找出頂部顏色畫不上去的原因；點「已更新至 vN」文字開啟，完成後整段刪除到 BAND-DIAG:END) -->
+<style>
+#bandDiag{position:fixed;left:8px;right:8px;top:calc(var(--safe-top,0px) + 100px);z-index:2147483001;background:rgba(0,0,0,.88);color:#fff;font:11px/1.5 ui-monospace,Menlo,monospace;padding:8px 10px;border-radius:10px;white-space:pre-wrap;max-height:62vh;overflow:auto}
+#bandDiag .row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+#bandDiag button{padding:6px 9px;border:1px solid rgba(255,255,255,.5);border-radius:8px;background:transparent;color:#fff;font:inherit}
+#verToastText{cursor:pointer}
+</style>
+<script>
+(function(){
+  var t=document.getElementById('verToastText'); if(!t) return;
+  var root=document.documentElement, p=null, extra=[];
+  var COVER='width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1', NOC='width=device-width, initial-scale=1, maximum-scale=1';
+  function setVP(c){var m=document.querySelector('meta[name=viewport]'),n=document.createElement('meta');n.name='viewport';n.content=c;if(m)m.remove();document.head.appendChild(n)}
+  function bar(top,h){var d=document.createElement('div');d.style.cssText='position:fixed;left:0;right:0;top:'+top+'px;height:'+h+'px;background:#f00;z-index:2147483000;pointer-events:none';document.body.appendChild(d);extra.push(d)}
+  function r(sel){var e=document.querySelector(sel);if(!e)return '-';var b=e.getBoundingClientRect();return Math.round(b.top)+'~'+Math.round(b.bottom)}
+  function show(out){
+    var vv=window.visualViewport, m=document.querySelector('meta[name=viewport]');
+    out.textContent='innerH '+innerHeight+'  screen '+screen.height+'  vvTop '+(vv?vv.offsetTop:'-')+'\n'+
+      'html bg '+getComputedStyle(root).backgroundColor+'\nbody bg '+getComputedStyle(document.body).backgroundColor+'\n'+
+      '#app '+r('#app')+'  header '+r('.app-header')+'  tab '+r('.tab-bar')+'\n'+
+      'cover: '+(m&&/cover/.test(m.content)?'是':'否');
+  }
+  t.addEventListener('click',function(){
+    if(p){p.remove();p=null;return}
+    p=document.createElement('div');p.id='bandDiag';
+    var out=document.createElement('div'),row=document.createElement('div');row.className='row';
+    function b(l,f){var x=document.createElement('button');x.type='button';x.textContent=l;x.onclick=function(){f();setTimeout(function(){show(out)},300)};row.appendChild(x)}
+    b('1 html紅',function(){root.style.setProperty('background','#f00','important')});
+    b('2 body透明',function(){document.body.style.setProperty('background','transparent','important')});
+    b('3 外條',function(){bar(-62,62)});
+    b('4 大外條',function(){bar(-300,300)});
+    b('5 theme紅',function(){var m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('content','#ff0000')});
+    b('6 cover',function(){setVP(COVER)});
+    b('7 no-cover',function(){setVP(NOC)});
+    b('重來',function(){location.reload()});
+    b('關閉',function(){p.remove();p=null});
+    p.appendChild(out);p.appendChild(row);document.body.appendChild(p);show(out);
+  });
+})();
+</script>
+<!-- BAND-DIAG:END -->
+<script src="seed-items.js?v=20261020_81"></script>
+<script src="app.js?v=20261020_81"></script>
 </body>
 </html>
