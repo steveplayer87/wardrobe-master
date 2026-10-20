@@ -49,16 +49,16 @@ html {
   width: 100%;
   margin: 0;
   padding: 0;
-  background: #ffffff; /* canvas colour = tab-bar colour, so any sliver below the viewport blends in */
+  background: #3A88E9; /* solid canvas colour paints the dynamic-island band; gradients live on body */
   overscroll-behavior: none;
 }
-html.home-page,
+html.home-page { background: #3A88E9 !important; }
+html.night-page,
+html.home-page.night-page { background: #0F172A !important; }
 body.home-page {
   background: linear-gradient(180deg, #3A88E9 0%, #5E9DF2 22%, #85B5F8 50%, #B8D5FA 80%, #E3EFFF 100%) no-repeat fixed #3A88E9 !important;
 }
-html.night-page,
 body.night-page,
-html.home-page.night-page,
 body.home-page.night-page {
   background: linear-gradient(180deg, #0F172A 0%, #1E293B 28%, #1E1B4B 60%, #181C3D 100%) no-repeat fixed #0F172A !important;
 }
@@ -1084,7 +1084,7 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
   flex: 1 1 0;
   min-height: 0;
   min-width: 0;
-  padding: 0 16px calc(var(--tab-h, 83px) + 20px);
+  padding: 0 16px calc(var(--tab-h, 83px) + 110px);
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
@@ -1331,7 +1331,7 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
   padding: 4px 0 10px;
   background: transparent;
   box-shadow: none;
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   position: relative;
 }
 #app.is-home-view .scene-label { margin-top: auto; }
@@ -4781,6 +4781,10 @@ body.night-page .studio-drag-tip {
 #app.is-home-view .rack-card {
   padding: 12px 14px 12px;
 }
+/* at rest only the title row is shown; the item list appears once the user scrolls (class set in syncHomeRackExpansion) */
+#app.is-home-view:not(.home-racks-expanded) .rack-card .rack-items,
+#app.is-home-view:not(.home-racks-expanded) .rack-card .rack-empty { display: none !important; }
+#app.is-home-view:not(.home-racks-expanded) .rack-card-head { margin-bottom: 0 !important; }
 .rack-chip img.rack-chip-thumb {
   padding: 0;
   width: 22px;

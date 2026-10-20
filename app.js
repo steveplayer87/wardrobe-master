@@ -1947,18 +1947,19 @@ function layoutHomePeek() {
   const main = document.getElementById('mainScroll');
   const view = document.getElementById('view-home');
   const tab = document.querySelector('.tab-bar');
+  const scene = view && view.querySelector('.scene-card');
   const row = view && view.querySelector('.rack-row');
   const card = row && row.querySelector('.rack-card');
   const head = card && card.querySelector('.rack-card-head');
-  if (!main || !view || !tab || !head || !view.classList.contains('is-active')) return;
+  if (!main || !view || !tab || !scene || !head || !view.classList.contains('is-active')) return;
   const tabH = tab.offsetHeight;
   if (tabH) document.documentElement.style.setProperty('--tab-h', tabH + 'px');
-  const padTop = parseFloat(getComputedStyle(card).paddingTop) || 12;
-  const GAP = 12; // breathing room between the title row and the tab bar
-  const peek = padTop + head.offsetHeight + GAP;
-  const rackTop = main.clientHeight - tabH - peek;
-  const need = rackTop + row.offsetHeight;
-  view.style.minHeight = Math.max(0, Math.round(need)) + 'px';
+  const cs = getComputedStyle(card);
+  const collapsedH = (parseFloat(cs.paddingTop) || 12) + head.offsetHeight + (parseFloat(cs.paddingBottom) || 12) + 2;
+  const GAP = 22; // empty space between the collapsed rack cards and the tab bar
+  const rowMarginTop = parseFloat(getComputedStyle(row).marginTop) || 0;
+  const rackTop = main.clientHeight - tabH - GAP - collapsedH;
+  scene.style.minHeight = Math.max(0, Math.round(rackTop - rowMarginTop)) + 'px';
 }
 function renderHome() {
   syncHomeRackExpansion();
