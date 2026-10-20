@@ -55,12 +55,22 @@ html {
 html.home-page { background: #3A88E9 !important; }
 html.night-page,
 html.home-page.night-page { background: #0F172A !important; }
-body.home-page {
-  background: linear-gradient(180deg, #3A88E9 0%, #5E9DF2 22%, #85B5F8 50%, #B8D5FA 80%, #E3EFFF 100%) no-repeat fixed #3A88E9 !important;
-}
+/* body keeps a SOLID colour (what iOS samples at the top edge for the island band); the gradient lives on a layer behind the app */
+body.home-page { background: #3A88E9 !important; }
 body.night-page,
-body.home-page.night-page {
-  background: linear-gradient(180deg, #0F172A 0%, #1E293B 28%, #1E1B4B 60%, #181C3D 100%) no-repeat fixed #0F172A !important;
+body.home-page.night-page { background: #0F172A !important; }
+body.home-page::before,
+body.night-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(180deg, #3A88E9 0%, #5E9DF2 22%, #85B5F8 50%, #B8D5FA 80%, #E3EFFF 100%);
+}
+body.night-page::before,
+body.home-page.night-page::before {
+  background: linear-gradient(180deg, #0F172A 0%, #1E293B 28%, #1E1B4B 60%, #181C3D 100%);
 }
 
 body {

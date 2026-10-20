@@ -3,13 +3,13 @@
 // (styles.css / seed-items.js / app.js). Mismatched versions just mean an
 // extra network fetch on first load, not breakage — but keeping them in sync
 // avoids stale duplicate entries piling up in the cache.
-const CACHE_NAME = 'wardrobe-master-v82';
+const CACHE_NAME = 'wardrobe-master-v83';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=20261020_82',
-  './seed-items.js?v=20261020_82',
-  './app.js?v=20261020_82',
+  './styles.css?v=20261020_83',
+  './seed-items.js?v=20261020_83',
+  './app.js?v=20261020_83',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

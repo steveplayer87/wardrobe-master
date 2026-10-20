@@ -2077,7 +2077,7 @@ function renderHome() {
   }
   const rackCount = rack.length;
   const rackTitle = document.getElementById('rackTitle') || document.querySelector('#card-rack .rack-title');
-  if (rackTitle) rackTitle.textContent = `暫存衣架・浴巾 ${towelDays} 天`;
+  if (rackTitle) rackTitle.textContent = '暫存衣架';
   const rackBadge = document.getElementById('rackBadge');
   if (rackBadge) {
     rackBadge.textContent = rackCount > 0 ? String(rackCount) : '';
