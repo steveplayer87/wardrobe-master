@@ -2,16 +2,23 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<style>html.vp-pending #app{opacity:0}#app{transition:opacity .18s ease}</style>
 <script>
-/* iOS standalone: WebKit mis-sizes the window at launch (bottom chin). Re-asserting the viewport after first layout
-   makes it recompute; verified on device (no viewport-fit=cover => dynamic island band + bottom edge fully filled). */
+/* iOS standalone window sizing: launch WITH viewport-fit=cover (full-screen window, canvas paints the island band),
+   then drop cover after load so WebKit re-lays out the viewport to the bottom edge. Verified on device by hand (button "B").
+   The app stays hidden for a moment so the one-time re-layout is not visible. */
 (function(){
-  var C='width=device-width, initial-scale=1, maximum-scale=1';
-  function re(){var m=document.querySelector('meta[name=viewport]'),n=document.createElement('meta');n.name='viewport';n.content=C;if(m)m.remove();document.head.appendChild(n)}
-  window.addEventListener('load',function(){setTimeout(re,300)});
-  window.addEventListener('pageshow',function(e){if(e.persisted)setTimeout(re,100)});
-  document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(re,150)});
+  var COVER='width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1';
+  var NOCOVER='width=device-width, initial-scale=1, maximum-scale=1';
+  var root=document.documentElement; root.classList.add('vp-pending');
+  function setVP(c){var m=document.querySelector('meta[name=viewport]'),n=document.createElement('meta');n.name='viewport';n.content=c;if(m)m.remove();document.head.appendChild(n)}
+  function settle(){setVP(NOCOVER);setTimeout(function(){if(typeof layoutHomePeek==='function')layoutHomePeek();root.classList.remove('vp-pending')},140)}
+  function again(){setVP(COVER);setTimeout(settle,80)}
+  window.addEventListener('load',function(){setTimeout(settle,500)});
+  setTimeout(function(){root.classList.remove('vp-pending')},2500);
+  window.addEventListener('pageshow',function(e){if(e.persisted)setTimeout(again,100)});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(again,150)});
 })();
 </script>
 <title>Wardrobe Master</title>
@@ -21,7 +28,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261020_77">
+<link rel="stylesheet" href="styles.css?v=20261020_78">
 </head>
 <body>
 
@@ -1513,7 +1520,7 @@
   <img class="photo-viewer-img" id="photoViewerImg" alt="">
 </div>
 
-<script src="seed-items.js?v=20261020_77"></script>
-<script src="app.js?v=20261020_77"></script>
+<script src="seed-items.js?v=20261020_78"></script>
+<script src="app.js?v=20261020_78"></script>
 </body>
 </html>
