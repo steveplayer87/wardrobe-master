@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261020_73">
+<link rel="stylesheet" href="styles.css?v=20261020_75">
 </head>
 <body>
 
@@ -1502,7 +1502,53 @@
   <img class="photo-viewer-img" id="photoViewerImg" alt="">
 </div>
 
-<script src="seed-items.js?v=20261020_73"></script>
-<script src="app.js?v=20261020_73"></script>
+<script src="seed-items.js?v=20261020_75"></script>
+<script src="app.js?v=20261020_75"></script>
+
+<!-- CHIN-DEBUG:START (診斷完成後整段刪除，到 CHIN-DEBUG:END 為止) -->
+<style>
+html.dbg.dbg.dbg{background:#ff0000 !important}
+html.dbg.dbg body{background:#ff00ff !important}
+html.dbg #app{outline:3px solid #00c000;outline-offset:-3px}
+html.dbg .tab-bar{outline:3px solid #0050ff;outline-offset:-3px}
+#dbgPanel{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 56px);z-index:2147483000;background:rgba(0,0,0,.84);color:#fff;font:11px/1.5 ui-monospace,Menlo,monospace;padding:8px 10px;border-radius:10px;white-space:pre-wrap;-webkit-user-select:text;user-select:text}
+#dbgPanel button{display:block;margin-top:6px;padding:6px 10px;border:1px solid rgba(255,255,255,.5);border-radius:8px;background:transparent;color:#fff;font:inherit}
+#dbgProbe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+<script>
+(function(){
+  var h=document.documentElement; h.classList.add('dbg');
+  var probe=document.createElement('div'); probe.id='dbgProbe';
+  var p=document.createElement('div'); p.id='dbgPanel';
+  var out=document.createElement('div'), btn=document.createElement('button');
+  btn.type='button'; btn.textContent='關閉診斷面板';
+  p.appendChild(out); p.appendChild(btn);
+  document.body.appendChild(probe); document.body.appendChild(p);
+  function f(n){return n==null?'-':Math.round(n*10)/10}
+  function bottom(sel){var e=document.querySelector(sel);return e?e.getBoundingClientRect().bottom:null}
+  var timer;
+  function upd(){
+    var ih=window.innerHeight, sh=screen.height, vv=window.visualViewport;
+    var cs=getComputedStyle(probe), sb=parseFloat(cs.paddingBottom)||0, st=parseFloat(cs.paddingTop)||0;
+    var ab=bottom('#app'), tb=bottom('.tab-bar'), v;
+    if(ih<sh-1) v='視窗本身比螢幕短 '+f(sh-ih)+'px（不是 CSS 能直接補的）';
+    else if(tb!=null&&tb<ih-1) v='tab bar 沒貼底，差 '+f(ih-tb)+'px';
+    else if(ab!=null&&ab<ih-1) v='#app 沒貼底，差 '+f(ih-ab)+'px';
+    else v='元素都貼到底；若仍有空白，看它是紅(html)還是洋紅(body)';
+    out.textContent=
+      'innerH '+ih+'  screen '+sh+'  visualVP '+(vv?f(vv.height):'-')+'\n'+
+      'clientH '+h.clientHeight+'  safe 上'+f(st)+' 下'+f(sb)+'\n'+
+      '#app bottom '+f(ab)+'  tab-bar bottom '+f(tb)+'\n'+
+      'standalone '+navigator.standalone+'  dpr '+window.devicePixelRatio+'\n'+
+      '判斷：'+v+'\n'+
+      '紅=html 洋紅=body 綠框=#app 藍框=tab bar';
+  }
+  btn.addEventListener('click',function(){clearInterval(timer);h.classList.remove('dbg');p.remove();probe.remove()});
+  window.addEventListener('resize',upd); window.addEventListener('orientationchange',upd);
+  if(window.visualViewport) window.visualViewport.addEventListener('resize',upd);
+  timer=setInterval(upd,800); upd();
+})();
+</script>
+<!-- CHIN-DEBUG:END -->
 </body>
 </html>

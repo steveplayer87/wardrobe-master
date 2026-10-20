@@ -328,52 +328,63 @@ function readFileAsImage(file) {
     reader.readAsDataURL(file);
   });
 }
+/* Remove a plain near-white photo background, but NEVER eat the garment.
+   - samples the real border colour; only acts if the border is uniformly near-white
+   - floods only through pixels within a tight distance of that colour (no 230+ catch-all)
+   - refuses to cross visible edges (local step limit), so outlines/shadows/seams stay as walls
+   - fails safe: if too much (or too little) would be removed, the image is left untouched */
 function knockoutWhiteCanvas(canvas) {
   try {
     const w = canvas.width, h = canvas.height;
     if (!w || !h) return;
     const ctx = canvas.getContext('2d');
     const imgData = ctx.getImageData(0, 0, w, h);
-    const data = imgData.data;
-    const cornerIndices = [0, (w - 1) * 4, (w * (h - 1)) * 4, (w * h - 1) * 4];
-    let whiteCorners = 0;
-    for (const idx of cornerIndices) {
-      if (data[idx + 3] >= 20 && data[idx] >= 230 && data[idx + 1] >= 230 && data[idx + 2] >= 230) whiteCorners++;
+    const d = imgData.data;
+    // 1. border sample
+    const bs = [];
+    const pushPx = (x, y) => { const i = (y * w + x) * 4; if (d[i + 3] >= 20) bs.push([d[i], d[i + 1], d[i + 2]]); };
+    const stepX = Math.max(1, Math.floor(w / 40)), stepY = Math.max(1, Math.floor(h / 40));
+    for (let x = 0; x < w; x += stepX) { pushPx(x, 0); pushPx(x, h - 1); }
+    for (let y = 0; y < h; y += stepY) { pushPx(0, y); pushPx(w - 1, y); }
+    if (bs.length < 8) return;                       // already transparent border -> nothing to do
+    const med = c => bs.map(p => p[c]).sort((a, b) => a - b)[bs.length >> 1];
+    const bg = [med(0), med(1), med(2)];
+    if (bg[0] < 235 || bg[1] < 235 || bg[2] < 235) return;       // not a white-ish background
+    const uniform = bs.filter(p => Math.max(Math.abs(p[0] - bg[0]), Math.abs(p[1] - bg[1]), Math.abs(p[2] - bg[2])) <= 8).length / bs.length;
+    if (uniform < 0.9) return;                       // busy border: not a clean studio background
+    // 2. guarded flood fill
+    const TOL = 7, STEP = 5;
+    const near = i => d[i + 3] < 20 || (Math.abs(d[i] - bg[0]) <= TOL && Math.abs(d[i + 1] - bg[1]) <= TOL && Math.abs(d[i + 2] - bg[2]) <= TOL);
+    const smooth = (i, j) => Math.abs(d[i] - d[j]) <= STEP && Math.abs(d[i + 1] - d[j + 1]) <= STEP && Math.abs(d[i + 2] - d[j + 2]) <= STEP;
+    const seen = new Uint8Array(w * h), q = new Int32Array(w * h);
+    let qh = 0, qt = 0;
+    const seed = p => { if (!seen[p] && near(p * 4)) { seen[p] = 1; q[qt++] = p; } };
+    for (let x = 0; x < w; x++) { seed(x); seed((h - 1) * w + x); }
+    for (let y = 0; y < h; y++) { seed(y * w); seed(y * w + w - 1); }
+    const tryN = (p, n) => { if (!seen[n] && near(n * 4) && smooth(p * 4, n * 4)) { seen[n] = 1; q[qt++] = n; } };
+    while (qh < qt) {
+      const p = q[qh++], x = p % w, y = (p / w) | 0;
+      if (x > 0) tryN(p, p - 1);
+      if (x < w - 1) tryN(p, p + 1);
+      if (y > 0) tryN(p, p - w);
+      if (y < h - 1) tryN(p, p + w);
     }
-    if (whiteCorners === 0) return;
-    const visited = new Uint8Array(w * h);
-    const queue = new Int32Array(w * h);
-    let qHead = 0, qTail = 0;
-    const isWhite = (idx) => {
-      if (data[idx + 3] < 20) return true;
-      return data[idx] >= 230 && data[idx + 1] >= 230 && data[idx + 2] >= 230;
-    };
-    for (let x = 0; x < w; x++) {
-      let p = x;
-      if (isWhite(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-      p = (h - 1) * w + x;
-      if (isWhite(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-    }
-    for (let y = 0; y < h; y++) {
-      let p = y * w;
-      if (!visited[p] && isWhite(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-      p = y * w + (w - 1);
-      if (!visited[p] && isWhite(p * 4)) { visited[p] = 1; queue[qTail++] = p; }
-    }
-    while (qHead < qTail) {
-      const p = queue[qHead++];
-      const x = p % w;
-      const y = (p / w) | 0;
-      if (x > 0 && !visited[p - 1] && isWhite((p - 1) * 4)) { visited[p - 1] = 1; queue[qTail++] = p - 1; }
-      if (x < w - 1 && !visited[p + 1] && isWhite((p + 1) * 4)) { visited[p + 1] = 1; queue[qTail++] = p + 1; }
-      if (y > 0 && !visited[p - w] && isWhite((p - w) * 4)) { visited[p - w] = 1; queue[qTail++] = p - w; }
-      if (y < h - 1 && !visited[p + w] && isWhite((p + w) * 4)) { visited[p + w] = 1; queue[qTail++] = p + w; }
-    }
-    for (let i = 0; i < w * h; i++) {
-      if (visited[i]) data[i * 4 + 3] = 0;
+    // 3. safety guard: a real cut-out keeps a sensible garment; otherwise leave the photo alone
+    const cleared = qt / (w * h);
+    if (cleared < 0.03 || cleared > 0.80) return;
+    // 4. apply + soften the 1px rim so no white halo remains
+    for (let i = 0; i < w * h; i++) if (seen[i]) d[i * 4 + 3] = 0;
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x;
+      if (seen[p]) continue;
+      if (seen[p - 1] || seen[p + 1] || seen[p - w] || seen[p + w]) {
+        const i = p * 4;
+        const dist = Math.max(Math.abs(d[i] - bg[0]), Math.abs(d[i + 1] - bg[1]), Math.abs(d[i + 2] - bg[2]));
+        if (dist < 40) d[i + 3] = Math.round(d[i + 3] * Math.min(1, Math.max(0.35, dist / 40)));
+      }
     }
     ctx.putImageData(imgData, 0, 0);
-  } catch(e) {}
+  } catch (e) {}
 }
 
 async function compressImageFile(file, maxDim = 640) {
@@ -1487,6 +1498,16 @@ function getImageTrimBounds(imgUrl, callback) {
             if (x > maxX) maxX = x;
             if (y < minY) minY = y;
             if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (found && ((maxX - minX + 1) / w < 0.3 || (maxY - minY + 1) / h < 0.3)) {
+        // content looks suspiciously tiny: probably a white garment. Fall back to alpha-only bounds.
+        minX = w; maxX = 0; minY = h; maxY = 0;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          if (data[(y * w + x) * 4 + 3] > 25) {
+            if (x < minX) minX = x; if (x > maxX) maxX = x;
+            if (y < minY) minY = y; if (y > maxY) maxY = y;
           }
         }
       }
