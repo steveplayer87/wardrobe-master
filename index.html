@@ -2,35 +2,15 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
-<style>html.vp-pending #app{opacity:0}#app{transition:opacity .18s ease}</style>
-<script>
-/* iOS standalone window sizing: launch WITH viewport-fit=cover, then drop it after load so WebKit re-lays out the viewport
-   (bottom edge filled, no blur around the dynamic island). WebKit only re-reads the colour painted into the island band
-   when the viewport changes, so a day/night colour change calls __refreshBand() to repeat the same switch (app hidden meanwhile). */
-(function(){
-  var COVER='width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1';
-  var NOCOVER='width=device-width, initial-scale=1, maximum-scale=1';
-  var root=document.documentElement; root.classList.add('vp-pending');
-  function setVP(c){var m=document.querySelector('meta[name=viewport]'),n=document.createElement('meta');n.name='viewport';n.content=c;if(m)m.remove();document.head.appendChild(n)}
-  function done(){setTimeout(function(){if(typeof layoutHomePeek==='function')layoutHomePeek();root.classList.remove('vp-pending')},140)}
-  function settle(){setVP(NOCOVER);window.__bandSettled=true;done()}
-  function again(){root.classList.add('vp-pending');setVP(COVER);setTimeout(settle,80)}
-  window.__refreshBand=again;
-  window.addEventListener('load',function(){setTimeout(settle,500)});
-  setTimeout(function(){root.classList.remove('vp-pending')},3000);
-  window.addEventListener('pageshow',function(e){if(e.persisted)setTimeout(again,100)});
-  document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(again,150)});
-})();
-</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Wardrobe Master</title>
 <meta name="theme-color" content="#3A88E9">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261020_83">
+<link rel="stylesheet" href="styles.css?v=20261020_84">
 </head>
 <body>
 
@@ -1533,7 +1513,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v83', K='wm_seen_version', seen=null;
+  var V='v84', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1543,7 +1523,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261020_83"></script>
-<script src="app.js?v=20261020_83"></script>
+<script src="seed-items.js?v=20261020_84"></script>
+<script src="app.js?v=20261020_84"></script>
 </body>
 </html>

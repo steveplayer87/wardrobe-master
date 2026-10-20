@@ -960,16 +960,11 @@ function replaceStateFromSnapshot(snapshot) {
 
 function syncHomeThemeColor(isHome, isNight) {
   const themeMeta = document.querySelector('meta[name="theme-color"]');
-  let color;
+  // opaque status bar: its colour is the page colour behind it. Day colour only for now (night comes later).
+  let color = '#A9CBF8';
   if (activeView === 'wardrobe' && uiWardrobeCat === 'retired') color = '#D8B45B';
-  else color = isNight ? '#0F172A' : '#3A88E9';   // same band colour on every page, follows day/night
   if (themeMeta) themeMeta.setAttribute('content', color);
-  const root = document.documentElement;
-  const prev = root.dataset.bandColor;
-  root.style.setProperty('background-color', color, 'important');
-  root.dataset.bandColor = color;
-  // WebKit only re-reads the island-band colour on a viewport change
-  if (prev && prev !== color && window.__bandSettled && typeof window.__refreshBand === 'function') window.__refreshBand();
+  document.documentElement.style.setProperty('background-color', color, 'important');
 }
 
 function activateView(view) {
@@ -2152,7 +2147,7 @@ function openRackOverview() {
   const towel = state.consumables.find(c => c.id === state.activeTowel) || state.consumables.find(c => isTowelId(c.id));
   const towelDays = towel ? daysUsed(towel) : 0;
   const titleEl = document.querySelector('#modal-rack-overview .modal-head h2');
-  if (titleEl) titleEl.textContent = `暫存衣架・浴巾 ${towelDays} 天`;
+  if (titleEl) titleEl.textContent = '暫存衣架';
 
   const pinnedWrap = document.getElementById('rackOverviewPinnedTowel');
   if (pinnedWrap) {
