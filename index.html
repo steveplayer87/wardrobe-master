@@ -2,7 +2,18 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<script>
+/* iOS standalone: WebKit mis-sizes the window at launch (bottom chin). Re-asserting the viewport after first layout
+   makes it recompute; verified on device (no viewport-fit=cover => dynamic island band + bottom edge fully filled). */
+(function(){
+  var C='width=device-width, initial-scale=1, maximum-scale=1';
+  function re(){var m=document.querySelector('meta[name=viewport]'),n=document.createElement('meta');n.name='viewport';n.content=C;if(m)m.remove();document.head.appendChild(n)}
+  window.addEventListener('load',function(){setTimeout(re,300)});
+  window.addEventListener('pageshow',function(e){if(e.persisted)setTimeout(re,100)});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(re,150)});
+})();
+</script>
 <title>Wardrobe Master</title>
 <meta name="theme-color" content="#3A88E9">
 <link rel="manifest" href="manifest.json">
@@ -10,7 +21,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261020_76">
+<link rel="stylesheet" href="styles.css?v=20261020_77">
 </head>
 <body>
 
@@ -1502,72 +1513,7 @@
   <img class="photo-viewer-img" id="photoViewerImg" alt="">
 </div>
 
-<script src="seed-items.js?v=20261020_76"></script>
-<script src="app.js?v=20261020_76"></script>
-
-<!-- CHIN-DEBUG:START (診斷完成後整段刪除，到 CHIN-DEBUG:END 為止) -->
-<style>
-html.dbg.dbg.dbg{background:#ff0000 !important}
-html.dbg.dbg body{background:#ff00ff !important}
-html.dbg #app{outline:3px solid #00c000;outline-offset:-3px}
-html.dbg .tab-bar{outline:3px solid #0050ff;outline-offset:-3px}
-#dbgPanel{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 56px);z-index:2147483000;max-height:62vh;overflow:auto;background:rgba(0,0,0,.86);color:#fff;font:11px/1.5 ui-monospace,Menlo,monospace;padding:8px 10px;border-radius:10px;white-space:pre-wrap;-webkit-user-select:text;user-select:text}
-#dbgPanel .row{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-#dbgPanel button{padding:6px 9px;border:1px solid rgba(255,255,255,.5);border-radius:8px;background:transparent;color:#fff;font:inherit}
-#dbgProbe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-</style>
-<script>
-(function(){
-  var h=document.documentElement; h.classList.add('dbg');
-  var VP_FULL='width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1';
-  var probe=document.createElement('div'); probe.id='dbgProbe';
-  var p=document.createElement('div'); p.id='dbgPanel';
-  var out=document.createElement('div'), logEl=document.createElement('div'), row=document.createElement('div');
-  row.className='row'; p.appendChild(out); p.appendChild(logEl); p.appendChild(row);
-  document.body.appendChild(probe); document.body.appendChild(p);
-  var logs=[];
-  function f(n){return n==null?'-':Math.round(n*10)/10}
-  function bottom(sel){var e=document.querySelector(sel);return e?e.getBoundingClientRect().bottom:null}
-  function setVP(c){
-    var m=document.querySelector('meta[name=viewport]'), n=document.createElement('meta');
-    n.name='viewport'; n.content=c; if(m) m.remove(); document.head.appendChild(n);
-  }
-  function upd(){
-    var ih=window.innerHeight, sh=screen.height, vv=window.visualViewport;
-    var cs=getComputedStyle(probe), sb=parseFloat(cs.paddingBottom)||0, st=parseFloat(cs.paddingTop)||0;
-    var ab=bottom('#app'), tb=bottom('.tab-bar'), v;
-    if(ih<sh-1) v='視窗比螢幕短 '+f(sh-ih)+'px';
-    else if(tb!=null&&tb<ih-1) v='tab bar 沒貼底，差 '+f(ih-tb)+'px';
-    else if(ab!=null&&ab<ih-1) v='#app 沒貼底，差 '+f(ih-ab)+'px';
-    else v='元素都貼到底，視窗與螢幕同高';
-    var m=document.querySelector('meta[name=viewport]');
-    out.textContent=
-      'innerH '+ih+'  outerH '+window.outerHeight+'  screen '+sh+'  visualVP '+(vv?f(vv.height):'-')+'\n'+
-      'clientH '+h.clientHeight+'  safe 上'+f(st)+' 下'+f(sb)+'  vvTop '+(vv?f(vv.offsetTop):'-')+'\n'+
-      '#app bottom '+f(ab)+'  tab-bar bottom '+f(tb)+'\n'+
-      'standalone '+navigator.standalone+'  dpr '+window.devicePixelRatio+'\n'+
-      'viewport: '+(m?m.content:'(無)')+'\n'+
-      '判斷：'+v;
-    logEl.textContent=logs.join('\n');
-  }
-  function test(name,fn){
-    var before=window.innerHeight; fn();
-    setTimeout(function(){logs.push('['+name+'] innerH '+before+' → '+window.innerHeight); upd();},400);
-  }
-  function btn(label,fn){var b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',fn);row.appendChild(b)}
-  btn('A 重寫viewport',function(){test('A',function(){setVP(VP_FULL)})});
-  btn('B 關cover',function(){test('B',function(){setVP('width=device-width, initial-scale=1, maximum-scale=1')})});
-  btn('C 去max-scale',function(){test('C',function(){setVP('width=device-width, initial-scale=1, viewport-fit=cover')})});
-  btn('D 捲動+resize',function(){test('D',function(){window.scrollTo(0,1);window.scrollTo(0,0);window.dispatchEvent(new Event('resize'))})});
-  btn('還原',function(){test('還原',function(){setVP(VP_FULL)})});
-  btn('關閉面板',function(){clearInterval(timer);h.classList.remove('dbg');p.remove();probe.remove()});
-  var timer=setInterval(upd,800);
-  window.addEventListener('resize',upd);
-  if(window.visualViewport) window.visualViewport.addEventListener('resize',upd);
-  upd();
-  setTimeout(function(){test('自動A',function(){setVP(VP_FULL)})},600);
-})();
-</script>
-<!-- CHIN-DEBUG:END -->
+<script src="seed-items.js?v=20261020_77"></script>
+<script src="app.js?v=20261020_77"></script>
 </body>
 </html>

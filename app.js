@@ -1942,8 +1942,28 @@ function syncHomeRackExpansion() {
   const isHome = document.getElementById('view-home')?.classList.contains('is-active');
   app.classList.toggle('home-racks-expanded', !!isHome && main.scrollTop > 28);
 }
+/* Home: push the rack row down so that, at rest, only its title row peeks out above the tab bar. */
+function layoutHomePeek() {
+  const main = document.getElementById('mainScroll');
+  const view = document.getElementById('view-home');
+  const tab = document.querySelector('.tab-bar');
+  const row = view && view.querySelector('.rack-row');
+  const card = row && row.querySelector('.rack-card');
+  const head = card && card.querySelector('.rack-card-head');
+  if (!main || !view || !tab || !head || !view.classList.contains('is-active')) return;
+  const tabH = tab.offsetHeight;
+  if (tabH) document.documentElement.style.setProperty('--tab-h', tabH + 'px');
+  const padTop = parseFloat(getComputedStyle(card).paddingTop) || 12;
+  const GAP = 12; // breathing room between the title row and the tab bar
+  const peek = padTop + head.offsetHeight + GAP;
+  const rackTop = main.clientHeight - tabH - peek;
+  const need = rackTop + row.offsetHeight;
+  view.style.minHeight = Math.max(0, Math.round(need)) + 'px';
+}
 function renderHome() {
   syncHomeRackExpansion();
+  requestAnimationFrame(layoutHomePeek);
+  setTimeout(layoutHomePeek, 300);
   ['hat', 'top', 'bottom', 'shoes'].forEach(slot => {
     const btn = document.querySelector(`.figure-slot[data-slot="${slot}"]`);
     if (!btn) return;
@@ -8282,6 +8302,7 @@ async function init() {
     if (app && app.style.height) app.style.height = '';
   }
   window.addEventListener('resize', lockViewportScroll);
+  window.addEventListener('resize', layoutHomePeek);
   window.addEventListener('orientationchange', lockViewportScroll);
   window.addEventListener('scroll', () => {
     if (window.scrollY !== 0 || window.scrollX !== 0) {

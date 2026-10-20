@@ -39,7 +39,8 @@
   --font-main: -apple-system, BlinkMacSystemFont, "PingFang TC", "Helvetica Neue", "Segoe UI", sans-serif;
 
   --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), 34px); /* home-indicator zone, kept even when viewport-fit is not cover */
+  --tab-h: 83px;
   --app-max-width: 402px;
 }
 
@@ -53,13 +54,13 @@ html {
 }
 html.home-page,
 body.home-page {
-  background: linear-gradient(180deg, #3A88E9 0%, #5E9DF2 22%, #85B5F8 50%, #B8D5FA 80%, #E3EFFF 100%) fixed !important;
+  background: linear-gradient(180deg, #3A88E9 0%, #5E9DF2 22%, #85B5F8 50%, #B8D5FA 80%, #E3EFFF 100%) no-repeat fixed #3A88E9 !important;
 }
 html.night-page,
 body.night-page,
 html.home-page.night-page,
 body.home-page.night-page {
-  background: linear-gradient(180deg, #0F172A 0%, #1E293B 28%, #1E1B4B 60%, #181C3D 100%) fixed !important;
+  background: linear-gradient(180deg, #0F172A 0%, #1E293B 28%, #1E1B4B 60%, #181C3D 100%) no-repeat fixed #0F172A !important;
 }
 
 body {
@@ -237,7 +238,7 @@ svg { width: 100%; height: 100%; display: block; }
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-top: 1px solid rgba(255,255,255,0.65);
   box-shadow: 0 -8px 26px rgba(28, 44, 84, 0.14), 0 -2px 6px rgba(0, 0, 0, 0.04);
-  padding: 6px 2px max(env(safe-area-inset-bottom, 0px), 16px);
+  padding: 8px 2px var(--safe-bottom);
   box-sizing: border-box;
   z-index: 50;
   -webkit-transform: translateZ(0);
@@ -1083,7 +1084,7 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
   flex: 1 1 0;
   min-height: 0;
   min-width: 0;
-  padding: 0 16px calc(90px + var(--safe-bottom));
+  padding: 0 16px calc(var(--tab-h, 83px) + 20px);
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
@@ -1330,9 +1331,11 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
   padding: 4px 0 10px;
   background: transparent;
   box-shadow: none;
-  flex-shrink: 0;
+  flex: 1 0 auto;
   position: relative;
 }
+#app.is-home-view .scene-label { margin-top: auto; }
+#app.is-home-view .figure-link-row { margin-bottom: auto; }
 #app.is-home-view .scene-sky {
   position: relative;
   width: 100%;
@@ -1499,7 +1502,7 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 #app.is-home-view .rack-row {
-  margin: 16px 0 32px;
+  margin: 16px 0 0;
   padding: 0;
   display: flex;
   gap: 10px;
