@@ -961,12 +961,15 @@ function replaceStateFromSnapshot(snapshot) {
 function syncHomeThemeColor(isHome, isNight) {
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   let color;
-  if (!isHome) color = '#ffffff';
-  else if (activeView === 'wardrobe' && uiWardrobeCat === 'retired') color = '#D8B45B';
-  else color = isNight ? '#0F172A' : '#3A88E9';   // seamless match with the atmosphere gradient top
+  if (activeView === 'wardrobe' && uiWardrobeCat === 'retired') color = '#D8B45B';
+  else color = isNight ? '#0F172A' : '#3A88E9';   // same band colour on every page, follows day/night
   if (themeMeta) themeMeta.setAttribute('content', color);
-  // solid colour on <html> is what iOS paints into the dynamic-island band
-  document.documentElement.style.setProperty('background-color', color, 'important');
+  const root = document.documentElement;
+  const prev = root.dataset.bandColor;
+  root.style.setProperty('background-color', color, 'important');
+  root.dataset.bandColor = color;
+  // WebKit only re-reads the island-band colour on a viewport change
+  if (prev && prev !== color && window.__bandSettled && typeof window.__refreshBand === 'function') window.__refreshBand();
 }
 
 function activateView(view) {
