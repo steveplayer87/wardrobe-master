@@ -104,16 +104,20 @@ const COLOR_FAMILIES = [
 ];
 
 const TEN_COLORS = [
-  { name: '紅', hex: '#DC2626' },
-  { name: '橘', hex: '#EA580C' },
-  { name: '黃', hex: '#EAB308' },
-  { name: '綠', hex: '#16A34A' },
-  { name: '藍', hex: '#2563EB' },
-  { name: '紫', hex: '#9333EA' },
-  { name: '黑', hex: '#18181B' },
-  { name: '白', hex: '#FFFFFF' },
-  { name: '粉紅', hex: '#EC4899' },
-  { name: '灰牛仔', hex: '#5C6B73' },
+  { name: '黑', hex: '#26262A' },
+  { name: '白', hex: '#F4F1EA' },
+  { name: '灰', hex: '#9A9DA1' },
+  { name: '藏青', hex: '#2F3B58' },
+  { name: '藍', hex: '#3F6CB0' },
+  { name: '灰牛仔', hex: '#6E8197' },
+  { name: '米', hex: '#D8CBB4' },
+  { name: '棕', hex: '#6B4A35' },
+  { name: '綠', hex: '#4F7F5F' },
+  { name: '紅', hex: '#B3392F' },
+  { name: '粉紅', hex: '#E7B0B8' },
+  { name: '黃', hex: '#E0B84F' },
+  { name: '橘', hex: '#D9783B' },
+  { name: '紫', hex: '#7A5C9A' },
   { name: '多色', hex: 'linear-gradient(135deg, #FF595E 0%, #FFCA3A 33%, #8AC926 66%, #1982C4 100%)' }
 ];
 
@@ -4243,7 +4247,7 @@ function renderColorForm() {
   const chipsWrap = document.getElementById('colorPresetChips');
   if (!chipsWrap) return;
   chipsWrap.innerHTML = '';
-  TEN_COLORS.forEach(c => {
+  TEN_COLORS.filter(c => c.name !== '多色').forEach(c => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'color-swatch-chip' + (pendingColor.hex === c.hex || pendingColor.name === c.name ? ' is-active' : '');
@@ -4271,6 +4275,8 @@ function syncColorFormUI() {
   if (btnClear) btnClear.hidden = !pendingColor.hex && !pendingColor.name;
   const nameInput = document.getElementById('fieldColorName');
   if (nameInput && document.activeElement !== nameInput) nameInput.value = pendingColor.name || '';
+  const dot = document.getElementById('colorSelectedDot');
+  if (dot) { dot.style.background = pendingColor.hex || ''; dot.classList.toggle('is-empty', !pendingColor.hex); }
   const pickerInput = document.getElementById('fieldColorPicker');
   if (pickerInput && /^#[0-9a-fA-F]{6}$/.test(pendingColor.hex || '')) pickerInput.value = pendingColor.hex;
 
@@ -5519,6 +5525,8 @@ function openFilterModal(context = 'wardrobe') {
   if (brandRow) {
     brandRow.innerHTML = '';
     const allBrands = Array.from(new Set(state.items.map(it => (it.brand || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+    const brandIconOf = {};
+    state.items.forEach(it => { const b = (it.brand || '').trim(); if (b && it.brandIcon && !brandIconOf[b]) brandIconOf[b] = it.brandIcon; });
     if (allBrands.length === 0) {
       brandRow.innerHTML = '<span class="empty-hint-sm" style="color:var(--c-text-muted);font-size:12px;padding:4px 0;">尚無品牌資料</span>';
     } else {
@@ -5526,7 +5534,15 @@ function openFilterModal(context = 'wardrobe') {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = 'chip' + (uiWardrobeFilters.brands.includes(b) ? ' is-active' : '');
-        chip.textContent = b;
+        if (brandIconOf[b]) {
+          const img = document.createElement('img');
+          img.className = 'chip-brand-icon';
+          img.alt = '';
+          img.loading = 'lazy';
+          img.src = brandIconOf[b];
+          chip.appendChild(img);
+        }
+        chip.appendChild(document.createTextNode(b));
         chip.addEventListener('click', () => {
           uiWardrobeFilters.brands = uiWardrobeFilters.brands.includes(b)
             ? uiWardrobeFilters.brands.filter(x => x !== b)

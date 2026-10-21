@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BandTest">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#3A88E9">
+<title>Band Test</title>
+<style>
+html{background:#3A88E9}
+body{margin:0;position:fixed;inset:0;background:linear-gradient(180deg,#3A88E9,#B8D5FA);color:#fff;font:14px -apple-system,"PingFang TC",sans-serif;overflow:hidden}
+.hd{position:absolute;left:16px;top:10px;font-size:22px;font-weight:800}
+.card{position:absolute;left:12px;right:12px;top:54px;bottom:95px;overflow:auto;background:rgba(10,20,50,.82);border-radius:14px;padding:10px 12px;font:11.5px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap}
+.row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+button{padding:7px 10px;border:1px solid rgba(255,255,255,.55);border-radius:9px;background:transparent;color:#fff;font:inherit}
+.tab{position:fixed;left:0;right:0;bottom:0;height:83px;background:#fff;color:#222;display:flex;align-items:center;justify-content:center;font-weight:700}
+</style>
+</head>
+<body>
+<div class="hd">Band Test</div>
+<div class="card" id="card">
+<b>看頂部那條（狀態列後面）變成什麼顏色：</b>
+紅=html　綠=body　藍=頂緣條　洋紅=theme-color　白/灰=都沒生效
+<div class="row" id="btns"></div>
+<div id="info"></div>
+<div id="log"></div>
+</div>
+<div class="tab">底部白色條（要貼到螢幕最底）</div>
+<script>
+(function(){
+  var COVER='width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1';
+  var NOC='width=device-width, initial-scale=1, maximum-scale=1';
+  var root=document.documentElement, t0=Date.now(), logs=[];
+  var probe=document.createElement('div');
+  probe.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+  document.body.appendChild(probe);
+  function f(n){return Math.round(n*10)/10}
+  function geo(){
+    var cs=getComputedStyle(probe), vv=window.visualViewport, m=document.querySelector('meta[name=viewport]');
+    return 'innerH '+innerHeight+' screen '+screen.height+' safe上'+f(parseFloat(cs.paddingTop)||0)+' 下'+f(parseFloat(cs.paddingBottom)||0)+' vvTop '+(vv?f(vv.offsetTop):'-')+' cover:'+(m&&/cover/.test(m.content)?'是':'否');
+  }
+  function log(s){logs.push(((Date.now()-t0)/1000).toFixed(2)+'s '+s);document.getElementById('log').textContent=logs.slice(-14).join('\n');document.getElementById('info').textContent=geo()}
+  function setVP(c){var m=document.querySelector('meta[name=viewport]'),n=document.createElement('meta');n.name='viewport';n.content=c;if(m)m.remove();document.head.appendChild(n)}
+  function cycle(){setVP(COVER);setTimeout(function(){setVP(NOC);setTimeout(function(){log('cycle完成 '+geo())},300)},80)}
+  var bar;
+  var acts=[
+    ['H html紅',function(){root.style.setProperty('background','#ff0000','important')}],
+    ['B body綠',function(){document.body.style.setProperty('background','#00b050','important')}],
+    ['C 頂緣藍條',function(){if(!bar){bar=document.createElement('div');bar.style.cssText='position:fixed;left:0;right:0;top:0;height:3px;background:#0050ff;z-index:99;pointer-events:none';document.body.appendChild(bar)}}],
+    ['T theme洋紅',function(){document.querySelector('meta[name=theme-color]').setAttribute('content','#ff00ff')}],
+    ['↻ 重切',cycle],
+    ['只 cover',function(){setVP(COVER)}],
+    ['只 no-cover',function(){setVP(NOC)}],
+    ['重來',function(){location.reload()}]
+  ];
+  acts.forEach(function(a){
+    var b=document.createElement('button');b.type='button';b.textContent=a[0];
+    b.onclick=function(){a[1]();log('按 '+a[0]);setTimeout(function(){log('→ '+geo())},350)};
+    document.getElementById('btns').appendChild(b);
+  });
+  log('啟動 '+geo());
+  window.addEventListener('load',function(){setTimeout(function(){log('自動 cycle(0.5s)');cycle()},500)});
+  document.addEventListener('visibilitychange',function(){log('visibility '+document.visibilityState)});
+  setInterval(function(){document.getElementById('info').textContent=geo()},1000);
+})();
+</script>
+</body>
+</html>

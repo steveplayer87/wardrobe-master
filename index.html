@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261020_85">
+<link rel="stylesheet" href="styles.css?v=20261020_86">
 </head>
 <body>
 
@@ -466,6 +466,7 @@
         </div>
         <div class="color-picker-quick-row" id="colorPresetChips"></div>
         <div class="color-custom-row">
+          <span class="color-selected-dot is-empty" id="colorSelectedDot" aria-hidden="true"></span>
           <label class="color-palette-btn" title="開啟調色盤">
             <input type="color" id="fieldColorPicker" value="#2563EB" class="color-native-input">
             <span class="icon-inline" data-icon="palette"></span>
@@ -1521,7 +1522,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v85', K='wm_seen_version', seen=null;
+  var V='v86', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1531,7 +1532,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261020_85"></script>
-<script src="app.js?v=20261020_85"></script>
+<script src="seed-items.js?v=20261020_86"></script>
+<script src="app.js?v=20261020_86"></script>
 </body>
 </html>
