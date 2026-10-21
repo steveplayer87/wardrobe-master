@@ -69,7 +69,7 @@ const FIGURE_ICONS = {
   hat: `<svg viewBox="0 0 50 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 32c0-12 7-20 17-20 8.2 0 14.2 5 15.8 13l.4 7Z" fill="currentColor" fill-opacity=".12"/><path d="M40 27.5c5 .6 8.4 2.6 7.6 5.4-.8 2.6-6.2 2.4-10.8 2.4H8" fill="currentColor" fill-opacity=".12"/><path d="M25 12c-3.2 5-4.2 12-3.6 20M25 12c4 3.6 6 11 5.8 20" opacity=".6"/><circle cx="25" cy="11.2" r="1.6" fill="currentColor" fill-opacity=".55"/></svg>`,
   top: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 6 8.5 9.8 3 19.2l7 3.6 2-3.3V41.5h24V19.5l2 3.3 7-3.6-5.5-9.4L30.5 6c-1.2 3-3.6 4.6-6.5 4.6S18.7 9 17.5 6Z" fill="currentColor" fill-opacity=".12"/><path d="M17.5 6c1 4.4 3.4 6.8 6.5 6.8S29.5 10.4 30.5 6" opacity=".75"/><path d="M12 37h24M10 22.8l2-3.3M38 22.8l-2-3.3" opacity=".6"/></svg>`,
   bottom: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 5h23l3 37.5h-11L24 18.5l-3.5 24h-11Z" fill="currentColor" fill-opacity=".12"/><path d="M12.9 10.5h22.2M24 10.5v8" opacity=".75"/><path d="M15.5 14.5c1.6 0 3 .6 4 1.6M32.5 14.5c-1.6 0-3 .6-4 1.6" opacity=".6"/><circle cx="24" cy="12.6" r=".9" fill="currentColor" stroke="none" opacity=".7"/></svg>`,
-  shoes: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 33.5c0-3.4 1.6-5.4 4.8-6.2l8.4-2.1c1.6-.4 2.6-1.4 3.2-3l.8-2.4c3.4 2.8 7.4 4.6 12.2 5.5 5.4 1 8.4 3 8.4 6.6v3.2c0 1.2-.9 2-2.1 2H6.6c-1.2 0-2.1-.8-2.1-2Z" fill="currentColor" fill-opacity=".12"/><path d="M4.5 34.2h39" opacity=".75"/><path d="M23.6 22.6l2.8 2.6M27.8 24.2l2.8 2.6M32 25.4l2.6 2.4" opacity=".7"/><path d="M13 28.4c1.4 1.2 3 1.8 4.8 1.8" opacity=".6"/></svg>`
+  shoes: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(1 4.5) scale(1.15 1) rotate(-5 12 20)"><path d="M6 6.4C6 2.9 8.6 1 12 1s6 1.9 6 5.4c0 3.9-1.5 6.6-1.7 10.4-.2 3.2 2.1 6.1 2.1 11.2 0 6.7-3 11.4-6.4 11.4s-6.4-4.7-6.4-11.4c0-5.1 2.3-8 2.1-11.2C7.5 13 6 10.3 6 6.4Z" fill="currentColor" fill-opacity=".14"/><path d="M8.7 6.6c0-2 1.3-3.1 3.3-3.1s3.3 1.1 3.3 3.1c0 2-1.2 3.3-3.3 3.3S8.7 8.6 8.7 6.6Z" opacity=".75"/><path d="M9.9 13.2h4.2M9.7 16.2h4.6M9.6 19.2h4.8" opacity=".7"/><path d="M7.4 29.6c2.4 1.8 6.8 1.8 9.2 0" opacity=".65"/></g><g transform="translate(47 4.5) scale(-1.15 1) rotate(-5 12 20)"><path d="M6 6.4C6 2.9 8.6 1 12 1s6 1.9 6 5.4c0 3.9-1.5 6.6-1.7 10.4-.2 3.2 2.1 6.1 2.1 11.2 0 6.7-3 11.4-6.4 11.4s-6.4-4.7-6.4-11.4c0-5.1 2.3-8 2.1-11.2C7.5 13 6 10.3 6 6.4Z" fill="currentColor" fill-opacity=".14"/><path d="M8.7 6.6c0-2 1.3-3.1 3.3-3.1s3.3 1.1 3.3 3.1c0 2-1.2 3.3-3.3 3.3S8.7 8.6 8.7 6.6Z" opacity=".75"/><path d="M9.9 13.2h4.2M9.7 16.2h4.6M9.6 19.2h4.8" opacity=".7"/><path d="M7.4 29.6c2.4 1.8 6.8 1.8 9.2 0" opacity=".65"/></g></svg>`
 };
 function applyStaticIcons() {
   document.querySelectorAll('[data-icon]').forEach(el => {
@@ -190,9 +190,10 @@ function classifyColorFamily(hex) {
   if (match) return match.family;
   try {
     const { h, s, l } = hexToHsl(clean);
+    if (l >= 90 && s <= 40) return '白色';
+    if (l <= 18 || (l <= 26 && s <= 22)) return '黑色';
     if (l >= 88 && s <= 30) return '白色';
-    if (l <= 14) return '黑色';
-    if (s <= 14) return '灰色';
+    if (s <= 12) return '灰色';
     if (h >= 25 && h <= 50 && s >= 15 && s <= 55 && l >= 72) return '米/杏色';
     if ((h >= 345 && h <= 360) || (h >= 0 && h < 14)) {
       if (l >= 70 && s >= 30) return '粉色';
@@ -4612,6 +4613,7 @@ function openAddModal(editId = null) {
       name: item.color || '',
       family: item.colorFamily || (item.colorHex ? classifyColorFamily(item.colorHex) : '')
     };
+    pendingColor.nameManual = !!pendingColor.name && pendingColor.name !== pendingColor.family && !TEN_COLORS.some(c => c.name === pendingColor.name);
     syncBrandForm(item.brand || '', item.brandIcon || null);
     document.getElementById('addModalTitle').textContent = '編輯單品';
     document.getElementById('addFormSubmitBtn').textContent = '儲存修改';
@@ -6691,9 +6693,7 @@ function wireEvents() {
       const fam = classifyColorFamily(hex);
       pendingColor.hex = hex;
       pendingColor.family = fam;
-      if (!pendingColor.name || COLOR_FAMILIES.includes(pendingColor.name)) {
-        pendingColor.name = fam;
-      }
+      if (!pendingColor.nameManual) pendingColor.name = fam;
       formDirty = true;
       syncColorFormUI();
       autoSaveAddItemDraft();
@@ -6705,9 +6705,10 @@ function wireEvents() {
     colorNameInput.addEventListener('input', e => {
       const val = e.target.value.trim();
       pendingColor.name = val;
+      pendingColor.nameManual = !!val;
       if (!pendingColor.family && val) {
-        const match = COLOR_FAMILIES.find(f => val.includes(f));
-        if (match) pendingColor.family = match;
+        const match = COLOR_FAMILIES.find(f => val.includes(f.name.replace(/色$/, '')));
+        if (match) pendingColor.family = match.name;
       }
       formDirty = true;
       syncColorFormUI();
@@ -6770,9 +6771,16 @@ function wireEvents() {
     formDirty = false;
     if (editingItemId) {
       const returnId = editingItemId;
+      const cameFromDetail = modalStack.some(m => m.id === 'modal-item');
       editingItemId = null;
+      const addSheet = document.getElementById('modal-add');
+      if (addSheet) {
+        addSheet.classList.remove('is-active', 'is-shown', 'is-behind', 'is-dragging');
+        addSheet.style.transform = ''; addSheet.style.transition = ''; addSheet.style.zIndex = '';
+      }
       modalStack = modalStack.filter(m => m.id !== 'modal-add' && m.id !== 'modal-item');
-      openItemDetail(returnId);
+      if (cameFromDetail) openItemDetail(returnId);
+      else forceCloseModal({ skipPersist: true });
     } else {
       forceCloseModal({ skipPersist: true });
     }

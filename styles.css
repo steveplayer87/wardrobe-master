@@ -4844,3 +4844,25 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 .color-selected-dot { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(0,0,0,.12); box-shadow: inset 0 0 0 2px #fff; }
 .color-selected-dot.is-empty { background: repeating-conic-gradient(#e5e7eb 0 25%, #fff 0 50%) 50% / 10px 10px !important; }
 .chip .chip-brand-icon { width: 16px; height: 16px; object-fit: contain; border-radius: 4px; background: #fff; padding: 1px; margin-right: 6px; vertical-align: -3px; box-sizing: content-box; }
+
+/* v87: weather art uses Meteocons by Bas Milius (MIT, see assets/weather/LICENSE-meteocons.txt) - iOS-weather style */
+.scene-art-sun, .scene-art-moon, .scene-art-cloud, .scene-art-rain {
+  width: 88px !important; height: 88px !important; top: -8px !important; right: 34px !important; left: auto !important;
+  border-radius: 0 !important; box-shadow: none !important; transform: none !important;
+  background-color: transparent !important; background-repeat: no-repeat !important; background-position: center !important; background-size: contain !important;
+  filter: drop-shadow(0 6px 12px rgba(20, 24, 70, 0.28)); opacity: 1 !important;
+}
+.scene-art-sun::before, .scene-art-sun::after, .scene-art-moon::before, .scene-art-moon::after,
+.scene-art-cloud::before, .scene-art-cloud::after { display: none !important; }
+.scene-art-sun   { background-image: url(assets/weather/clear-day.svg) !important; }
+.scene-art-moon  { background-image: url(assets/weather/clear-night.svg) !important; }
+.scene-art-cloud { background-image: url(assets/weather/overcast.svg) !important; }
+.scene-sky.is-night .scene-art-cloud { background-image: url(assets/weather/overcast-night.svg) !important; }
+.scene-art-rain  { background-image: url(assets/weather/rain.svg) !important; }
+.scene-sky.is-night .scene-art-rain { background-image: url(assets/weather/partly-cloudy-night-rain.svg) !important; }
+.scene-sky.is-snow .scene-art-rain { background-image: url(assets/weather/snow.svg) !important; }
+.scene-sky.is-snow.is-night .scene-art-rain { background-image: url(assets/weather/partly-cloudy-night-snow.svg) !important; }
+.scene-sky.is-rain .scene-art-cloud, .scene-sky.is-snow .scene-art-cloud { display: none !important; }
+.weather-preview-sky .scene-art-sun, .weather-preview-sky .scene-art-moon, .weather-preview-sky .scene-art-cloud, .weather-preview-sky .scene-art-rain {
+  width: 64px !important; height: 64px !important; top: 4px !important; right: 18px !important;
+}
