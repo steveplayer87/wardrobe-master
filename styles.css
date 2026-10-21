@@ -4,7 +4,7 @@
    apricot clothesline accent, sage clean / coral needs-wash.
    ========================================================= */
 :root {
-  --color-bg: #F7F8FA;
+  --color-bg: #F5F8F9;
   --color-surface: #FFFFFF;
   --color-surface-2: #EFF1F5;
   --color-ink: #1C2333;
@@ -4814,3 +4814,17 @@ body.night-page .studio-drag-tip {
 
 
 
+
+/* v85: palette native input (visually hidden but still clickable through its label) */
+.color-native-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.color-palette-btn { position: relative; }
+.color-custom-row input[type="text"] { flex: 1; min-width: 0; padding: 9px 12px; border: 1.5px solid var(--color-line); border-radius: 12px; font-size: 13px; background: var(--color-surface); }
+
+/* v85: one continuous top surface - status bar, header, category chips and sort row share the same colour, no shadows or divider lines */
+#app:not(.is-home-view):not(.is-retired-view) .app-header { background: var(--color-bg) !important; box-shadow: none !important; }
+.wardrobe-sticky-header { background: var(--color-bg) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; border-bottom: none !important; }
+#app.is-retired-view .wardrobe-sticky-header { background: #D8B45B !important; border-bottom: none !important; }
+#app.is-retired-view .app-header { box-shadow: none !important; }
+
+/* v85: slightly larger home slot placeholder icons */
+#app.is-home-view .figure-slot:not(.is-filled):not(.is-transparent-slot) .figure-thumb svg { width: 44px !important; height: 44px !important; opacity: 0.9; }

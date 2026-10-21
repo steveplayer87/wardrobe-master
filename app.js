@@ -65,10 +65,18 @@ const ICONS = {
   check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
   chevronRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`,
 };
+const FIGURE_ICONS = {
+  hat: `<svg viewBox="0 0 50 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 32c0-12 7-20 17-20 8.2 0 14.2 5 15.8 13l.4 7Z" fill="currentColor" fill-opacity=".12"/><path d="M40 27.5c5 .6 8.4 2.6 7.6 5.4-.8 2.6-6.2 2.4-10.8 2.4H8" fill="currentColor" fill-opacity=".12"/><path d="M25 12c-3.2 5-4.2 12-3.6 20M25 12c4 3.6 6 11 5.8 20" opacity=".6"/><circle cx="25" cy="11.2" r="1.6" fill="currentColor" fill-opacity=".55"/></svg>`,
+  top: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 6 8.5 9.8 3 19.2l7 3.6 2-3.3V41.5h24V19.5l2 3.3 7-3.6-5.5-9.4L30.5 6c-1.2 3-3.6 4.6-6.5 4.6S18.7 9 17.5 6Z" fill="currentColor" fill-opacity=".12"/><path d="M17.5 6c1 4.4 3.4 6.8 6.5 6.8S29.5 10.4 30.5 6" opacity=".75"/><path d="M12 37h24M10 22.8l2-3.3M38 22.8l-2-3.3" opacity=".6"/></svg>`,
+  bottom: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 5h23l3 37.5h-11L24 18.5l-3.5 24h-11Z" fill="currentColor" fill-opacity=".12"/><path d="M12.9 10.5h22.2M24 10.5v8" opacity=".75"/><path d="M15.5 14.5c1.6 0 3 .6 4 1.6M32.5 14.5c-1.6 0-3 .6-4 1.6" opacity=".6"/><circle cx="24" cy="12.6" r=".9" fill="currentColor" stroke="none" opacity=".7"/></svg>`,
+  shoes: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 33.5c0-3.4 1.6-5.4 4.8-6.2l8.4-2.1c1.6-.4 2.6-1.4 3.2-3l.8-2.4c3.4 2.8 7.4 4.6 12.2 5.5 5.4 1 8.4 3 8.4 6.6v3.2c0 1.2-.9 2-2.1 2H6.6c-1.2 0-2.1-.8-2.1-2Z" fill="currentColor" fill-opacity=".12"/><path d="M4.5 34.2h39" opacity=".75"/><path d="M23.6 22.6l2.8 2.6M27.8 24.2l2.8 2.6M32 25.4l2.6 2.4" opacity=".7"/><path d="M13 28.4c1.4 1.2 3 1.8 4.8 1.8" opacity=".6"/></svg>`
+};
 function applyStaticIcons() {
   document.querySelectorAll('[data-icon]').forEach(el => {
     const name = el.getAttribute('data-icon');
-    if (ICONS[name]) el.innerHTML = ICONS[name];
+    const figIcon = el.closest && el.closest('#figureBoard, #simFigureBoard') ? FIGURE_ICONS[name] : null;
+    if (figIcon) el.innerHTML = figIcon;
+    else if (ICONS[name]) el.innerHTML = ICONS[name];
   });
   document.querySelectorAll('.modal-close, .modal-close-btn').forEach(el => {
     if (!el.querySelector('svg') || el.textContent.trim() === '✕') {
@@ -1537,10 +1545,82 @@ function thumbInner(item) {
 const SIMPLE_ICONS_SLUGS_URL = 'https://raw.githubusercontent.com/simple-icons/simple-icons/develop/slugs.md';
 const SIMPLE_ICONS_CDN_URL = 'https://cdn.simpleicons.org/';
 const BRAND_NAME_ALIASES = {
-  '優衣庫': 'Uniqlo', 'ユニクロ': 'Uniqlo', '無印良品': 'Muji', '耐吉': 'Nike', '愛迪達': 'Adidas',
+  '優衣庫': 'Uniqlo', 'ユニクロ': 'Uniqlo', '極優': 'GU', '無印良品': 'Muji', '耐吉': 'Nike', '愛迪達': 'Adidas',
   '匡威': 'Converse', '新百倫': 'New Balance', '彪馬': 'Puma', '北面': 'The North Face',
   '迪卡儂': 'Decathlon', '古馳': 'Gucci', '香奈兒': 'Chanel', '路易威登': 'Louis Vuitton',
 };
+const LOCAL_BRANDS = [
+  ["lativ", "lativ", "lativ.com.tw"],
+  ["NET", "net,net服飾", "net-fashion.com"],
+  ["GU", "gu,極優", "gu-global.com"],
+  ["UNIQLO", "uniqlo,優衣庫,ユニクロ", "uniqlo.com"],
+  ["MUJI 無印良品", "muji,無印良品,無印", "muji.com"],
+  ["Hang Ten", "hangten,hang ten", "hangten.com.tw"],
+  ["Life8", "life8,life 8", "life8.com.tw"],
+  ["GIORDANO 佐丹奴", "giordano,佐丹奴", "giordano.com"],
+  ["PAZZO", "pazzo", "pazzo.com.tw"],
+  ["SPAO", "spao", "spao.com"],
+  ["iROO", "iroo", "iroo.com.tw"],
+  ["OB 嚴選", "ob,ob嚴選,嚴選", "obdesign.com.tw"],
+  ["Gap", "gap,蓋璞", "gap.com"],
+  ["ZARA", "zara", "zara.com"],
+  ["H&M", "h&m,hm,hennes", "hm.com"],
+  ["COS", "cos", "cos.com"],
+  ["A.P.C.", "apc,a.p.c", "apc.fr"],
+  ["Levi's", "levis,levi's,李維斯", "levi.com"],
+  ["Lee", "lee", "lee.com"],
+  ["Wrangler", "wrangler,威格", "wrangler.com"],
+  ["Dickies", "dickies", "dickies.com"],
+  ["Carhartt", "carhartt,卡哈特", "carhartt.com"],
+  ["Stüssy", "stussy,斯圖西", "stussy.com"],
+  ["A BATHING APE", "bape,a bathing ape,猿人頭", "bape.com"],
+  ["Champion", "champion,冠軍", "champion.com"],
+  ["FILA", "fila,斐樂", "fila.com"],
+  ["Kappa", "kappa", "kappa.com"],
+  ["Lacoste", "lacoste,鱷魚", "lacoste.com"],
+  ["Polo Ralph Lauren", "polo,ralph lauren,拉夫勞倫", "ralphlauren.com"],
+  ["Tommy Hilfiger", "tommy,湯米", "tommy.com"],
+  ["Calvin Klein", "ck,calvin klein", "calvinklein.com"],
+  ["Nautica", "nautica", "nautica.com"],
+  ["Columbia", "columbia,哥倫比亞", "columbia.com"],
+  ["Jack Wolfskin", "jack wolfskin,飛狼", "jack-wolfskin.com"],
+  ["Arc'teryx", "arcteryx,始祖鳥", "arcteryx.com"],
+  ["Patagonia", "patagonia,巴塔哥尼亞", "patagonia.com"],
+  ["The North Face", "north face,tnf,北面", "thenorthface.com"],
+  ["montbell", "montbell,mont-bell", "montbell.jp"],
+  ["DESCENTE", "descente,迪桑特", "descente.com"],
+  ["Mizuno", "mizuno,美津濃", "mizuno.com"],
+  ["ASICS", "asics,亞瑟士", "asics.com"],
+  ["Onitsuka Tiger", "onitsuka tiger,鬼塚虎", "onitsukatiger.com"],
+  ["Skechers", "skechers,斯凱奇", "skechers.com"],
+  ["Crocs", "crocs,卡駱馳", "crocs.com"],
+  ["Vans", "vans,范斯", "vans.com"],
+  ["Converse", "converse,匡威", "converse.com"],
+  ["New Balance", "nb,new balance,紐巴倫,新百倫", "newbalance.com"],
+  ["Nike", "nike,耐吉", "nike.com"],
+  ["adidas", "adidas,愛迪達", "adidas.com"],
+  ["PUMA", "puma,彪馬", "puma.com"],
+  ["Reebok", "reebok,銳跑", "reebok.com"],
+  ["Under Armour", "ua,under armour,安德瑪", "underarmour.com"],
+  ["Timberland", "timberland,踢不爛", "timberland.com"],
+  ["Dr. Martens", "dr martens,馬汀", "drmartens.com"],
+  ["Birkenstock", "birkenstock,勃肯", "birkenstock.com"],
+  ["BEAMS", "beams", "beams.co.jp"],
+  ["UNITED ARROWS", "united arrows,綠標", "united-arrows.co.jp"],
+  ["PORTER", "porter,吉田", "yoshidakaban.com"],
+  ["DECATHLON 迪卡儂", "decathlon,迪卡儂", "decathlon.com.tw"],
+];
+const BRAND_FAVICON_URL = domain => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+function normalizeBrandText(s) { return String(s || '').toLowerCase().replace(/[\s\-_.'’·&]/g, ''); }
+function findLocalBrandMatches(query) {
+  const q = normalizeBrandText(query);
+  if (!q) return [];
+  return LOCAL_BRANDS.map(([name, aliases, domain]) => {
+    const names = [name, ...aliases.split(',')].map(normalizeBrandText);
+    const score = Math.min(...names.map(n => n === q ? 0 : n.startsWith(q) ? 1 : n.includes(q) ? 2 : q.includes(n) && n.length > 1 ? 3 : 99));
+    return { name, slug: domain, iconUrl: BRAND_FAVICON_URL(domain), score, local: true };
+  }).filter(m => m.score < 99).sort((x, y) => x.score - y.score).slice(0, 6);
+}
 let brandIconCatalog = null;
 let brandIconCatalogPromise = null;
 let pendingBrandIcon = null;
@@ -1589,9 +1669,12 @@ async function searchBrandIcons() {
   results.innerHTML = '<p class="settings-helper">搜尋品牌圖示中…</p>';
   status.textContent = '正在從網路尋找品牌圖示…';
   try {
-    const catalog = await loadBrandIconCatalog();
-    const matches = findBrandIconMatches(query, catalog);
-    results.innerHTML = matches.length ? matches.map((match, index) => `<button type="button" class="brand-search-result" data-brand-index="${index}"><span class="brand-icon brand-icon-small"><img src="${SIMPLE_ICONS_CDN_URL}${encodeURIComponent(match.slug)}" alt="" loading="lazy"></span><span><b>${escapeHtml(match.name)}</b><small>${escapeHtml(match.slug)}</small></span></button>`).join('') : '<p class="settings-helper">找不到相符圖示，仍可保存品牌文字。</p>';
+    let simple = [];
+    try { simple = findBrandIconMatches(query, await loadBrandIconCatalog()).map(m => ({ ...m, iconUrl: `${SIMPLE_ICONS_CDN_URL}${encodeURIComponent(m.slug)}` })); } catch (e) {}
+    const local = findLocalBrandMatches(query);
+    const seen = new Set(local.map(m => normalizeBrandText(m.name)));
+    const matches = local.concat(simple.filter(m => !seen.has(normalizeBrandText(m.name)))).slice(0, 10);
+    results.innerHTML = matches.length ? matches.map((match, index) => `<button type="button" class="brand-search-result" data-brand-index="${index}"><span class="brand-icon brand-icon-small"><img src="${escapeHtml(match.iconUrl)}" alt="" loading="lazy"></span><span><b>${escapeHtml(match.name)}</b><small>${escapeHtml(match.slug)}</small></span></button>`).join('') : '<p class="settings-helper">找不到相符圖示，仍可保存品牌文字。</p>';
     results._matches = matches;
     status.textContent = matches.length ? `找到 ${matches.length} 個相符品牌，點選一個即可套用。` : '沒有相符圖示；品牌名稱仍會正常保存。';
   } catch (error) {
@@ -1950,7 +2033,7 @@ function layoutHomePeek() {
   if (tabH) document.documentElement.style.setProperty('--tab-h', tabH + 'px');
   const padTop = parseFloat(getComputedStyle(card).paddingTop) || 12;
   const blank = parseFloat(getComputedStyle(head).marginBottom) || 0; // empty band under the title row
-  const SAFETY = 10;                                  // item names start this far BEHIND the tab bar at rest
+  const SAFETY = 28;                                  // item names start this far BEHIND the tab bar at rest
   const visible = padTop + head.offsetHeight + Math.max(0, blank - SAFETY);
   const rowMarginTop = parseFloat(getComputedStyle(row).marginTop) || 0;
   const rackTop = main.clientHeight - tabH - visible;
@@ -2009,7 +2092,7 @@ function renderHome() {
         btn.classList.remove('is-transparent-slot');
         thumb.setAttribute('style', `aspect-ratio:${ratio};background-color:transparent;`);
         thumb.style.transform = `translate(${layout.x}%, ${layout.y}%) scale(${layout.scale / 100})`;
-        thumb.innerHTML = ICONS[slot] || '';
+        thumb.innerHTML = FIGURE_ICONS[slot] || ICONS[slot] || '';
       }
       btn.setAttribute('aria-label', btn.getAttribute('data-label'));
     }
@@ -4186,6 +4269,10 @@ function renderColorForm() {
 function syncColorFormUI() {
   const btnClear = document.getElementById('btnClearColor');
   if (btnClear) btnClear.hidden = !pendingColor.hex && !pendingColor.name;
+  const nameInput = document.getElementById('fieldColorName');
+  if (nameInput && document.activeElement !== nameInput) nameInput.value = pendingColor.name || '';
+  const pickerInput = document.getElementById('fieldColorPicker');
+  if (pickerInput && /^#[0-9a-fA-F]{6}$/.test(pendingColor.hex || '')) pickerInput.value = pendingColor.hex;
 
   document.querySelectorAll('#colorPresetChips .color-swatch-chip').forEach(btn => {
     const name = btn.getAttribute('data-color');
@@ -4297,7 +4384,7 @@ function renderOutfitStudio() {
       thumb.innerHTML = thumbInner(item);
     } else {
       thumb.setAttribute('style', `aspect-ratio:${ratio};background-color:transparent;`);
-      thumb.innerHTML = ICONS[slot] || '';
+      thumb.innerHTML = FIGURE_ICONS[slot] || ICONS[slot] || '';
     }
 
     thumb.style.transform = `translate(${layout.x}%, ${layout.y}%) scale(${layout.scale / 100})`;
@@ -6464,7 +6551,7 @@ function wireEvents() {
     const match = e.currentTarget._matches?.[Number(result.dataset.brandIndex)];
     if (!match) return;
     pendingBrandName = match.name;
-    pendingBrandIcon = `${SIMPLE_ICONS_CDN_URL}${encodeURIComponent(match.slug)}`;
+    pendingBrandIcon = match.iconUrl || `${SIMPLE_ICONS_CDN_URL}${encodeURIComponent(match.slug)}`;
     document.getElementById('fieldBrand').value = pendingBrandName;
     document.getElementById('brandSearchResults').innerHTML = '';
     document.getElementById('brandSearchStatus').textContent = '已選擇品牌圖示；儲存後會顯示在單品資訊。';
@@ -8121,7 +8208,7 @@ function openDisplayFigureSim() {
         thumb.innerHTML = '';
       } else {
         thumb.style.backgroundImage = '';
-        thumb.innerHTML = categoryIcon(slot);
+        thumb.innerHTML = FIGURE_ICONS[slot] || categoryIcon(slot);
       }
     }
   });
