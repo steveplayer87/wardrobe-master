@@ -127,6 +127,39 @@ export default {
         if (request.method === "POST") {
           const body = await request.json();
           const current = await env.WARDROBE_STORE.get("app_state_text", "json");
+          // Safety net for already-open older clients: never accept an upload that silently drops
+          // records or photo references already present in the cloud. Intentional deletions must
+          // first be reconciled with the current cloud state rather than overwriting blindly.
+          if (current) {
+            const incomingItems = Array.isArray(body.items) ? body.items : [];
+            const currentItems = Array.isArray(current.items) ? current.items : [];
+            const incomingIds = new Set(incomingItems.map(item => item.id));
+            const missingItemIds = currentItems.filter(item => !incomingIds.has(item.id)).map(item => item.id);
+            const photoCount = items => items.reduce((count, item) => count + (item.image ? 1 : 0) + (item.imageBack ? 1 : 0), 0);
+            const missingPhotos = photoCount(currentItems) - photoCount(incomingItems);
+            const missingCollections = [];
+            for (const [key, label] of [["ootdHistory", "歷史穿搭"], ["wishlist", "想買清單"], ["styleGallery", "風格圖庫"], ["haircuts", "理髮紀錄"], ["consumables", "生活耗材"], ["sandboxItems", "沙盒單品"], ["sandboxes", "沙盒"]]) {
+              const currentCount = Array.isArray(current[key]) ? current[key].length : 0;
+              const incomingCount = Array.isArray(body[key]) ? body[key].length : 0;
+              if (incomingCount < currentCount) missingCollections.push({ key, label, currentCount, incomingCount });
+            }
+            if (missingItemIds.length || missingPhotos > 0 || missingCollections.length) {
+              return new Response(JSON.stringify({
+                success: false,
+                error: "STALE_STATE_PROTECTED",
+                message: "Upload blocked because the cloud contains records missing from this client. Restore or reconcile cloud data before uploading.",
+                details: {
+                  missingItemCount: missingItemIds.length,
+                  missingItemIds: missingItemIds.slice(0, 25),
+                  missingPhotoReferences: Math.max(0, missingPhotos),
+                  missingCollections
+                }
+              }), {
+                status: 409,
+                headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
+              });
+            }
+          }
           const contentHash = async value => {
             const copy = { ...(value || {}) };
             delete copy.updatedAt;

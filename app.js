@@ -5755,7 +5755,7 @@ function setCloudSyncStatus(status, detail) {
   const styles = {
     ready: ['#9ca3af', '雲端同步待命'], pending: ['#d97706', '有變更待同步'],
     offline: ['#9ca3af', '離線編輯中'], syncing: ['#2563eb', '正在同步'],
-    synced: ['#16a34a', '雲端已同步'], error: ['#dc2626', '同步待重試']
+    synced: ['#16a34a', '雲端已同步'], error: ['#dc2626', '同步待重試'], blocked: ['#dc2626', '同步已暫停']
   };
   const [color, title] = styles[status] || styles.ready;
   light.style.background = color;
@@ -5765,7 +5765,7 @@ function setCloudSyncStatus(status, detail) {
   detailEl.textContent = detail || (status === 'offline' ? '恢復網路後自動同步' :
     status === 'pending' ? '有網路時自動上傳' : status === 'syncing' ? '正在上傳資料與必要照片' :
     status === 'synced' ? (lastAt ? '上次同步：' + new Date(lastAt).toLocaleString() : '資料已建立同步基準') :
-    status === 'error' ? '保留變更，稍後自動重試' : '有變更時自動同步');
+    status === 'blocked' ? '為避免資料遺失，已暫停上傳' : status === 'error' ? '保留變更，稍後自動重試' : '有變更時自動同步');
 }
 
 async function checkCloudSyncSafety(localState = state) {
@@ -5839,7 +5839,7 @@ async function runAutoCloudSync() {
       if (safety.offline) setCloudSyncStatus('offline');
       else {
         localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
-        setCloudSyncStatus('error', safety.message);
+        setCloudSyncStatus('blocked', safety.message)
       }
       return;
     }
@@ -5877,7 +5877,7 @@ async function syncEverythingToCloud() {
       if (safety.offline) setCloudSyncStatus('offline');
       else {
         localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
-        setCloudSyncStatus('error', safety.message);
+        setCloudSyncStatus('blocked', safety.message)
         toast('為避免覆蓋較完整的雲端資料，已暫停同步。請先從雲端還原資料。');
       }
       return;
@@ -6155,7 +6155,7 @@ async function backupWardrobeToCloud(options = {}) {
         if (safety.offline) setCloudSyncStatus('offline');
         else {
           localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
-          setCloudSyncStatus('error', safety.message);
+          setCloudSyncStatus('blocked', safety.message)
           if (!silent) toast('為避免覆蓋較完整的雲端資料，已暫停備份。請先從雲端還原資料。');
         }
         return false;
@@ -8752,7 +8752,7 @@ async function init() {
       const safety = await checkCloudSyncSafety(state);
       if (!safety.safe && !safety.offline) {
         localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
-        setCloudSyncStatus('error', safety.message);
+        setCloudSyncStatus('blocked', safety.message)
       } else if (!navigator.onLine || safety.offline) {
         setCloudSyncStatus(pending ? 'offline' : 'ready');
       } else if (pending || currentFingerprint !== cloudLastFingerprint) {
@@ -8865,7 +8865,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261022_93').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261022_94').then(reg => {
         reg.update().catch(() => {});
         if (reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
