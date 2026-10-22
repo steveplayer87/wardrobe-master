@@ -578,6 +578,7 @@ function defaultState() {
     consumables: CONSUMABLE_DEFS.map(c => ({ id: c.id, name: c.name, cycleDays: c.cycleDays, icon: c.icon, startDate: todayStr(), history: [] })),
     activeTowel: 'towelA',
     laundry: { lastWashDate: todayStr(), cycleDays: 2, snoozedUntil: null, history: [] },
+    syncMeta: { consumables: { laundry: 0, sheets: 0, toothbrush: 0, razor: 0 } },
     wishlist: [],
     styleGallery: [],
     haircuts: [],
@@ -681,6 +682,9 @@ function hydrateState(rawObj) {
     consumables: Array.isArray(parsed.consumables) && parsed.consumables.length ? parsed.consumables : base.consumables,
     activeTowel: parsed.activeTowel === 'towelB' ? 'towelB' : 'towelA',
     laundry: Object.assign({}, base.laundry, parsed.laundry || {}),
+    syncMeta: {
+      consumables: Object.assign({}, base.syncMeta.consumables, parsed.syncMeta?.consumables || {})
+    },
     wishlist: Array.isArray(parsed.wishlist) ? parsed.wishlist : [],
     styleGallery: Array.isArray(parsed.styleGallery) ? parsed.styleGallery : [],
     haircuts: Array.isArray(parsed.haircuts) ? parsed.haircuts : [],
@@ -952,7 +956,28 @@ async function persistStateToDB() {
   }
 }
 
+function getConsumableSyncValues(source) {
+  const find = id => source?.consumables?.find(c => c.id === id);
+  const dateOf = item => item?.startDate || item?.history?.[0]?.date || null;
+  return {
+    laundry: source?.laundry?.lastWashDate || null,
+    sheets: dateOf(find('sheets')),
+    toothbrush: dateOf(find('toothbrush')),
+    razor: dateOf(find('razor')),
+  };
+}
+
 function saveState(options = {}) {
+  if (!options.skipSyncTimestampUpdate) {
+    state.syncMeta = state.syncMeta || { consumables: {} };
+    state.syncMeta.consumables = state.syncMeta.consumables || {};
+    const before = getConsumableSyncValues(historySnapshot || {});
+    const after = getConsumableSyncValues(state);
+    for (const key of Object.keys(after)) {
+      if (before[key] !== after[key]) state.syncMeta.consumables[key] = Date.now();
+      else if (!Number.isFinite(Number(state.syncMeta.consumables[key]))) state.syncMeta.consumables[key] = 0;
+    }
+  }
   const next = cloneState(state);
   if (historyReady && !applyingHistory && !options.skipHistory) {
     if (!historySnapshot || stateSignature(historySnapshot) !== stateSignature(next)) {
@@ -5725,11 +5750,17 @@ async function syncLifeConsumablesWithCloud() {
       '換電動牙刷頭': state.consumables?.find(c => c.id === 'toothbrush')?.startDate || state.consumables?.find(c => c.id === 'toothbrush')?.history?.[0]?.date || null,
       '換刮鬍刀片': state.consumables?.find(c => c.id === 'razor')?.startDate || state.consumables?.find(c => c.id === 'razor')?.history?.[0]?.date || null,
     };
+    const clientUpdatedAt = {
+      '洗衣服': Number(state.syncMeta?.consumables?.laundry) || 0,
+      '洗床單枕頭套/棉被': Number(state.syncMeta?.consumables?.sheets) || 0,
+      '換電動牙刷頭': Number(state.syncMeta?.consumables?.toothbrush) || 0,
+      '換刮鬍刀片': Number(state.syncMeta?.consumables?.razor) || 0,
+    };
 
     const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/sync-consumables`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: clientItems })
+      body: JSON.stringify({ items: clientItems, updatedAt: clientUpdatedAt })
     });
 
     if (!res.ok) throw new Error('雲端回應失敗: ' + res.status);
@@ -5737,6 +5768,7 @@ async function syncLifeConsumablesWithCloud() {
     if (!data.success) throw new Error(data.error || '同步失敗');
 
     const resolved = data.resolved || {};
+    const resolvedUpdatedAt = data.resolvedUpdatedAt || {};
     let changed = false;
 
     // 1. 洗衣服
@@ -5790,19 +5822,63 @@ async function syncLifeConsumablesWithCloud() {
     }
 
     if (changed) {
-      saveState();
       renderConsumables();
       if (typeof renderHome === 'function') renderHome();
       if (typeof renderLaundryOverview === 'function') renderLaundryOverview();
     }
 
-    // 單向同步：此處只更新本機與 Notion 的耗材欄位，不自動回寫整份雲端狀態。
-    // 避免舊分頁／舊本機資料覆蓋 Cloudflare 的較新資料。
+    // 同步結果的版本時間一併保存；這些欄位不顯示在介面。
+    state.syncMeta = state.syncMeta || { consumables: {} };
+    state.syncMeta.consumables = state.syncMeta.consumables || {};
+    const syncKeyMap = {
+      '洗衣服': 'laundry',
+      '洗床單枕頭套/棉被': 'sheets',
+      '換電動牙刷頭': 'toothbrush',
+      '換刮鬍刀片': 'razor',
+    };
+    for (const [label, key] of Object.entries(syncKeyMap)) {
+      if (Number(resolvedUpdatedAt[label]) > 0) state.syncMeta.consumables[key] = Number(resolvedUpdatedAt[label]);
+    }
+    if (changed || Object.keys(resolvedUpdatedAt).length) saveState({ action: '生活紀錄雙向同步', skipSyncTimestampUpdate: true });
+
+    // 全衣櫥雲端差異檢查：只讀取並報告，不自動覆蓋其他資料。
+    let auditText = '';
+    try {
+      const cloudRes = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, { cache: 'no-store' });
+      if (cloudRes.ok) {
+        const cloud = await cloudRes.json();
+        const normalize = (value, key = '') => {
+          if (Array.isArray(value)) return value.map(v => normalize(v));
+          if (!value || typeof value !== 'object') return value;
+          const out = {};
+          for (const k of Object.keys(value).sort()) {
+            if (['updatedAt', 'syncMeta', 'geminiApiKey'].includes(k)) continue;
+            if (k === 'weather' && value[k] && typeof value[k] === 'object') {
+              const w = { ...value[k] }; delete w.current; delete w.updatedAt;
+              out[k] = normalize(w); continue;
+            }
+            if (k === 'image' || k === 'imageBack') {
+              out[k === 'image' ? 'hasImage' : 'hasImageBack'] = !!value[k]; continue;
+            }
+            out[k] = normalize(value[k], k);
+          }
+          return out;
+        };
+        const sections = Object.keys(state).filter(key => !['syncMeta', 'updatedAt', 'geminiApiKey'].includes(key));
+        const differing = sections.filter(key => JSON.stringify(normalize(state[key])) !== JSON.stringify(normalize(cloud[key])));
+        auditText = differing.length
+          ? `衣櫥檢查：${differing.length} 個資料區有差異（${differing.join('、')}），未自動覆蓋`
+          : '衣櫥檢查：其他資料與雲端一致';
+      } else auditText = '衣櫥檢查未完成（無法讀取雲端狀態）';
+    } catch (auditErr) {
+      console.warn('衣櫥雲端差異檢查失敗:', auditErr);
+      auditText = '衣櫥檢查未完成（連線或讀取失敗）';
+    }
 
     const updatedNotionText = data.updatedNotion?.length ? `已更新 Notion：${data.updatedNotion.join('、')}` : '';
     const updatedClientText = data.updatedClient?.length ? `已自 Notion 更新：${data.updatedClient.join('、')}` : '';
-    const msg = [updatedNotionText, updatedClientText].filter(Boolean).join('；') || '雙向同步完成！已連動 Notion 與 Cloudflare';
-    toast(msg);
+    const syncText = [updatedNotionText, updatedClientText].filter(Boolean).join('；') || '四項生活紀錄已比對';
+    toast(`${syncText}。${auditText}`);
   } catch (err) {
     console.error('生活耗材同步失敗:', err);
     toast('同步失敗，請檢查網路連線');

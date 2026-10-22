@@ -5,7 +5,7 @@
 ## 專案與發布網址
 - GitHub 倉庫：[https://github.com/steveplayer87/wardrobe-master](https://github.com/steveplayer87/wardrobe-master)
 - GitHub Pages：[https://steveplayer87.github.io/wardrobe-master/](https://steveplayer87.github.io/wardrobe-master/)
-- 目前版本：v90（2026-10-22）
+- 目前版本：v91（2026-10-22）
 
 ## 使用方式
 
@@ -23,6 +23,9 @@
 - 外部工具或後端作業若要修改雲端資料，應先讀取最新雲端狀態，只修改目標欄位，再合併寫回，保留其他欄位；寫入後重新讀取並驗證結果。
 - App 的一般單向同步不得因生命消耗品同步等背景流程，自動將整份可能過期的本機狀態覆寫回雲端。只有明確的使用者備份操作才會進行整份狀態備份；使用前應確認本機資料是最新的。
 - Notion 洗衣歷史回填按鈕已從設定介面移除，避免把一次性修復操作留在一般使用流程中。後端 Notion 日期來源與雲端狀態 API 保留，供受控的外部維護作業使用；回填不應修改 Notion 日記或建立衣物個別洗滌紀錄。
+- v91：四項生活紀錄在 App 端保存隱藏的毫秒級 `updatedAt`，同步時比較 App 修改時間與 Notion 頁面／日記最後修改時間；沒有時間戳的舊資料才回退比較日期值。
+- v91：「雙向同步」會額外唯讀比對衣櫥其他資料區與 Cloudflare 的差異，只報告、不自動覆蓋其他欄位，以免缺少逐筆版本時間時造成資料遺失。
+- v91：Worker 的 `/api/state` 會在狀態內容真正變更時，將被取代的不同版本保存到 `app_state_history`，最多保留 20 個不同內容版本；`/api/state/history` 列出版本，`/api/state/history/:id` 讀取指定版本。`updatedAt` 與同步時間戳本身不計入內容差異。這是部署後開始累積的版本歷史，無法還原部署前 KV 未保存的舊版本。
 
 ## 備份
 

@@ -91,16 +91,70 @@ export default {
         });
       }
 
-      // 3. 日常輕量狀態同步（純文字資料：衣服清單、洗滌狀態、穿搭紀錄、耗材，~120KB）
+      // 3. 日常輕量狀態同步與去重歷史版本（保留最近 20 個不同內容版本）
+      if (path === "/api/state/history" && request.method === "GET") {
+        const history = await env.WARDROBE_STORE.get("app_state_history", "json") || [];
+        return new Response(JSON.stringify({
+          success: true,
+          limit: 20,
+          count: history.length,
+          versions: history.map(({ id, savedAt, hash, state }) => ({
+            id, savedAt, hash, itemCount: Array.isArray(state?.items) ? state.items.length : 0
+          }))
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
+      }
+      if (path.startsWith("/api/state/history/") && request.method === "GET") {
+        const id = decodeURIComponent(path.slice("/api/state/history/".length));
+        const history = await env.WARDROBE_STORE.get("app_state_history", "json") || [];
+        const version = history.find(entry => entry.id === id);
+        if (!version) return new Response(JSON.stringify({ success: false, error: "History version not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+        return new Response(JSON.stringify({ success: true, version }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
+        });
+      }
       if (path === "/api/state") {
         if (request.method === "GET") {
           const state = await env.WARDROBE_STORE.get("app_state_text", "json");
           return new Response(JSON.stringify(state || {}), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
+            headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
           });
         }
         if (request.method === "POST") {
           const body = await request.json();
+          const current = await env.WARDROBE_STORE.get("app_state_text", "json");
+          const contentHash = async value => {
+            const copy = { ...(value || {}) };
+            delete copy.updatedAt;
+            delete copy.syncMeta;
+            const stable = value => {
+              if (Array.isArray(value)) return value.map(stable);
+              if (value && typeof value === "object") {
+                return Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])]));
+              }
+              return value;
+            };
+            const bytes = new TextEncoder().encode(JSON.stringify(stable(copy)));
+            const digest = await crypto.subtle.digest("SHA-256", bytes);
+            return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+          };
+          if (current) {
+            const previousHash = await contentHash(current);
+            const nextHash = await contentHash(body);
+            if (previousHash !== nextHash) {
+              const history = await env.WARDROBE_STORE.get("app_state_history", "json") || [];
+              if (!history.some(entry => entry.hash === previousHash)) {
+                history.unshift({
+                  id: `${current.updatedAt || Date.now()}-${previousHash.slice(0, 12)}`,
+                  savedAt: Number(current.updatedAt) || Date.now(),
+                  hash: previousHash,
+                  state: current
+                });
+                await env.WARDROBE_STORE.put("app_state_history", JSON.stringify(history.slice(0, 20)));
+              }
+            }
+          }
           body.updatedAt = Date.now();
           await env.WARDROBE_STORE.put("app_state_text", JSON.stringify(body));
           return new Response(JSON.stringify({ success: true, updatedAt: body.updatedAt }), {
@@ -171,14 +225,16 @@ export default {
           const title = page.properties?.["項目"]?.title?.[0]?.plain_text;
           const date = page.properties?.["上次日期"]?.date?.start;
           if (title) {
-            notionItems[title] = { pageId: page.id, date: date || null };
+            notionItems[title] = { pageId: page.id, date: date || null, updatedAt: Date.parse(page.last_edited_time || "") || 0 };
           }
         }
 
         const clientPayload = request.method === "POST" ? await request.json() : {};
         const clientDates = clientPayload.items || {};
+        const clientUpdatedAt = clientPayload.updatedAt || {};
 
         const resolved = {};
+        const resolvedUpdatedAt = {};
         const updatedNotion = [];
         const updatedClient = [];
 
@@ -188,6 +244,7 @@ export default {
         // 亦掃描日記資料庫最新「註記」欄位，實現日記更新後生活標籤自動跟著更新
         const diaryDbId = env.NOTION_DIARY_DB_ID || "50adbc0959024715a90484ddc73b62d6";
         const diaryDates = {};
+        const diaryUpdatedAt = {};
         try {
           const diaryRes = await fetch(`https://api.notion.com/v1/databases/${diaryDbId}/query`, {
             method: "POST",
@@ -212,6 +269,7 @@ export default {
                     if (note === key || note.includes(key)) {
                       if (!diaryDates[key] || d > diaryDates[key]) {
                         diaryDates[key] = d;
+                        diaryUpdatedAt[key] = Date.parse(page.last_edited_time || "") || 0;
                       }
                     }
                   }
@@ -226,12 +284,16 @@ export default {
         for (const key of trackKeys) {
           const notionInfo = notionItems[key];
           const cDate = clientDates[key] || null;
+          const cUpdatedAt = Number(clientUpdatedAt[key]) || 0;
           let nDate = notionInfo?.date || null;
+          let nUpdatedAt = Number(notionInfo?.updatedAt) || 0;
           const dDate = diaryDates[key] || null;
+          const dUpdatedAt = Number(diaryUpdatedAt[key]) || 0;
 
-          // 若日記日期比生活標籤新，以日記日期更新生活標籤
+          // 日記標籤是 Notion 的另一個資料來源；記住該日記頁最後修改時間。
           if (dDate && (!nDate || dDate > nDate)) {
             nDate = dDate;
+            nUpdatedAt = dUpdatedAt;
             if (notionInfo?.pageId) {
               await fetch(`https://api.notion.com/v1/pages/${notionInfo.pageId}`, {
                 method: "PATCH",
@@ -250,9 +312,19 @@ export default {
             }
           }
 
-          if (cDate && (!nDate || cDate > nDate)) {
-            // App 端日期較新，反向更新 Notion
+          const appWins = cDate && (
+            (cUpdatedAt > 0 && nUpdatedAt > 0 && cUpdatedAt > nUpdatedAt) ||
+            (!(cUpdatedAt > 0 && nUpdatedAt > 0) && (!nDate || cDate > nDate))
+          );
+          const notionWins = nDate && (
+            (cUpdatedAt > 0 && nUpdatedAt > 0 && nUpdatedAt > cUpdatedAt) ||
+            (!(cUpdatedAt > 0 && nUpdatedAt > 0) && (!cDate || nDate > cDate))
+          );
+
+          if (appWins) {
+            // App 修改時間較新；舊資料尚無時間戳時，才回退比較日期值。
             resolved[key] = cDate;
+            resolvedUpdatedAt[key] = Math.max(cUpdatedAt, Date.now());
             if (notionInfo?.pageId) {
               await fetch(`https://api.notion.com/v1/pages/${notionInfo.pageId}`, {
                 method: "PATCH",
@@ -269,12 +341,14 @@ export default {
               });
               updatedNotion.push(key);
             }
-          } else if (nDate && (!cDate || nDate > cDate)) {
-            // Notion (或日記) 日期較新，指示 App 端更新
+          } else if (notionWins) {
+            // Notion 頁面／日記最後修改時間較新，指示 App 端更新。
             resolved[key] = nDate;
+            resolvedUpdatedAt[key] = nUpdatedAt || cUpdatedAt || Date.now();
             updatedClient.push(key);
           } else {
             resolved[key] = nDate || cDate || null;
+            resolvedUpdatedAt[key] = Math.max(cUpdatedAt, nUpdatedAt, dUpdatedAt);
           }
         }
 
@@ -282,6 +356,7 @@ export default {
           success: true,
           syncedAt: Date.now(),
           resolved,
+          resolvedUpdatedAt,
           updatedNotion,
           updatedClient
         };
@@ -344,6 +419,7 @@ export default {
         // 亦掃描日記資料庫中的阿鵝項目
         const diaryDbId = env.NOTION_DIARY_DB_ID || "50adbc0959024715a90484ddc73b62d6";
         const diaryDates = {};
+        const diaryUpdatedAt = {};
         try {
           const diaryRes = await fetch(`https://api.notion.com/v1/databases/${diaryDbId}/query`, {
             method: "POST",
@@ -368,6 +444,7 @@ export default {
                     if (note === key || note.includes(key)) {
                       if (!diaryDates[key] || d > diaryDates[key]) {
                         diaryDates[key] = d;
+                        diaryUpdatedAt[key] = Date.parse(page.last_edited_time || "") || 0;
                       }
                     }
                   }
