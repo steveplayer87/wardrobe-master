@@ -5,7 +5,7 @@
 ## 專案與發布網址
 - GitHub 倉庫：[https://github.com/steveplayer87/wardrobe-master](https://github.com/steveplayer87/wardrobe-master)
 - GitHub Pages：[https://steveplayer87.github.io/wardrobe-master/](https://steveplayer87.github.io/wardrobe-master/)
-- 目前版本：v92（2026-10-22）
+- 目前版本：v93（2026-10-22）
 
 ## 使用方式
 
@@ -46,3 +46,5 @@ localStorage 不會跨網站來源自動同步。從舊版本移轉時，請先�
   - 280~320 磅高磅純棉羅紋中筒白襪（耐洗不易鬆垮，百搭鞋款）。
   - 水洗復古老帽（Washed Cap，修飾身形頭身比）。
 - [ ] **夏冬交替過渡模組**：自動標記換季過渡期穿搭組合，方便一鍵檢視「早晚溫差 7°C 以上」的機動外搭。
+
+- v93：自動與手動上傳前先檢查雲端是否有本機缺少的單品、照片參照或紀錄；若雲端資料較完整則暫停上傳並在設定同步狀態燈顯示原因，避免舊本機狀態覆蓋雲端。啟動時只做一次安全檢查，沒有變更時不輪詢。從雲端還原成功後會更新本機同步基準。

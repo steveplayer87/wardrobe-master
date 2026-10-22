@@ -5741,6 +5741,7 @@ const CLOUDFLARE_WORKER_URL = 'https://wardrobe-sync.jispig28.workers.dev';
 const CLOUD_SYNC_PENDING_KEY = 'wm_cloud_sync_pending_v1';
 const CLOUD_SYNC_FINGERPRINT_KEY = 'wm_cloud_sync_fingerprint_v1';
 const CLOUD_SYNC_LAST_AT_KEY = 'wm_cloud_sync_last_at_v1';
+const CLOUD_SYNC_SAFETY_KEY = 'wm_cloud_sync_safety_blocked_v1';
 let cloudAutoSyncReady = false;
 let cloudAutoSyncTimer = null;
 let cloudAutoSyncInFlight = false;
@@ -5765,6 +5766,36 @@ function setCloudSyncStatus(status, detail) {
     status === 'pending' ? '有網路時自動上傳' : status === 'syncing' ? '正在上傳資料與必要照片' :
     status === 'synced' ? (lastAt ? '上次同步：' + new Date(lastAt).toLocaleString() : '資料已建立同步基準') :
     status === 'error' ? '保留變更，稍後自動重試' : '有變更時自動同步');
+}
+
+async function checkCloudSyncSafety(localState = state) {
+  if (!navigator.onLine) return { safe: false, offline: true, message: '離線編輯中；恢復網路後再檢查' };
+  try {
+    const response = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Cloud state HTTP ${response.status}`);
+    const remote = await response.json();
+    const local = localState || {};
+    const issues = [];
+    const localItems = Array.isArray(local.items) ? local.items : [];
+    const remoteItems = Array.isArray(remote.items) ? remote.items : [];
+    const localIds = new Set(localItems.map(item => item.id));
+    const missingCloudItems = remoteItems.filter(item => !localIds.has(item.id));
+    if (missingCloudItems.length) issues.push(`雲端多 ${missingCloudItems.length} 件單品`);
+    const photoCount = items => items.reduce((n, item) => n + (item.image ? 1 : 0) + (item.imageBack ? 1 : 0), 0);
+    const localPhotos = photoCount(localItems);
+    const remotePhotos = photoCount(remoteItems);
+    if (remotePhotos > localPhotos) issues.push(`雲端多 ${remotePhotos - localPhotos} 個照片參照`);
+    for (const [key, label] of [['ootdHistory', '歷史穿搭'], ['wishlist', '想買清單'], ['styleGallery', '風格圖庫'], ['haircuts', '理髮紀錄'], ['consumables', '生活耗材'], ['sandboxItems', '沙盒單品'], ['sandboxes', '沙盒']]) {
+      const localCount = Array.isArray(local[key]) ? local[key].length : 0;
+      const remoteCount = Array.isArray(remote[key]) ? remote[key].length : 0;
+      if (remoteCount > localCount) issues.push(`雲端${label}較多 (${remoteCount} / 本機 ${localCount})`);
+    }
+    if (issues.length) return { safe: false, issues, remote, message: issues.join('；') + '。已暫停上傳，避免覆蓋雲端資料；請先「從雲端還原資料」或確認差異。' };
+    return { safe: true, remote };
+  } catch (error) {
+    console.warn('Cloud sync safety check failed:', error);
+    return { safe: false, message: '無法確認雲端資料；為避免覆蓋，已暫停上傳' };
+  }
 }
 
 async function cloudSyncFingerprint(source = state) {
@@ -5803,7 +5834,17 @@ async function runAutoCloudSync() {
       setCloudSyncStatus('synced');
       return;
     }
-    const ok = await backupWardrobeToCloud({ silent: true, stateSnapshot: snapshot });
+    const safety = await checkCloudSyncSafety(snapshot);
+    if (!safety.safe) {
+      if (safety.offline) setCloudSyncStatus('offline');
+      else {
+        localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
+        setCloudSyncStatus('error', safety.message);
+      }
+      return;
+    }
+    localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
+    const ok = await backupWardrobeToCloud({ silent: true, stateSnapshot: snapshot, safetyChecked: true });
     if (!ok) throw new Error('Cloud upload failed');
     cloudLastFingerprint = fingerprint;
     localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, fingerprint);
@@ -5815,7 +5856,7 @@ async function runAutoCloudSync() {
     try { localStorage.setItem(CLOUD_SYNC_PENDING_KEY, '1'); } catch (_) {}
     setCloudSyncStatus(navigator.onLine ? 'error' : 'offline');
     clearTimeout(cloudAutoSyncTimer);
-    if (navigator.onLine) cloudAutoSyncTimer = setTimeout(runAutoCloudSync, 5 * 60 * 1000);
+    if (navigator.onLine && !localStorage.getItem(CLOUD_SYNC_SAFETY_KEY)) cloudAutoSyncTimer = setTimeout(runAutoCloudSync, 5 * 60 * 1000);
   } finally {
     cloudAutoSyncInFlight = false;
     try {
@@ -5831,8 +5872,19 @@ async function syncEverythingToCloud() {
   if (button) button.disabled = true;
   setCloudSyncStatus('syncing', '同步四項生活紀錄與完整衣櫥資料');
   try {
+    const safety = await checkCloudSyncSafety(state);
+    if (!safety.safe) {
+      if (safety.offline) setCloudSyncStatus('offline');
+      else {
+        localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
+        setCloudSyncStatus('error', safety.message);
+        toast('為避免覆蓋較完整的雲端資料，已暫停同步。請先從雲端還原資料。');
+      }
+      return;
+    }
+    localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
     await syncLifeConsumablesWithCloud({ silent: true });
-    const ok = await backupWardrobeToCloud({ silent: true });
+    const ok = await backupWardrobeToCloud({ silent: true, safetyChecked: true });
     if (!ok) throw new Error('衣櫥資料上傳失敗');
     cloudLastFingerprint = await cloudSyncFingerprint(state);
     localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, cloudLastFingerprint);
@@ -6097,6 +6149,18 @@ async function backupWardrobeToCloud(options = {}) {
   if (!silent) toast('正在同步備份至 Cloudflare...');
   try {
     const textData = JSON.parse(JSON.stringify(options.stateSnapshot || state));
+    if (!options.safetyChecked) {
+      const safety = await checkCloudSyncSafety(textData);
+      if (!safety.safe) {
+        if (safety.offline) setCloudSyncStatus('offline');
+        else {
+          localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
+          setCloudSyncStatus('error', safety.message);
+          if (!silent) toast('為避免覆蓋較完整的雲端資料，已暫停備份。請先從雲端還原資料。');
+        }
+        return false;
+      }
+    }
     const imagesToUpload = [];
     const versionedImageId = async (id, data) => {
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
@@ -6169,6 +6233,12 @@ async function restoreWardrobeFromCloud() {
         normalizeLoadedState();
         saveState();
         renderAll();
+        cloudLastFingerprint = await cloudSyncFingerprint(state);
+        localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, cloudLastFingerprint);
+        localStorage.setItem(CLOUD_SYNC_LAST_AT_KEY, String(Date.now()));
+        localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
+        localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
+        setCloudSyncStatus('synced');
         toast('雲端還原完成！');
         closeModal();
       } catch (err) {
@@ -8679,10 +8749,12 @@ async function init() {
       cloudLastFingerprint = localStorage.getItem(CLOUD_SYNC_FINGERPRINT_KEY) || '';
       const pending = localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1';
       const currentFingerprint = await cloudSyncFingerprint(state);
-      if (!cloudLastFingerprint) {
-        cloudLastFingerprint = currentFingerprint;
-        localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, currentFingerprint);
-        setCloudSyncStatus('ready', '有修改時自動同步；目前不會額外讀取雲端');
+      const safety = await checkCloudSyncSafety(state);
+      if (!safety.safe && !safety.offline) {
+        localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
+        setCloudSyncStatus('error', safety.message);
+      } else if (!navigator.onLine || safety.offline) {
+        setCloudSyncStatus(pending ? 'offline' : 'ready');
       } else if (pending || currentFingerprint !== cloudLastFingerprint) {
         scheduleAutoCloudSync(500);
       } else {
@@ -8793,7 +8865,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261022_92').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261022_93').then(reg => {
         reg.update().catch(() => {});
         if (reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
