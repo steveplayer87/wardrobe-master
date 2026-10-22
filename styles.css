@@ -702,6 +702,7 @@ svg { width: 100%; height: 100%; display: block; }
   word-break: break-word;
 }
 .item-wear { font-size: 10px; color: var(--color-ink-faint); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sandbox-picker-category { color: var(--color-denim); }
 
 .empty-hint { text-align: center; color: var(--color-ink-faint); font-size: 13px; padding: 40px 20px; line-height: 1.6; }
 

@@ -5,7 +5,13 @@
 ## 專案與發布網址
 - GitHub 倉庫：[https://github.com/steveplayer87/wardrobe-master](https://github.com/steveplayer87/wardrobe-master)
 - GitHub Pages：[https://steveplayer87.github.io/wardrobe-master/](https://steveplayer87.github.io/wardrobe-master/)
-- 目前版本：v94（2026-10-22）
+- 目前版本：v95（2026-10-22）
+
+## UI 元件與樣式架構
+
+- UI 元件依賴、共用呈現函式、頁面差異、CSS 整理原則與驗證清單，請見 [`UI_ARCHITECTURE.md`](./UI_ARCHITECTURE.md)。
+- 專案使用原生 HTML/CSS/JavaScript；共用衣物卡片為 `buildItemCard()`，照片、品牌與名稱呈現原語分開維護。願望清單主頁與衣物詳情保留各自需要的互動與版面，不強行合併。
+- v95：沙盒願望清單選擇卡片共用照片、品牌與名稱呈現函式，移除該處的 inline 樣式；更新前端資產版本與 Service Worker 快取版本。
 
 ## 使用方式
 
@@ -49,3 +55,5 @@ localStorage 不會跨網站來源自動同步。從舊版本移轉時，請先�
 
 - v93：自動與手動上傳前先檢查雲端是否有本機缺少的單品、照片參照或紀錄；若雲端資料較完整則暫停上傳並在設定同步狀態燈顯示原因，避免舊本機狀態覆蓋雲端。啟動時只做一次安全檢查，沒有變更時不輪詢。從雲端還原成功後會更新本機同步基準。
 - v94：Worker `/api/state` 增加伺服器端防覆蓋檢查，拒絕缺少既有雲端單品、照片參照或紀錄的舊客戶端上傳；設定同步狀態使用「同步已暫停」明確呈現安全阻擋。
+
+- v95：整理 UI 共用呈現原語，沙盒願望清單選擇卡片共用照片、品牌與名稱標記；新增 `UI_ARCHITECTURE.md` 記錄元件依賴、CSS 規則、互動邊界及驗證流程。

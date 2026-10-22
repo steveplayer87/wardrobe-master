@@ -1559,10 +1559,18 @@ function getImageTrimBounds(imgUrl, callback) {
   };
   img.src = imgUrl;
 }
+// Shared item-card presentation primitives. Keep context-specific actions in the
+// caller; these helpers only render safe, consistent identity/photo markup.
 function itemPhotoMarkup(item) {
   return item.image
     ? `<img class="item-photo-image" src="${escapeHtml(item.image)}" alt="" loading="lazy">`
     : thumbInner(item);
+}
+function itemCardBrandMarkup(item, size = 'tiny') {
+  return `<p class="item-brand${item.brand ? '' : ' is-empty'}">${item.brand ? `${brandIconMarkup(item, size)}<span>${escapeHtml(item.brand)}</span>` : '&nbsp;'}</p>`;
+}
+function itemCardNameMarkup(name) {
+  return `<p class="item-name">${escapeHtml(name || '')}</p>`;
 }
 function calendarPhotoStyle(item) {
   const pos = item?.category === 'bottom' ? 'center top' : 'center bottom';
@@ -2448,14 +2456,14 @@ function buildItemCard(item, opts) {
       : '';
 
   let infoHtml = '';
-  const brandMarkup = `<p class="item-brand${item.brand ? '' : ' is-empty'}">${item.brand ? `${brandIconMarkup(item, 'tiny')}<span>${escapeHtml(item.brand)}</span>` : '&nbsp;'}</p>`;
+  const brandMarkup = itemCardBrandMarkup(item, 'tiny');
   if (opts && opts.laundryMode) {
     const wornDates = (item.wearHistory || []).filter(d => !item.lastWashedDate || d > item.lastWashedDate);
     const daysWorn = wornDates.length > 0 ? new Set(wornDates).size : (item.wearCount || 1);
     const lastWashStr = item.lastWashedDate ? fmtDate(item.lastWashedDate) : (item.washHistory && item.washHistory[0]?.date ? fmtDate(item.washHistory[0].date) : '無紀錄');
     infoHtml = `
       ${brandMarkup}
-      <p class="item-name">${escapeHtml(item.name)}</p>
+      ${itemCardNameMarkup(item.name)}
       <div class="laundry-item-meta">
         <span class="lim-days">已穿 ${daysWorn} 天</span>
         <span class="lim-icon">${ICONS.sparkles || ''}</span>
@@ -2466,7 +2474,7 @@ function buildItemCard(item, opts) {
   } else {
     infoHtml = `
       ${brandMarkup}
-      <p class="item-name">${escapeHtml(item.name)}</p>
+      ${itemCardNameMarkup(item.name)}
       <p class="item-wear">穿了 ${item.wearCount||0} 次${activityMeta}</p>
       ${washBoostMarkup(item, opts)}
     `;
@@ -2761,7 +2769,7 @@ function renderRank() {
       <div class="item-photo">${itemPhotoMarkup(item)}</div>
       <span class="rank-badge">#${idx + 1}</span>
       <div class="item-info">
-        <p class="item-name">${escapeHtml(item.name)}</p>
+        ${itemCardNameMarkup(item.name)}
         <p class="item-wear">穿過 ${count} 次</p>
       </div>`;
     card.addEventListener('click', () => openItemDetail(item.id));
@@ -8425,15 +8433,17 @@ function renderSandboxPickerItems(type) {
       card = document.createElement('button');
       card.type = 'button';
       card.className = 'item-card';
-      const thumb = it.image
-        ? `<div class="item-card-photo" style="background-image:url('${it.image}');background-size:contain;background-position:center;background-repeat:no-repeat;width:100%;height:100%;"></div>`
-        : `<div class="item-card-photo" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;"><span class="rack-chip-thumb">${categoryIcon(it.category || 'top')}</span></div>`;
+      card.dataset.id = it.id;
+      card.dataset.category = it.category || 'top';
+      // Wishlist entries use the same photo, brand and name primitives as wardrobe
+      // cards while retaining this picker's own action and category metadata.
+      const displayItem = { ...it, category: it.category || 'top' };
       card.innerHTML = `
-        <div class="item-photo">${thumb}</div>
+        <div class="item-photo">${itemPhotoMarkup(displayItem)}</div>
         <div class="item-info">
-          ${it.brand ? `<p class="item-brand"><span>${escapeHtml(it.brand)}</span></p>` : ''}
-          <p class="item-name">${escapeHtml(it.name)}</p>
-          <p class="item-wear" style="color:var(--color-denim);">${categoryLabel(it.category || 'top')}</p>
+          ${it.brand ? itemCardBrandMarkup(it, 'tiny') : ''}
+          ${itemCardNameMarkup(it.name)}
+          <p class="item-wear sandbox-picker-category">${categoryLabel(it.category || 'top')}</p>
         </div>
       `;
       card.addEventListener('click', () => {
