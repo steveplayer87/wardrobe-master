@@ -17,7 +17,7 @@
 
 每次更新 JavaScript、CSS 或 HTML 後，請同步更新 `index.html` 和 `sw.js` 的資產 query-string 版本、service worker cache 名稱及版本提示，避免舊快取殘留。發布後要驗證 GitHub Pages 實際載入的版本。
 
-## 雲端狀態與單向同步
+## 雲端狀態與同步規則
 
 - Cloudflare Worker 的 `/api/state` 是 App 雲端狀態讀寫入口；`/api/laundry-history-import` 提供從 Notion 日記取得洗衣日期的後端來源。
 - 外部工具或後端作業若要修改雲端資料，應先讀取最新雲端狀態，只修改目標欄位，再合併寫回，保留其他欄位；寫入後重新讀取並驗證結果。
