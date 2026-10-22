@@ -6282,7 +6282,6 @@ function wireEvents() {
   });
   document.getElementById('btnImportSeedList').addEventListener('click', () => { importSeedItems(); closeModal(); });
   document.getElementById('btnSyncLifeConsumables')?.addEventListener('click', syncLifeConsumablesWithCloud);
-  document.getElementById('btnImportLaundryHistory')?.addEventListener('click', importLaundryHistoryFromNotion);
   document.getElementById('btnCloudBackup')?.addEventListener('click', backupWardrobeToCloud);
   document.getElementById('btnCloudRestore')?.addEventListener('click', restoreWardrobeFromCloud);
 

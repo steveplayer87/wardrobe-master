@@ -767,10 +767,6 @@
         <button type="button" class="btn-secondary btn-with-icon" id="btnCloudRestore"><span data-icon="download"></span>從雲端還原資料</button>
       </div>
       <div class="settings-actions" style="margin-top:8px">
-        <button type="button" class="btn-secondary btn-with-icon" id="btnImportLaundryHistory"><span data-icon="history"></span>從 Notion 日記補登洗衣歷史</button>
-      </div>
-      <p class="settings-note" style="margin-top:6px;">掃描所有日記中的「洗衣服」標籤，預覽後只補入缺少的日期，不會修改日記或重複新增。</p>
-      <div class="settings-actions" style="margin-top:8px">
         <button type="button" class="btn-secondary" id="btnImportSeedList">匯入我的舊衣物清單</button>
       </div>
       <div class="settings-actions" style="margin-top:8px">
@@ -1526,7 +1522,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v89', K='wm_seen_version', seen=null;
+  var V='v90', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1536,7 +1532,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261022_89"></script>
-<script src="app.js?v=20261022_89"></script>
+<script src="seed-items.js?v=20261022_90"></script>
+<script src="app.js?v=20261022_90"></script>
 </body>
 </html>
