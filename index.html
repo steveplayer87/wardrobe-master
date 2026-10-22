@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261022_91">
+<link rel="stylesheet" href="styles.css?v=20261022_92">
 </head>
 <body>
 
@@ -331,15 +331,7 @@
             <p class="section-title">生活耗材</p>
             <p class="section-intro">固定週期用品，到期會提醒你更換</p>
           </div>
-          <button type="button" class="btn-primary-sm" id="btnSyncLifeConsumables">
-            <svg id="iconSyncLifeSpin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-              <path d="M3 3v5h5"/>
-              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
-              <path d="M16 21h5v-5"/>
-            </svg>
-            <span>雙向同步</span>
-          </button>
+
         </div>
         <div class="consumable-grid" id="consumableGrid"></div>
       </div>
@@ -626,6 +618,24 @@
       </div>
     </div>
     <form class="form" id="settingsForm">
+      <div id="cloudSyncPanel" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;margin:0 0 14px;border:1px solid var(--color-line);border-radius:14px;background:var(--color-surface,rgba(127,127,127,.04));">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+          <span id="cloudSyncLight" aria-label="雲端同步狀態" style="width:10px;height:10px;flex:0 0 10px;border-radius:50%;background:#9ca3af;box-shadow:0 0 0 3px rgba(156,163,175,.14);"></span>
+          <div style="min-width:0;">
+            <div id="cloudSyncLabel" style="font-size:13px;font-weight:650;">雲端同步待命</div>
+            <div id="cloudSyncDetail" style="font-size:11px;color:var(--color-ink-soft);margin-top:3px;">有變更時自動同步</div>
+          </div>
+        </div>
+        <button type="button" class="btn-primary-sm" id="btnSyncLifeConsumables" style="flex:0 0 auto;white-space:nowrap;">
+          <svg id="iconSyncLifeSpin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+            <path d="M16 21h5v-5"/>
+          </svg>
+          <span>立即同步</span>
+        </button>
+      </div>
       <div class="settings-profile-card">
         <label class="field settings-nickname-field">暱稱
           <input type="text" id="settingName" placeholder="你的名字">
@@ -1522,7 +1532,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v91', K='wm_seen_version', seen=null;
+  var V='v92', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1532,7 +1542,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261022_91"></script>
-<script src="app.js?v=20261022_91"></script>
+<script src="seed-items.js?v=20261022_92"></script>
+<script src="app.js?v=20261022_92"></script>
 </body>
 </html>

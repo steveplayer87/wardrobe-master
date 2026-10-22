@@ -979,12 +979,12 @@ function saveState(options = {}) {
     }
   }
   const next = cloneState(state);
+  const stateChanged = !historySnapshot || stateSignature(historySnapshot) !== stateSignature(next);
   if (historyReady && !applyingHistory && !options.skipHistory) {
-    if (!historySnapshot || stateSignature(historySnapshot) !== stateSignature(next)) {
-      pushHistory(historySnapshot, options.action);
-    }
+    if (stateChanged) pushHistory(historySnapshot, options.action);
   }
   historySnapshot = next;
+  if (stateChanged) scheduleAutoCloudSync();
   updateHistoryControls();
 
   clearTimeout(dbSaveTimer);
@@ -5738,8 +5738,117 @@ function openManagePropsModal(propType) {
    CLOUDFLARE SYNC & NOTION TWO-WAY LIFE TRACKING
    ============================================================ */
 const CLOUDFLARE_WORKER_URL = 'https://wardrobe-sync.jispig28.workers.dev';
+const CLOUD_SYNC_PENDING_KEY = 'wm_cloud_sync_pending_v1';
+const CLOUD_SYNC_FINGERPRINT_KEY = 'wm_cloud_sync_fingerprint_v1';
+const CLOUD_SYNC_LAST_AT_KEY = 'wm_cloud_sync_last_at_v1';
+let cloudAutoSyncReady = false;
+let cloudAutoSyncTimer = null;
+let cloudAutoSyncInFlight = false;
+let cloudLastFingerprint = '';
 
-async function syncLifeConsumablesWithCloud() {
+function setCloudSyncStatus(status, detail) {
+  const light = document.getElementById('cloudSyncLight');
+  const label = document.getElementById('cloudSyncLabel');
+  const detailEl = document.getElementById('cloudSyncDetail');
+  if (!light || !label || !detailEl) return;
+  const styles = {
+    ready: ['#9ca3af', '雲端同步待命'], pending: ['#d97706', '有變更待同步'],
+    offline: ['#9ca3af', '離線編輯中'], syncing: ['#2563eb', '正在同步'],
+    synced: ['#16a34a', '雲端已同步'], error: ['#dc2626', '同步待重試']
+  };
+  const [color, title] = styles[status] || styles.ready;
+  light.style.background = color;
+  light.style.boxShadow = '0 0 0 3px ' + color + '22';
+  label.textContent = title;
+  const lastAt = Number(localStorage.getItem(CLOUD_SYNC_LAST_AT_KEY)) || 0;
+  detailEl.textContent = detail || (status === 'offline' ? '恢復網路後自動同步' :
+    status === 'pending' ? '有網路時自動上傳' : status === 'syncing' ? '正在上傳資料與必要照片' :
+    status === 'synced' ? (lastAt ? '上次同步：' + new Date(lastAt).toLocaleString() : '資料已建立同步基準') :
+    status === 'error' ? '保留變更，稍後自動重試' : '有變更時自動同步');
+}
+
+async function cloudSyncFingerprint(source = state) {
+  const copy = JSON.parse(JSON.stringify(source || {}));
+  delete copy.updatedAt; delete copy.syncMeta; delete copy.geminiApiKey;
+  if (copy.profile?.weather && typeof copy.profile.weather === 'object') {
+    delete copy.profile.weather.current; delete copy.profile.weather.updatedAt;
+  }
+  const stable = value => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object'
+    ? Object.fromEntries(Object.keys(value).sort().map(k => [k, stable(value[k])])) : value;
+  const bytes = new TextEncoder().encode(JSON.stringify(stable(copy)));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function scheduleAutoCloudSync(delay = 1800) {
+  if (!cloudAutoSyncReady) return;
+  try { localStorage.setItem(CLOUD_SYNC_PENDING_KEY, '1'); } catch (_) {}
+  setCloudSyncStatus(navigator.onLine ? 'pending' : 'offline');
+  clearTimeout(cloudAutoSyncTimer);
+  if (!navigator.onLine) return;
+  cloudAutoSyncTimer = setTimeout(runAutoCloudSync, delay);
+}
+
+async function runAutoCloudSync() {
+  if (!cloudAutoSyncReady || cloudAutoSyncInFlight || !navigator.onLine) {
+    if (!navigator.onLine && localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') setCloudSyncStatus('offline');
+    return;
+  }
+  cloudAutoSyncInFlight = true;
+  setCloudSyncStatus('syncing');
+  const snapshot = JSON.parse(JSON.stringify(state));
+  try {
+    const fingerprint = await cloudSyncFingerprint(snapshot);
+    if (fingerprint === cloudLastFingerprint && localStorage.getItem(CLOUD_SYNC_PENDING_KEY) !== '1') {
+      setCloudSyncStatus('synced');
+      return;
+    }
+    const ok = await backupWardrobeToCloud({ silent: true, stateSnapshot: snapshot });
+    if (!ok) throw new Error('Cloud upload failed');
+    cloudLastFingerprint = fingerprint;
+    localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, fingerprint);
+    localStorage.setItem(CLOUD_SYNC_LAST_AT_KEY, String(Date.now()));
+    localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
+    setCloudSyncStatus('synced');
+  } catch (err) {
+    console.warn('Automatic cloud sync will retry:', err);
+    try { localStorage.setItem(CLOUD_SYNC_PENDING_KEY, '1'); } catch (_) {}
+    setCloudSyncStatus(navigator.onLine ? 'error' : 'offline');
+    clearTimeout(cloudAutoSyncTimer);
+    if (navigator.onLine) cloudAutoSyncTimer = setTimeout(runAutoCloudSync, 5 * 60 * 1000);
+  } finally {
+    cloudAutoSyncInFlight = false;
+    try {
+      const currentFingerprint = await cloudSyncFingerprint(state);
+      if (currentFingerprint !== cloudLastFingerprint) scheduleAutoCloudSync(500);
+    } catch (_) {}
+  }
+}
+
+async function syncEverythingToCloud() {
+  if (!navigator.onLine) { setCloudSyncStatus('offline'); return; }
+  const button = document.getElementById('btnSyncLifeConsumables');
+  if (button) button.disabled = true;
+  setCloudSyncStatus('syncing', '同步四項生活紀錄與完整衣櫥資料');
+  try {
+    await syncLifeConsumablesWithCloud({ silent: true });
+    const ok = await backupWardrobeToCloud({ silent: true });
+    if (!ok) throw new Error('衣櫥資料上傳失敗');
+    cloudLastFingerprint = await cloudSyncFingerprint(state);
+    localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, cloudLastFingerprint);
+    localStorage.setItem(CLOUD_SYNC_LAST_AT_KEY, String(Date.now()));
+    localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
+    setCloudSyncStatus('synced');
+    toast('生活紀錄與衣櫥資料已同步至雲端');
+  } catch (err) {
+    localStorage.setItem(CLOUD_SYNC_PENDING_KEY, '1');
+    setCloudSyncStatus(navigator.onLine ? 'error' : 'offline');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function syncLifeConsumablesWithCloud(options = {}) {
   const spinIcon = document.getElementById('iconSyncLifeSpin');
   if (spinIcon) spinIcon.classList.add('spinning');
 
@@ -5878,10 +5987,12 @@ async function syncLifeConsumablesWithCloud() {
     const updatedNotionText = data.updatedNotion?.length ? `已更新 Notion：${data.updatedNotion.join('、')}` : '';
     const updatedClientText = data.updatedClient?.length ? `已自 Notion 更新：${data.updatedClient.join('、')}` : '';
     const syncText = [updatedNotionText, updatedClientText].filter(Boolean).join('；') || '四項生活紀錄已比對';
-    toast(`${syncText}。${auditText}`);
+    if (!options.silent) toast(`${syncText}。${auditText}`);
+    return true;
   } catch (err) {
     console.error('生活耗材同步失敗:', err);
-    toast('同步失敗，請檢查網路連線');
+    if (!options.silent) toast('同步失敗，請檢查網路連線');
+    return false;
   } finally {
     if (spinIcon) spinIcon.classList.remove('spinning');
   }
@@ -5985,7 +6096,7 @@ async function backupWardrobeToCloud(options = {}) {
   const silent = !!options.silent;
   if (!silent) toast('正在同步備份至 Cloudflare...');
   try {
-    const textData = JSON.parse(JSON.stringify(state));
+    const textData = JSON.parse(JSON.stringify(options.stateSnapshot || state));
     const imagesToUpload = [];
     const versionedImageId = async (id, data) => {
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
@@ -6364,7 +6475,7 @@ function wireEvents() {
     e.target.value = '';
   });
   document.getElementById('btnImportSeedList').addEventListener('click', () => { importSeedItems(); closeModal(); });
-  document.getElementById('btnSyncLifeConsumables')?.addEventListener('click', syncLifeConsumablesWithCloud);
+  document.getElementById('btnSyncLifeConsumables')?.addEventListener('click', syncEverythingToCloud);
   document.getElementById('btnCloudBackup')?.addEventListener('click', backupWardrobeToCloud);
   document.getElementById('btnCloudRestore')?.addEventListener('click', restoreWardrobeFromCloud);
 
@@ -8563,7 +8674,35 @@ async function init() {
     renderAll();
     updateHistoryControls();
     refreshWeather(false);
-    setInterval(() => { ensureNewDay(); renderAll(); }, 5 * 60 * 1000);
+    cloudAutoSyncReady = true;
+    try {
+      cloudLastFingerprint = localStorage.getItem(CLOUD_SYNC_FINGERPRINT_KEY) || '';
+      const pending = localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1';
+      const currentFingerprint = await cloudSyncFingerprint(state);
+      if (!cloudLastFingerprint) {
+        cloudLastFingerprint = currentFingerprint;
+        localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, currentFingerprint);
+        setCloudSyncStatus('ready', '有修改時自動同步；目前不會額外讀取雲端');
+      } else if (pending || currentFingerprint !== cloudLastFingerprint) {
+        scheduleAutoCloudSync(500);
+      } else {
+        const lastAt = Number(localStorage.getItem(CLOUD_SYNC_LAST_AT_KEY)) || 0;
+        setCloudSyncStatus('synced', lastAt ? '上次同步：' + new Date(lastAt).toLocaleString() : '資料已建立同步基準');
+      }
+    } catch (_) { setCloudSyncStatus('ready'); }
+    window.addEventListener('online', () => {
+      if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') scheduleAutoCloudSync(300);
+    });
+    window.addEventListener('offline', () => {
+      if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') setCloudSyncStatus('offline');
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1' && navigator.onLine) scheduleAutoCloudSync(300);
+    });
+    setInterval(() => {
+      ensureNewDay(); renderAll();
+      if (cloudAutoSyncReady && localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1' && navigator.onLine && !cloudAutoSyncTimer && !cloudAutoSyncInFlight) scheduleAutoCloudSync(300);
+    }, 5 * 60 * 1000);
 
 
     window.addEventListener('pagehide', () => persistStateToDB());
@@ -8654,7 +8793,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261020_73').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261022_92').then(reg => {
         reg.update().catch(() => {});
         if (reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
