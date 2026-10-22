@@ -8884,7 +8884,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261022_97').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261022_98').then(reg => {
         reg.update().catch(() => {});
         if (reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
