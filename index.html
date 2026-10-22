@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261022_95">
+<link rel="stylesheet" href="styles.css?v=20261022_97">
 </head>
 <body>
 
@@ -636,6 +636,13 @@
           <span>立即同步</span>
         </button>
       </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;margin:0 0 14px;border:1px solid var(--color-line);border-radius:14px;">
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:650;">Notion 生活標籤同步</div>
+          <div style="font-size:11px;color:var(--color-ink-soft);margin-top:3px;">開啟 App 或手動按鈕時執行，不再定時掃描</div>
+        </div>
+        <button type="button" class="btn-secondary" id="btnSyncNotionLife" style="flex:0 0 auto;white-space:nowrap;">同步 Notion</button>
+      </div>
       <div class="settings-profile-card">
         <label class="field settings-nickname-field">暱稱
           <input type="text" id="settingName" placeholder="你的名字">
@@ -676,14 +683,6 @@
             <span class="sdb-arrow">›</span>
           </button>
 
-          <button type="button" class="settings-display-card-btn" id="btnOpenDisplayCard">
-            <span class="sdb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M12 3.5v17"/></svg></span>
-            <div class="sdb-info">
-              <span class="sdb-title">衣櫥卡片圖片大小</span>
-              <span class="sdb-sub">目前縮放佔比：<strong id="cardImageScaleSummary">72%</strong></span>
-            </div>
-            <span class="sdb-arrow">›</span>
-          </button>
         </div>
       </div>
 
@@ -772,12 +771,6 @@
         <button class="btn-secondary btn-with-icon" id="btnExportData"><span data-icon="download"></span>匯出備份</button>
         <button class="btn-secondary" id="btnImportData">匯入備份</button>
         <input type="file" accept="application/json" id="importFileInput" hidden>
-      </div>
-      <div class="settings-actions" style="margin-top:8px">
-        <button type="button" class="btn-secondary btn-with-icon" id="btnCloudRestore"><span data-icon="download"></span>從雲端還原資料</button>
-      </div>
-      <div class="settings-actions" style="margin-top:8px">
-        <button type="button" class="btn-secondary" id="btnImportSeedList">匯入我的舊衣物清單</button>
       </div>
       <div class="settings-actions" style="margin-top:8px">
         <button type="button" class="btn-secondary" id="btnForceRefresh" style="border-style:dashed;color:var(--color-ink-soft);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:-2px;margin-right:4px"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>強制清除快取並立即重新整理</button>
@@ -1300,25 +1293,17 @@
     </div>
   </div>
 
-  <!-- Display Simulation: Wardrobe Card Image Scale -->
-  <div class="modal-sheet modal-sheet-tall" id="modal-display-card" data-modal>
+  <!-- Import backup source chooser -->
+  <div class="modal-sheet" id="modal-import-source" data-modal>
     <div class="modal-handle"></div>
     <div class="modal-head">
-      <h2>衣櫥卡片圖片大小</h2>
-      <button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      <h2>匯入備份</h2>
+      <button class="modal-close" data-close aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
-    <div class="display-sim-stage-wrap">
-      <div class="display-sim-card-stage" id="displaySimCardStage">
-        <!-- Rendered sample wardrobe cards live -->
-      </div>
-      <div class="display-sim-controls">
-        <div class="settings-label-row">
-          <label for="sliderCardImageScale">卡片圖片佔比大小</label>
-          <output id="valCardImageScale">72%</output>
-        </div>
-        <input type="range" id="sliderCardImageScale" min="45" max="100" value="72">
-        <p class="settings-helper" style="margin-top:6px;">調整單品照片在卡片邊框內的顯示佔比，不會更動原始圖片。</p>
-      </div>
+    <p class="settings-helper" style="margin:0 0 14px;">選擇備份來源。匯入會以備份內容覆蓋目前本機資料。</p>
+    <div class="settings-actions" style="flex-direction:column;">
+      <button type="button" class="btn-secondary btn-with-icon" id="btnImportLocalBackup"><span data-icon="folder-open"></span>從本機匯入 JSON 備份</button>
+      <button type="button" class="btn-secondary btn-with-icon" id="btnImportCloudBackup"><span data-icon="cloud-download"></span>從雲端匯入</button>
     </div>
   </div>
 
@@ -1532,7 +1517,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v95', K='wm_seen_version', seen=null;
+  var V='v96', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1542,7 +1527,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261022_95"></script>
-<script src="app.js?v=20261022_95"></script>
+<script src="seed-items.js?v=20261022_97"></script>
+<script src="app.js?v=20261022_97"></script>
 </body>
 </html>

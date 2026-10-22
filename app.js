@@ -230,12 +230,13 @@ function getCategoryAspectRatio(category) {
 const MAIN_SLOTS = ['top', 'bottom', 'shoes'];
 const EXTRA_SLOTS = ['outer', 'hat', 'accessory'];
 const ALL_SLOTS = MAIN_SLOTS.concat(EXTRA_SLOTS);
-const HOME_SLOT_RATIOS = { hat: 2.2, top: 1.08, bottom: 0.72, shoes: 1.45 };
+const HOME_SLOT_RATIOS = { hat: 2.2, top: 1.08, bottom: 0.78, shoes: 1.45 };
+const OUTFIT_SHORTS_RATIO = 1.15;
 const OUTFIT_LAYOUT_DEFAULTS = {
-  hat: { scale: 92, x: 0, y: 0 },
+  hat: { scale: 100, x: 0, y: 0 },
   top: { scale: 100, x: 0, y: 0 },
-  bottom: { scale: 104, x: 0, y: 0 },
-  shoes: { scale: 102, x: 0, y: 0 },
+  bottom: { scale: 100, x: 0, y: 0 },
+  shoes: { scale: 100, x: 0, y: 0 },
 };
 function normalizeOutfitLayout(layout) {
   const result = {};
@@ -565,7 +566,6 @@ function defaultState() {
     profile: {
       name: '',
       avatar: '',
-      cardImageScale: 72,
       weather: { city: '', latitude: null, longitude: null, timezone: 'auto', current: null, updatedAt: 0 },
       outfitLayout: normalizeOutfitLayout(OUTFIT_LAYOUT_DEFAULTS),
       washThresholds: { bottom: 3, outer: 5, shoes: 8, hat: 8, accessory: 8 },
@@ -656,7 +656,7 @@ function hydrateState(rawObj) {
   profile.categoryAspect = Object.assign({}, base.profile.categoryAspect, (parsed.profile && parsed.profile.categoryAspect) || {});
   profile.weather = Object.assign({}, base.profile.weather, (parsed.profile && parsed.profile.weather) || {});
   profile.outfitLayout = normalizeOutfitLayout((parsed.profile && parsed.profile.outfitLayout) || base.profile.outfitLayout);
-  profile.cardImageScale = Math.min(100, Math.max(45, Number(profile.cardImageScale) || 72));
+  delete profile.cardImageScale;
   profile.avatar = typeof profile.avatar === 'string' ? profile.avatar : '';
   const normalizedItems = (Array.isArray(parsed.items) ? parsed.items : []).map(i => {
     if (!i.colorFamily) {
@@ -748,7 +748,7 @@ function normalizeLoadedState() {
     .filter(photo => photo && typeof photo.image === 'string' && photo.image)
     .map(photo => ({ id: photo.id || uid(), image: photo.image, createdAt: photo.createdAt || Date.now() }));
   state.profile = state.profile || {};
-  state.profile.cardImageScale = Math.min(100, Math.max(45, Number(state.profile.cardImageScale) || 72));
+  delete state.profile.cardImageScale;
   state.profile.avatar = typeof state.profile.avatar === 'string' ? state.profile.avatar : '';
   state.profile.weather = Object.assign({ city: '', area: '', latitude: null, longitude: null, timezone: 'auto', current: null, updatedAt: 0, tempOffset: 0, tempUnit: 'C' }, state.profile.weather || {});
   state.profile.outfitLayout = normalizeOutfitLayout(state.profile.outfitLayout);
@@ -1065,7 +1065,6 @@ function undoState() {
   applyingHistory = false;
   renderAll();
   renderAvatar();
-  renderCardImageScale();
   updateHistoryControls();
   restoreHistoryView(targetView);
   toast(`已還原${label}`);
@@ -1085,7 +1084,6 @@ function redoState() {
   applyingHistory = false;
   renderAll();
   renderAvatar();
-  renderCardImageScale();
   updateHistoryControls();
   restoreHistoryView(targetView);
   toast(`已重做${label}`);
@@ -1462,7 +1460,6 @@ function renderAll() {
   renderNotifications();
   renderWishlist();
   renderAvatar();
-  renderCardImageScale();
 }
 
 function renderHeader() {
@@ -1794,15 +1791,6 @@ function renderAvatar() {
   const clear = document.getElementById('btnClearAvatar');
   if (clear) clear.classList.toggle('is-hidden', !src);
 }
-function renderCardImageScale() {
-  const value = Math.min(100, Math.max(45, Number(state.profile.cardImageScale) || 72));
-  state.profile.cardImageScale = value;
-  document.getElementById('app')?.style.setProperty('--card-image-size', `${value}%`);
-  const slider = document.getElementById('cardImageScale');
-  const output = document.getElementById('cardImageScaleValue');
-  if (slider) slider.value = String(value);
-  if (output) output.textContent = `${value}%`;
-}
 const WEATHER_LABELS = {
   0: ['晴朗', ''], 1: ['大致晴朗', ''], 2: ['局部多雲', ''], 3: ['陰天', ''],
   45: ['霧', ''], 48: ['霧', ''], 51: ['細雨', ''], 53: ['細雨', ''], 55: ['細雨', ''],
@@ -2089,7 +2077,7 @@ function renderHome() {
     const item = itemId ? findItem(itemId) : null;
     const layout = (state.profile.outfitLayout && state.profile.outfitLayout[slot]) || OUTFIT_LAYOUT_DEFAULTS[slot];
     const isShorts = slot === 'bottom' && isShortsItem(item);
-    const ratio = isShorts ? 1.15 : (HOME_SLOT_RATIOS[slot] || getCategoryAspectRatio(slot));
+    const ratio = isShorts ? OUTFIT_SHORTS_RATIO : (HOME_SLOT_RATIOS[slot] || getCategoryAspectRatio(slot));
     if (item) {
       btn.classList.remove('is-transparent-slot');
       btn.classList.add('is-filled');
@@ -5776,6 +5764,34 @@ function setCloudSyncStatus(status, detail) {
     status === 'blocked' ? '為避免資料遺失，已暫停上傳' : status === 'error' ? '保留變更，稍後自動重試' : '有變更時自動同步');
 }
 
+let notionLifeSyncInFlight = false;
+let notionLifeSyncLastAttemptAt = 0;
+const NOTION_LIFE_SYNC_AUTO_COOLDOWN_MS = 15 * 60 * 1000;
+
+async function syncNotionLifeTags({ automatic = false } = {}) {
+  if (notionLifeSyncInFlight || !navigator.onLine) return false;
+  const now = Date.now();
+  if (automatic && now - notionLifeSyncLastAttemptAt < NOTION_LIFE_SYNC_AUTO_COOLDOWN_MS) return false;
+  notionLifeSyncInFlight = true;
+  notionLifeSyncLastAttemptAt = now;
+  const button = document.getElementById('btnSyncNotionLife');
+  if (button) { button.disabled = true; button.textContent = '同步中…'; }
+  try {
+    const response = await fetch(`${CLOUDFLARE_WORKER_URL}/api/cron-sync`, { method: 'POST' });
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new Error(result.error || `HTTP ${response.status}`);
+    if (!automatic) toast(`Notion 生活標籤同步完成${Number.isFinite(result.updatedCount) ? `，更新 ${result.updatedCount} 項` : ''}。`);
+    return true;
+  } catch (error) {
+    console.warn('Notion 生活標籤同步失敗:', error);
+    if (!automatic) toast(`Notion 同步失敗：${error.message || '請檢查網路後重試'}`);
+    return false;
+  } finally {
+    notionLifeSyncInFlight = false;
+    if (button) { button.disabled = false; button.textContent = '同步 Notion'; }
+  }
+}
+
 async function checkCloudSyncSafety(localState = state) {
   if (!navigator.onLine) return { safe: false, offline: true, message: '離線編輯中；恢復網路後再檢查' };
   try {
@@ -6170,6 +6186,11 @@ async function backupWardrobeToCloud(options = {}) {
       }
     }
     const imagesToUpload = [];
+    const uploadedImageIds = new Set();
+    try {
+      const savedIds = JSON.parse(localStorage.getItem('wm_cloud_uploaded_images_v1') || '[]');
+      if (Array.isArray(savedIds)) savedIds.forEach(id => uploadedImageIds.add(id));
+    } catch (_) {}
     const versionedImageId = async (id, data) => {
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
       const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
@@ -6179,17 +6200,17 @@ async function backupWardrobeToCloud(options = {}) {
     for (const it of (textData.items || [])) {
       if (it.image && it.image.startsWith('data:')) {
         const id = await versionedImageId(it.id, it.image);
-        imagesToUpload.push({ id, data: it.image });
+        if (!uploadedImageIds.has(id)) imagesToUpload.push({ id, data: it.image });
         it.image = `/api/image/${id}`;
       }
       if (it.imageBack && it.imageBack.startsWith('data:')) {
         const id = await versionedImageId(`${it.id}_back`, it.imageBack);
-        imagesToUpload.push({ id, data: it.imageBack });
+        if (!uploadedImageIds.has(id)) imagesToUpload.push({ id, data: it.imageBack });
         it.imageBack = `/api/image/${id}`;
       }
     }
 
-    // 先上傳不可變的照片版本，再寫入引用它們的狀態；避免歷史版本指向被覆寫的同一張照片。
+    // 只上傳本機尚未成功上傳過的不可變照片版本，避免每次同步重複消耗 KV 寫入額度。
     await Promise.all(imagesToUpload.map(async img => {
       const imageRes = await fetch(`${CLOUDFLARE_WORKER_URL}/api/image/${img.id}`, {
         method: 'POST',
@@ -6197,7 +6218,14 @@ async function backupWardrobeToCloud(options = {}) {
         body: img.data
       });
       if (!imageRes.ok) throw new Error(`照片版本上傳失敗：${img.id}`);
+      uploadedImageIds.add(img.id);
     }));
+    if (imagesToUpload.length) {
+      try {
+        // 保留最近 2,000 個成功上傳的照片版本 ID；超出時先淘汰最早紀錄。
+        localStorage.setItem('wm_cloud_uploaded_images_v1', JSON.stringify(Array.from(uploadedImageIds).slice(-2000)));
+      } catch (_) {}
+    }
 
     const stateRes = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, {
       method: 'POST',
@@ -6462,7 +6490,6 @@ function wireEvents() {
       if (nameEl) nameEl.value = state.profile.name || '';
       if (typeof syncThresholdCardsUI === 'function') syncThresholdCardsUI();
       if (typeof renderAvatar === 'function') renderAvatar();
-      if (typeof renderCardImageScale === 'function') renderCardImageScale();
       if (typeof syncWeatherSettings === 'function') syncWeatherSettings();
       const res = document.getElementById('weatherSearchResults');
       if (res) res.innerHTML = '';
@@ -6532,7 +6559,9 @@ function wireEvents() {
     a.click();
     document.body.removeChild(a);
   });
-  document.getElementById('btnImportData').addEventListener('click', () => document.getElementById('importFileInput').click());
+  document.getElementById('btnImportData').addEventListener('click', () => openModal('modal-import-source'));
+  document.getElementById('btnImportLocalBackup')?.addEventListener('click', () => { closeModal(); document.getElementById('importFileInput').click(); });
+  document.getElementById('btnImportCloudBackup')?.addEventListener('click', () => { closeModal(); restoreWardrobeFromCloud(); });
   document.getElementById('importFileInput').addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -6540,22 +6569,25 @@ function wireEvents() {
       const text = await file.text();
       const parsed = JSON.parse(text);
       if (!parsed || !Array.isArray(parsed.items)) throw new Error('格式不正確');
-      Object.keys(state).forEach(k => delete state[k]);
-      Object.assign(state, defaultState(), parsed);
-      normalizeLoadedState();
-      saveState();
-      renderAll();
-      toast('匯入完成');
-      closeModal();
+      openConfirm('匯入本機備份？', '目前本機衣櫥與生活設定將被這份 JSON 備份完整覆蓋。建議先確認已匯出目前資料。', [
+        { label: '取消', kind: 'secondary' },
+        { label: '確認匯入', kind: 'primary', onClick: () => {
+          Object.keys(state).forEach(k => delete state[k]);
+          Object.assign(state, defaultState(), parsed);
+          normalizeLoadedState();
+          saveState();
+          renderAll();
+          toast('本機備份匯入完成');
+        } }
+      ]);
     } catch (err) {
       toast('匯入失敗，請確認檔案是否為 Wardrobe Master 的備份檔');
     }
     e.target.value = '';
   });
-  document.getElementById('btnImportSeedList').addEventListener('click', () => { importSeedItems(); closeModal(); });
   document.getElementById('btnSyncLifeConsumables')?.addEventListener('click', syncEverythingToCloud);
+  document.getElementById('btnSyncNotionLife')?.addEventListener('click', () => syncNotionLifeTags());
   document.getElementById('btnCloudBackup')?.addEventListener('click', backupWardrobeToCloud);
-  document.getElementById('btnCloudRestore')?.addEventListener('click', restoreWardrobeFromCloud);
 
   // wardrobe: sort + filter + search + select mode
   document.getElementById('sortSelect').addEventListener('change', e => { uiWardrobeSort = e.target.value; renderWardrobe(); });
@@ -7382,7 +7414,6 @@ function wireEvents() {
     el.addEventListener('input', saveSettingsDraft);
     el.addEventListener('change', saveSettingsDraft);
   });
-  document.getElementById('cardImageScale')?.addEventListener('input', e => { state.profile.cardImageScale = Number(e.target.value); renderCardImageScale(); saveState(); renderWardrobe(); });
   document.getElementById('avatarInput').addEventListener('change', async e => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -7582,7 +7613,6 @@ function wireEvents() {
     saveSettingsDraft();
     renderAll();
     renderAvatar();
-    renderCardImageScale();
     toast('設定已儲存');
     modalReturnTo = null;
     forceCloseModal();
@@ -8571,7 +8601,9 @@ function wireThresholdSteppers() {
 function applyGlobalDisplayStyles() {
   const opacity = typeof state.profile.figureGlassOpacity === 'number' ? state.profile.figureGlassOpacity : 85;
   document.documentElement.style.setProperty('--figure-glass-opacity', (opacity / 100).toFixed(2));
-  document.documentElement.style.setProperty('--card-img-scale', `${state.profile.cardImageScale || 72}%`);
+  document.documentElement.style.setProperty('--outfit-top-ratio', String(HOME_SLOT_RATIOS.top));
+  document.documentElement.style.setProperty('--outfit-bottom-ratio', String(HOME_SLOT_RATIOS.bottom));
+  document.documentElement.style.setProperty('--outfit-shorts-ratio', String(OUTFIT_SHORTS_RATIO));
   const figureScale = state.profile.figureBoardScale || 100;
   document.documentElement.style.setProperty('--figure-board-scale', (figureScale / 100).toFixed(2));
 }
@@ -8629,34 +8661,11 @@ function openDisplayFigureSim() {
   openModal('modal-display-figure');
 }
 
-function openDisplayCardSim() {
-  const stage = document.getElementById('displaySimCardStage');
-  if (stage) {
-    stage.innerHTML = '';
-    const sampleItems = (state.items && state.items.length) ? state.items.slice(0, 2) : [
-      { id: 'sim1', name: '經典丹寧外套', category: 'outer', brand: 'LEVIS', image: '' },
-      { id: 'sim2', name: '重磅純棉短T', category: 'top', brand: 'UNIQLO', image: '' }
-    ];
-    sampleItems.forEach(item => {
-      stage.appendChild(buildItemCard(item, { readOnly: true }));
-    });
-  }
-
-  const slider = document.getElementById('sliderCardImageScale');
-  const valOut = document.getElementById('valCardImageScale');
-  const curScale = state.profile.cardImageScale || 72;
-  if (slider) slider.value = String(curScale);
-  if (valOut) valOut.textContent = `${curScale}%`;
-
-  openModal('modal-display-card');
-}
-
 function wireDisplaySimulations() {
   wireThresholdSteppers();
   applyGlobalDisplayStyles();
 
   document.getElementById('btnOpenDisplayFigure')?.addEventListener('click', openDisplayFigureSim);
-  document.getElementById('btnOpenDisplayCard')?.addEventListener('click', openDisplayCardSim);
   document.getElementById('btnOpenWeatherSettings')?.addEventListener('click', () => openModal('modal-weather-settings'));
 
   const scaleSlider = document.getElementById('sliderFigureBoardScale');
@@ -8695,18 +8704,7 @@ function wireDisplaySimulations() {
     openOutfitStudio();
   });
 
-  const cardScaleSlider = document.getElementById('sliderCardImageScale');
-  const cardScaleVal = document.getElementById('valCardImageScale');
-  if (cardScaleSlider) {
-    cardScaleSlider.addEventListener('input', e => {
-      const val = Math.min(100, Math.max(45, Number(e.target.value) || 72));
-      state.profile.cardImageScale = val;
-      if (cardScaleVal) cardScaleVal.textContent = `${val}%`;
-      document.documentElement.style.setProperty('--card-img-scale', `${val}%`);
-      clearTimeout(outfitScaleSaveTimer);
-      outfitScaleSaveTimer = setTimeout(() => { saveState(); renderWardrobe(); }, 320);
-    });
-  }
+
 }
 
 
@@ -8755,18 +8753,26 @@ async function init() {
     updateHistoryControls();
     refreshWeather(false);
     cloudAutoSyncReady = true;
+    // App 啟動時自動同步一次；之後切回前景時最多每 15 分鐘觸發一次，避免頻繁查詢 Notion。
+    if (navigator.onLine) syncNotionLifeTags({ automatic: true });
     try {
       cloudLastFingerprint = localStorage.getItem(CLOUD_SYNC_FINGERPRINT_KEY) || '';
       const pending = localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1';
       const currentFingerprint = await cloudSyncFingerprint(state);
-      const safety = await checkCloudSyncSafety(state);
-      if (!safety.safe && !safety.offline) {
-        localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
-        setCloudSyncStatus('blocked', safety.message)
-      } else if (!navigator.onLine || safety.offline) {
+      const needsUpload = pending || currentFingerprint !== cloudLastFingerprint;
+      if (!navigator.onLine) {
         setCloudSyncStatus(pending ? 'offline' : 'ready');
-      } else if (pending || currentFingerprint !== cloudLastFingerprint) {
-        scheduleAutoCloudSync(500);
+      } else if (needsUpload) {
+        // 只有即將上傳時才讀取雲端做安全比對；單純開啟且資料未變更，不必消耗一次 KV 讀取。
+        const safety = await checkCloudSyncSafety(state);
+        if (!safety.safe && !safety.offline) {
+          localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
+          setCloudSyncStatus('blocked', safety.message)
+        } else if (safety.offline) {
+          setCloudSyncStatus('offline');
+        } else {
+          scheduleAutoCloudSync(500);
+        }
       } else {
         const lastAt = Number(localStorage.getItem(CLOUD_SYNC_LAST_AT_KEY)) || 0;
         setCloudSyncStatus('synced', lastAt ? '上次同步：' + new Date(lastAt).toLocaleString() : '資料已建立同步基準');
@@ -8779,7 +8785,10 @@ async function init() {
       if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') setCloudSyncStatus('offline');
     });
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1' && navigator.onLine) scheduleAutoCloudSync(300);
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') scheduleAutoCloudSync(300);
+        syncNotionLifeTags({ automatic: true });
+      }
     });
     setInterval(() => {
       ensureNewDay(); renderAll();
@@ -8875,7 +8884,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261022_94').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261022_97').then(reg => {
         reg.update().catch(() => {});
         if (reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });

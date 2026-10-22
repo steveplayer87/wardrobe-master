@@ -39,6 +39,9 @@
   --font-main: -apple-system, BlinkMacSystemFont, "PingFang TC", "Helvetica Neue", "Segoe UI", sans-serif;
 
   --safe-top: env(safe-area-inset-top, 0px);
+  --outfit-top-ratio: 1.08;
+  --outfit-bottom-ratio: 0.78;
+  --outfit-shorts-ratio: 1.15;
   --safe-bottom: max(env(safe-area-inset-bottom, 0px), 34px); /* home-indicator zone, kept even when viewport-fit is not cover */
   --tab-h: 83px;
   --app-max-width: 402px;
@@ -997,30 +1000,25 @@ img.notif-thumb { padding: 0; background-color: transparent; }
 .photo-placeholder.has-photo { background-color: transparent !important; }
 .figure-slot.has-photo .figure-thumb { background-color: transparent !important; }
 .figure-slot.is-transparent-slot { display: none !important; }
-.item-card[data-category="shoes"] .item-photo-image,
-.item-photo-shoes .item-photo-image {
-  width: 90% !important;
-  height: 90% !important;
-}
 .detail-photo { background-color: var(--color-surface-2); background-repeat: no-repeat; background-size: contain; }
 .cal-thumb { background-repeat: no-repeat; background-size: contain; }
 .cal-thumbs { gap: 0; width: 84%; align-items: center; }
 .cal-thumb-top {
-  aspect-ratio: 1.35;
-  margin-bottom: -8px !important;
+  aspect-ratio: var(--outfit-top-ratio, 1.08);
+  margin-bottom: -6px !important;
   z-index: 2;
   position: relative;
 }
 .cal-thumb-bottom {
-  width: 96%;
-  aspect-ratio: 0.88;
+  width: 82%;
+  aspect-ratio: var(--outfit-bottom-ratio, 0.78);
   margin-top: 0 !important;
   z-index: 1;
   position: relative;
 }
 .cal-thumb-bottom.is-shorts {
   width: 78% !important;
-  aspect-ratio: 1.15 !important;
+  aspect-ratio: var(--outfit-shorts-ratio, 1.15) !important;
   margin-top: -1px !important;
 }
 .cal-dot-laundry { background: var(--color-denim); }
@@ -1218,7 +1216,7 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
 .item-photo {
   background-repeat: no-repeat;
   background-position: center;
-  background-size: var(--card-image-size, 72%) auto;
+  background-size: contain;
 }
 .detail-photo, .photo-placeholder, .wishlist-photo, .notif-thumb,
 .rack-chip .rack-chip-thumb { background-color: var(--color-surface-2); }
@@ -1241,7 +1239,6 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
 .settings-label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .settings-label-row output { font-size: 13px; font-weight: 800; color: var(--color-denim); }
 .settings-helper { font-size: 11.5px; color: var(--color-ink-faint); line-height: 1.5; }
-#cardImageScale { width: 100%; accent-color: var(--color-denim); }
 .avatar-upload { display: block; }
 .avatar-preview { width: 100%; min-height: 92px; border: 1.5px dashed var(--color-line); border-radius: var(--radius-l); background: var(--color-surface); background-size: contain; background-position: center; background-repeat: no-repeat; color: var(--color-ink-faint); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; overflow: hidden; }
 .avatar-preview.has-photo { color: transparent; border-style: solid; }
@@ -1878,8 +1875,8 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
 .item-photo { overflow: hidden; }
 .item-photo-image {
   display: block;
-  width: var(--card-image-size, 72%);
-  height: var(--card-image-size, 72%);
+  width: 88%;
+  height: 88%;
   max-width: 100%;
   max-height: 100%;
   margin: auto;

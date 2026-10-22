@@ -178,17 +178,21 @@ export default {
           if (current) {
             const previousHash = await contentHash(current);
             const nextHash = await contentHash(body);
-            if (previousHash !== nextHash) {
-              const history = await env.WARDROBE_STORE.get("app_state_history", "json") || [];
-              if (!history.some(entry => entry.hash === previousHash)) {
-                history.unshift({
-                  id: `${current.updatedAt || Date.now()}-${previousHash.slice(0, 12)}`,
-                  savedAt: Number(current.updatedAt) || Date.now(),
-                  hash: previousHash,
-                  state: current
-                });
-                await env.WARDROBE_STORE.put("app_state_history", JSON.stringify(history.slice(0, 20)));
-              }
+            if (previousHash === nextHash) {
+              // 內容未變更時不重寫 KV，也不更新時間戳；避免無效寫入與歷史版本檢查。
+              return new Response(JSON.stringify({ success: true, unchanged: true, updatedAt: current.updatedAt || null }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+              });
+            }
+            const history = await env.WARDROBE_STORE.get("app_state_history", "json") || [];
+            if (!history.some(entry => entry.hash === previousHash)) {
+              history.unshift({
+                id: `${current.updatedAt || Date.now()}-${previousHash.slice(0, 12)}`,
+                savedAt: Number(current.updatedAt) || Date.now(),
+                hash: previousHash,
+                state: current
+              });
+              await env.WARDROBE_STORE.put("app_state_history", JSON.stringify(history.slice(0, 20)));
             }
           }
           body.updatedAt = Date.now();
@@ -397,9 +401,6 @@ export default {
           updatedClient
         };
 
-        // 存入 KV 供超級儀表板與離線快取使用
-        await env.WARDROBE_STORE.put("last_consumables_sync", JSON.stringify(result));
-
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
@@ -550,8 +551,8 @@ export default {
         });
       }
 
-      // 7. 手動/外部觸發全量自動同步日記至生活標籤
-      if (path === "/api/cron-sync") {
+      // 7. 手動或 App 重新進入時觸發日記至生活標籤同步；不再使用定時排程
+      if (path === "/api/cron-sync" && request.method === "POST") {
         const result = await syncAllDiaryToNotion(env);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -567,10 +568,6 @@ export default {
     }
   },
 
-  // Cloudflare 雲端定時排程（Cron Triggers 每 5 分鐘全自動觸發）
-  async scheduled(controller, env, ctx) {
-    ctx.waitUntil(syncAllDiaryToNotion(env));
-  }
 };
 
 /**
@@ -671,6 +668,6 @@ async function syncAllDiaryToNotion(env) {
     updatedCount: updated.length,
     updated
   };
-  await env.WARDROBE_STORE.put("last_cron_sync_result", JSON.stringify(result));
+  // 同步結果直接回傳呼叫端；沒有消費者讀取此 KV 紀錄，因此不額外寫入。
   return result;
 }
