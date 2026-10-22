@@ -31,7 +31,67 @@ export default {
         });
       }
 
-      // 2. 日常輕量狀態同步（純文字資料：衣服清單、洗滌狀態、穿搭紀錄、耗材，~120KB）
+      // 2. 從 Notion 日記完整回填洗衣日期（唯讀查詢，不改動 Notion 日記）
+      if (path === "/api/laundry-history-import" && request.method === "GET") {
+        if (!env.NOTION_TOKEN) {
+          return new Response(JSON.stringify({ error: "Notion token not configured on Worker" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        const diaryDbId = env.NOTION_DIARY_DB_ID || "50adbc0959024715a90484ddc73b62d6";
+        const dates = new Set();
+        let startCursor;
+        let scanned = 0;
+
+        // Notion page_size 上限為 100；必須翻頁，不能只讀最近 30 筆。
+        do {
+          const payload = { page_size: 100 };
+          if (startCursor) payload.start_cursor = startCursor;
+          const diaryRes = await fetch(`https://api.notion.com/v1/databases/${diaryDbId}/query`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${env.NOTION_TOKEN}`,
+              "Notion-Version": "2022-06-28",
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!diaryRes.ok) {
+            const detail = await diaryRes.text();
+            return new Response(JSON.stringify({ error: "Failed to query Notion diary", detail }), {
+              status: 502,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+
+          const diaryJson = await diaryRes.json();
+          for (const page of diaryJson.results || []) {
+            scanned += 1;
+            const date = page.properties?.["Date"]?.date?.start;
+            const tags = (page.properties?.["註記"]?.multi_select || []).map(tag => tag.name);
+            if (date && tags.some(tag => tag === "洗衣服" || tag.includes("洗衣服"))) {
+              dates.add(date.slice(0, 10));
+            }
+          }
+          startCursor = diaryJson.has_more ? diaryJson.next_cursor : null;
+        } while (startCursor);
+
+        const sortedDates = Array.from(dates).sort();
+        return new Response(JSON.stringify({
+          success: true,
+          source: "notion-diary",
+          scanned,
+          count: sortedDates.length,
+          dates: sortedDates
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
+        });
+      }
+
+      // 3. 日常輕量狀態同步（純文字資料：衣服清單、洗滌狀態、穿搭紀錄、耗材，~120KB）
       if (path === "/api/state") {
         if (request.method === "GET") {
           const state = await env.WARDROBE_STORE.get("app_state_text", "json");
@@ -49,7 +109,7 @@ export default {
         }
       }
 
-      // 3. 獨立單品照片儲存池（動靜分離：只有新加入衣服或換照片才上傳，終身快取）
+      // 4. 獨立單品照片儲存池（動靜分離：只有新加入衣服或換照片才上傳，終身快取）
       if (path.startsWith("/api/image/")) {
         const imageId = path.replace("/api/image/", "");
         if (!imageId) return new Response("Missing image id", { status: 400, headers: corsHeaders });
@@ -77,7 +137,7 @@ export default {
         }
       }
 
-      // 4. 生活耗材雙向同步（與 Notion 生活標籤追蹤資料庫雙向對齊）
+      // 5. 生活耗材雙向同步（與 Notion 生活標籤追蹤資料庫雙向對齊）
       if (path === "/api/sync-consumables") {
         if (!env.NOTION_TOKEN || !env.NOTION_LIFE_DB_ID) {
           return new Response(JSON.stringify({ error: "Notion credentials not configured on Worker" }), {
@@ -234,7 +294,7 @@ export default {
         });
       }
 
-      // 5. 阿鵝管家三項雙向同步（供超級儀表板直連 Notion）
+      // 6. 阿鵝管家三項雙向同步（供超級儀表板直連 Notion）
       if (path === "/api/sync-goose") {
         if (!env.NOTION_TOKEN || !env.NOTION_LIFE_DB_ID) {
           return new Response(JSON.stringify({ error: "Notion credentials not configured on Worker" }), {
@@ -377,7 +437,7 @@ export default {
         });
       }
 
-      // 6. 手動/外部觸發全量自動同步日記至生活標籤
+      // 7. 手動/外部觸發全量自動同步日記至生活標籤
       if (path === "/api/cron-sync") {
         const result = await syncAllDiaryToNotion(env);
         return new Response(JSON.stringify(result), {

@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261020_87">
+<link rel="stylesheet" href="styles.css?v=20261022_88">
 </head>
 <body>
 
@@ -757,7 +757,7 @@
       </div>
     </form>
     <div class="settings-footer">
-      <p class="settings-note">資料儲存在這台裝置的瀏覽器裡，換裝置或清除瀏覽器資料會遺失，建議定期匯出備份。</p>
+      <p class="settings-note">主要資料儲存在本機 IndexedDB，亦可同步至 Cloudflare 雲端；仍建議定期匯出備份。</p>
       <div class="settings-actions">
         <button class="btn-secondary btn-with-icon" id="btnExportData"><span data-icon="download"></span>匯出備份</button>
         <button class="btn-secondary" id="btnImportData">匯入備份</button>
@@ -766,6 +766,10 @@
       <div class="settings-actions" style="margin-top:8px">
         <button type="button" class="btn-secondary btn-with-icon" id="btnCloudRestore"><span data-icon="download"></span>從雲端還原資料</button>
       </div>
+      <div class="settings-actions" style="margin-top:8px">
+        <button type="button" class="btn-secondary btn-with-icon" id="btnImportLaundryHistory"><span data-icon="history"></span>從 Notion 日記補登洗衣歷史</button>
+      </div>
+      <p class="settings-note" style="margin-top:6px;">掃描所有日記中的「洗衣服」標籤，預覽後只補入缺少的日期，不會修改日記或重複新增。</p>
       <div class="settings-actions" style="margin-top:8px">
         <button type="button" class="btn-secondary" id="btnImportSeedList">匯入我的舊衣物清單</button>
       </div>
@@ -1522,7 +1526,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v87', K='wm_seen_version', seen=null;
+  var V='v88', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1532,7 +1536,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261020_87"></script>
-<script src="app.js?v=20261020_87"></script>
+<script src="seed-items.js?v=20261022_88"></script>
+<script src="app.js?v=20261022_88"></script>
 </body>
 </html>

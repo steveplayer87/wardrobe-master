@@ -1,6 +1,6 @@
 # Wardrobe Master
 
-這是一個可安裝到 iPhone 主畫面的個人衣櫥、穿搭與洗衣管理 PWA（Wardrobe Master）。資料預設保存在目前瀏覽器／網站來源中，並可透過 App 內的「設定 → 匯出備份／匯入備份」搬移。
+這是一個可安裝到 iPhone 主畫面的個人衣櫥、穿搭與洗衣管理 PWA（Wardrobe Master）。主要資料保存在本機 IndexedDB（localStorage 作相容備援），並可同步至 Cloudflare Worker + KV；也可透過 App 內的「設定 → 匯出備份／匯入備份」搬移。
 
 ## 專案與發布網址
 - GitHub 倉庫：[https://github.com/steveplayer87/wardrobe-master](https://github.com/steveplayer87/wardrobe-master)
@@ -13,6 +13,10 @@
 ## 開發方式
 
 這個專案不需要 build step。修改 `index.html`、`styles.css`、`app.js` 或 `seed-items.js` 後推送到 `main`，GitHub Actions 會自動部署到 GitHub Pages。若更新 JavaScript 或 CSS，請同步更新 `index.html` 與 `sw.js` 中的 query-string 版本及 service worker cache 名稱，避免舊快取殘留。
+
+## 洗衣歷史回填
+
+設定中提供「從 Notion 日記補登洗衣歷史」功能。它會透過 Cloudflare Worker 分頁掃描整個 Notion 日記資料庫，找出「註記」包含「洗衣服」的日期，預覽後只補入衣櫥助手目前缺少的日期，最後同步本機與 Cloudflare 狀態；不會改寫日記內容，也不會自動建立衣物的個別洗滌紀錄。
 
 ## 備份
 

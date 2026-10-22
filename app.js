@@ -5811,6 +5811,56 @@ async function syncLifeConsumablesWithCloud() {
   }
 }
 
+async function importLaundryHistoryFromNotion() {
+  const button = document.getElementById('btnImportLaundryHistory');
+  if (button) button.disabled = true;
+  try {
+    toast('正在掃描 Notion 全部日記中的洗衣標籤…');
+    const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/laundry-history-import`, { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok || !data.success || !Array.isArray(data.dates)) {
+      throw new Error(data.error || `後端回應失敗：${res.status}`);
+    }
+
+    const existing = laundryHistoryDates();
+    const missingDates = data.dates.filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date) && !existing.has(date));
+    const sortedMissingDates = missingDates.slice().sort();
+    const preview = sortedMissingDates.slice(0, 12).map(date => formatDayWithWeekday(date)).join('、');
+    if (!missingDates.length) {
+      toast(`掃描 ${data.scanned} 篇日記，共找到 ${data.count} 個洗衣日期；目前歷史已全部包含，無需補登。`);
+      return;
+    }
+
+    openConfirm(
+      '從 Notion 補登洗衣歷史',
+      `掃描了 ${data.scanned} 篇日記，找到 ${data.count} 個不同洗衣日期。現有紀錄缺少 ${missingDates.length} 天：<br><br>${preview}${missingDates.length > 12 ? `<br>…另有 ${missingDates.length - 12} 天` : ''}<br><br>確認後只會補入缺少日期、去除重複，並更新本機與 Cloudflare 的洗衣歷史；不會修改 Notion 日記或衣物洗滌紀錄。`,
+      [
+        { label: '取消', kind: 'secondary', returnTo: 'modal-settings' },
+        {
+          label: `補登 ${missingDates.length} 天`,
+          kind: 'primary',
+          returnTo: 'modal-settings',
+          onClick: async () => {
+            for (const date of missingDates) recordLaundryEvent(date);
+            syncLatestLaundryDate();
+            saveState({ action: '從 Notion 補登洗衣歷史' });
+            renderAll();
+            const cloudSaved = await backupWardrobeToCloud({ silent: true });
+            toast(cloudSaved
+              ? `已補登 ${missingDates.length} 天洗衣歷史，並同步雲端。`
+              : `已補登 ${missingDates.length} 天至本機，但雲端同步失敗；請稍後重試雲端備份。`);
+          }
+        }
+      ]
+    );
+  } catch (err) {
+    console.error('Notion 洗衣歷史補登失敗:', err);
+    toast(`補登失敗：${err.message || '請檢查網路或 Notion 後端設定'}`);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 async function backupWardrobeToCloud(options = {}) {
   const silent = !!options.silent;
   if (!silent) toast('正在同步備份至 Cloudflare...');
@@ -5847,9 +5897,11 @@ async function backupWardrobeToCloud(options = {}) {
     }
 
     if (!silent) toast('雲端備份成功！已同步至 Cloudflare');
+    return true;
   } catch (err) {
     console.error('雲端備份失敗:', err);
     if (!silent) toast('雲端備份失敗：' + err.message);
+    return false;
   }
 }
 
@@ -6186,6 +6238,7 @@ function wireEvents() {
   });
   document.getElementById('btnImportSeedList').addEventListener('click', () => { importSeedItems(); closeModal(); });
   document.getElementById('btnSyncLifeConsumables')?.addEventListener('click', syncLifeConsumablesWithCloud);
+  document.getElementById('btnImportLaundryHistory')?.addEventListener('click', importLaundryHistoryFromNotion);
   document.getElementById('btnCloudBackup')?.addEventListener('click', backupWardrobeToCloud);
   document.getElementById('btnCloudRestore')?.addEventListener('click', restoreWardrobeFromCloud);
 
