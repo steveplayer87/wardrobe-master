@@ -110,7 +110,10 @@ export default {
         if (!version) return new Response(JSON.stringify({ success: false, error: "History version not found" }), {
           status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
-        return new Response(JSON.stringify({ success: true, version }), {
+        const safeVersion = { ...version, state: { ...(version.state || {}) } };
+        // 不在歷史版本端點額外暴露舊版 API 金鑰；還原時保留本機目前的金鑰即可。
+        delete safeVersion.state.geminiApiKey;
+        return new Response(JSON.stringify({ success: true, version: safeVersion }), {
           headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
         });
       }
