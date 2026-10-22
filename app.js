@@ -5796,8 +5796,8 @@ async function syncLifeConsumablesWithCloud() {
       if (typeof renderLaundryOverview === 'function') renderLaundryOverview();
     }
 
-    // 自動連帶將全量衣櫥狀態同步至 Cloudflare（真正一鍵全域雙向同步）
-    backupWardrobeToCloud({ silent: true }).catch(e => console.warn('雲端備份警告:', e));
+    // 單向同步：此處只更新本機與 Notion 的耗材欄位，不自動回寫整份雲端狀態。
+    // 避免舊分頁／舊本機資料覆蓋 Cloudflare 的較新資料。
 
     const updatedNotionText = data.updatedNotion?.length ? `已更新 Notion：${data.updatedNotion.join('、')}` : '';
     const updatedClientText = data.updatedClient?.length ? `已自 Notion 更新：${data.updatedClient.join('、')}` : '';
@@ -5826,29 +5826,73 @@ async function importLaundryHistoryFromNotion() {
     const missingDates = data.dates.filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date) && !existing.has(date));
     const sortedMissingDates = missingDates.slice().sort();
     const preview = sortedMissingDates.slice(0, 12).map(date => formatDayWithWeekday(date)).join('、');
-    if (!missingDates.length) {
-      toast(`掃描 ${data.scanned} 篇日記，共找到 ${data.count} 個洗衣日期；目前歷史已全部包含，無需補登。`);
-      return;
-    }
+    const previewText = preview || '本機已包含這些日期，仍會與雲端現有歷史合併並重新驗證。';
 
     openConfirm(
-      '從 Notion 補登洗衣歷史',
-      `掃描了 ${data.scanned} 篇日記，找到 ${data.count} 個不同洗衣日期。現有紀錄缺少 ${missingDates.length} 天：<br><br>${preview}${missingDates.length > 12 ? `<br>…另有 ${missingDates.length - 12} 天` : ''}<br><br>確認後只會補入缺少日期、去除重複，並更新本機與 Cloudflare 的洗衣歷史；不會修改 Notion 日記或衣物洗滌紀錄。`,
+      '單向匯入 Notion 洗衣歷史',
+      `掃描了 ${data.scanned} 篇日記，找到 ${data.count} 個不同洗衣日期。本機目前缺少 ${missingDates.length} 天：<br><br>${previewText}${missingDates.length > 12 ? `<br>…另有 ${missingDates.length - 12} 天` : ''}<br><br>確認後會以雲端資料為底，合併 Notion 的所有洗衣日期並回讀驗證；不會修改 Notion 日記、衣物洗滌紀錄或其他雲端資料欄位。`,
       [
         { label: '取消', kind: 'secondary', returnTo: 'modal-settings' },
         {
-          label: `補登 ${missingDates.length} 天`,
+          label: missingDates.length ? `補登 ${missingDates.length} 天` : `核對並同步 ${data.count} 天`,
           kind: 'primary',
           returnTo: 'modal-settings',
           onClick: async () => {
-            for (const date of missingDates) recordLaundryEvent(date);
-            syncLatestLaundryDate();
-            saveState({ action: '從 Notion 補登洗衣歷史' });
-            renderAll();
-            const cloudSaved = await backupWardrobeToCloud({ silent: true });
-            toast(cloudSaved
-              ? `已補登 ${missingDates.length} 天洗衣歷史，並同步雲端。`
-              : `已補登 ${missingDates.length} 天至本機，但雲端同步失敗；請稍後重試雲端備份。`);
+            try {
+              // 以雲端現有狀態為底，只合併 Notion 日期；絕不拿本機整份舊狀態覆蓋雲端。
+              const cloudRes = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, { cache: 'no-store' });
+              if (!cloudRes.ok) throw new Error('讀取雲端狀態失敗');
+              const cloudState = await cloudRes.json();
+              if (!cloudState || !Array.isArray(cloudState.items)) throw new Error('雲端狀態格式不正確');
+              if (!cloudState.laundry || typeof cloudState.laundry !== 'object') {
+                cloudState.laundry = { lastWashDate: null, cycleDays: 2, snoozedUntil: null, history: [] };
+              }
+
+              const cloudHistory = Array.isArray(cloudState.laundry.history) ? cloudState.laundry.history : [];
+              const merged = new Map();
+              const getDate = entry => typeof entry === 'string' ? entry : entry?.date;
+              [...cloudHistory, ...(Array.isArray(state.laundry?.history) ? state.laundry.history : [])].forEach(entry => {
+                const date = getDate(entry);
+                if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !merged.has(date)) merged.set(date, entry);
+              });
+              data.dates.forEach(date => {
+                if (/^\d{4}-\d{2}-\d{2}$/.test(date) && !merged.has(date)) merged.set(date, date);
+              });
+              cloudState.laundry.history = [...merged.entries()]
+                .sort((a, b) => b[0].localeCompare(a[0]))
+                .map(([, entry]) => entry);
+
+              const latestDate = [...merged.keys()].sort().at(-1) || null;
+              const currentLastDate = cloudState.laundry.lastWashDate;
+              cloudState.laundry.lastWashDate = [currentLastDate, latestDate].filter(Boolean).sort().at(-1) || null;
+
+              const saveRes = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cloudState)
+              });
+              if (!saveRes.ok) throw new Error('寫入雲端狀態失敗');
+
+              // 本機也合併日期，讓目前畫面立即顯示；不回寫整份本機狀態。
+              for (const date of merged.keys()) {
+                if (!laundryHistoryDates().has(date)) recordLaundryEvent(date);
+              }
+              syncLatestLaundryDate();
+              saveState({ action: '單向匯入 Notion 洗衣歷史' });
+              renderAll();
+
+              // 回讀驗證雲端確實保存了合併後的歷史。
+              const verifyRes = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, { cache: 'no-store' });
+              if (!verifyRes.ok) throw new Error('寫入後回讀驗證失敗');
+              const verifyState = await verifyRes.json();
+              const verifyHistory = Array.isArray(verifyState?.laundry?.history) ? verifyState.laundry.history : [];
+              const verifyDates = new Set(verifyHistory.map(getDate).filter(Boolean));
+              if (data.dates.some(date => !verifyDates.has(date))) throw new Error('雲端回讀未包含全部 Notion 日期');
+              toast(`單向匯入完成：Notion ${data.count} 個日期，雲端洗衣歷史共 ${verifyDates.size} 筆，已驗證。`);
+            } catch (err) {
+              console.error('單向匯入洗衣歷史失敗:', err);
+              toast(`單向匯入失敗：${err.message || '請稍後重試'}`);
+            }
           }
         }
       ]
