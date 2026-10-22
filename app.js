@@ -5987,17 +5987,34 @@ async function backupWardrobeToCloud(options = {}) {
   try {
     const textData = JSON.parse(JSON.stringify(state));
     const imagesToUpload = [];
+    const versionedImageId = async (id, data) => {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+      const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+      return `${id}_${hash}`;
+    };
 
-    textData.items.forEach(it => {
+    for (const it of (textData.items || [])) {
       if (it.image && it.image.startsWith('data:')) {
-        imagesToUpload.push({ id: it.id, data: it.image });
-        it.image = `/api/image/${it.id}`;
+        const id = await versionedImageId(it.id, it.image);
+        imagesToUpload.push({ id, data: it.image });
+        it.image = `/api/image/${id}`;
       }
       if (it.imageBack && it.imageBack.startsWith('data:')) {
-        imagesToUpload.push({ id: `${it.id}_back`, data: it.imageBack });
-        it.imageBack = `/api/image/${it.id}_back`;
+        const id = await versionedImageId(`${it.id}_back`, it.imageBack);
+        imagesToUpload.push({ id, data: it.imageBack });
+        it.imageBack = `/api/image/${id}`;
       }
-    });
+    }
+
+    // 先上傳不可變的照片版本，再寫入引用它們的狀態；避免歷史版本指向被覆寫的同一張照片。
+    await Promise.all(imagesToUpload.map(async img => {
+      const imageRes = await fetch(`${CLOUDFLARE_WORKER_URL}/api/image/${img.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: img.data
+      });
+      if (!imageRes.ok) throw new Error(`照片版本上傳失敗：${img.id}`);
+    }));
 
     const stateRes = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, {
       method: 'POST',
@@ -6005,16 +6022,6 @@ async function backupWardrobeToCloud(options = {}) {
       body: JSON.stringify(textData)
     });
     if (!stateRes.ok) throw new Error('文字狀態儲存失敗');
-
-    if (imagesToUpload.length > 0) {
-      await Promise.all(imagesToUpload.map(img =>
-        fetch(`${CLOUDFLARE_WORKER_URL}/api/image/${img.id}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: img.data
-        }).catch(e => console.warn('圖片上傳失敗:', img.id, e))
-      ));
-    }
 
     if (!silent) toast('雲端備份成功！已同步至 Cloudflare');
     return true;
