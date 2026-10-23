@@ -2646,6 +2646,52 @@ function getAdjacentMonth(y, m, offset) {
   return { y: ny, m: nm };
 }
 
+const calendarImageWarmCache = new Map();
+function warmCalendarMonthImages(y, m, priority = 'low') {
+  const entries = allOotdEntries();
+  const monthPrefix = `${y}-${String(m + 1).padStart(2, '0')}-`;
+  const urls = [];
+  entries.forEach(entry => {
+    if (!entry.date?.startsWith(monthPrefix)) return;
+    [entry.top, entry.outer, entry.bottom, entry.shoes, entry.hat].forEach(id => {
+      if (!id) return;
+      const item = findItem(id);
+      const url = item && (transparentCleanCache.get(item.image) || item.image);
+      if (url && !urls.includes(url)) urls.push(url);
+    });
+  });
+  urls.forEach(url => {
+    if (calendarImageWarmCache.has(url)) {
+      if (priority === 'high') calendarImageWarmCache.get(url).fetchPriority = 'high';
+      return;
+    }
+    const img = new Image();
+    img.decoding = 'async';
+    img.fetchPriority = priority;
+    img.onload = () => { calendarImageWarmCache.set(url, img); };
+    img.onerror = () => calendarImageWarmCache.delete(url);
+    img.src = url;
+    calendarImageWarmCache.set(url, img);
+  });
+  // Keep only URLs relevant to the current and immediately adjacent months.
+  {
+    const keep = new Set();
+    [-1, 0, 1].forEach(offset => {
+      const target = getAdjacentMonth(uiCalMonth.y, uiCalMonth.m, offset);
+      const prefix = `${target.y}-${String(target.m + 1).padStart(2, '0')}-`;
+      entries.forEach(entry => {
+        if (!entry.date?.startsWith(prefix)) return;
+        [entry.top, entry.outer, entry.bottom, entry.shoes, entry.hat].forEach(id => {
+          const item = id ? findItem(id) : null;
+          const url = item && (transparentCleanCache.get(item.image) || item.image);
+          if (url) keep.add(url);
+        });
+      });
+    });
+    for (const url of calendarImageWarmCache.keys()) if (!keep.has(url)) calendarImageWarmCache.delete(url);
+  }
+}
+
 function renderMonthGrid(grid, y, m) {
   if (!grid) return;
   grid.innerHTML = '';
@@ -2722,6 +2768,9 @@ function renderHistory() {
   renderMonthGrid(document.getElementById('calGridPrev'), prevMonth.y, prevMonth.m);
   renderMonthGrid(document.getElementById('calGrid'), uiCalMonth.y, uiCalMonth.m);
   renderMonthGrid(document.getElementById('calGridNext'), nextMonth.y, nextMonth.m);
+  warmCalendarMonthImages(prevMonth.y, prevMonth.m, 'low');
+  warmCalendarMonthImages(uiCalMonth.y, uiCalMonth.m, 'high');
+  warmCalendarMonthImages(nextMonth.y, nextMonth.m, 'low');
   renderCalStats();
   renderRank();
 }
@@ -4717,6 +4766,35 @@ function openOutfitEditor() {
   openOutfitStudio();
 }
 
+let editingInDetailDrawer = false;
+function mountEditFormInDetailDrawer() {
+  const detail = document.getElementById('itemDetailBody');
+  const addSheet = document.getElementById('modal-add');
+  const itemSheet = document.getElementById('modal-item');
+  const head = addSheet?.querySelector('.modal-head');
+  const form = document.getElementById('addItemForm');
+  if (!detail || !itemSheet || !head || !form) return;
+  detail.hidden = true;
+  head.dataset.sharedEditHead = '1';
+  form.dataset.sharedEditForm = '1';
+  itemSheet.append(head, form);
+  itemSheet.classList.add('is-editing-item');
+  editingInDetailDrawer = true;
+}
+function unmountEditFormFromDetailDrawer() {
+  if (!editingInDetailDrawer) return;
+  const addSheet = document.getElementById('modal-add');
+  const itemSheet = document.getElementById('modal-item');
+  const detail = document.getElementById('itemDetailBody');
+  const head = itemSheet?.querySelector('[data-shared-edit-head]');
+  const form = itemSheet?.querySelector('[data-shared-edit-form]');
+  if (addSheet && head) { delete head.dataset.sharedEditHead; addSheet.insertBefore(head, addSheet.firstChild?.nextSibling || null); }
+  if (addSheet && form) { delete form.dataset.sharedEditForm; addSheet.appendChild(form); }
+  if (detail) detail.hidden = false;
+  itemSheet?.classList.remove('is-editing-item');
+  editingInDetailDrawer = false;
+}
+
 function openAddModal(editId = null) {
   editingItemId = editId;
   pendingPhoto = null;
@@ -4821,10 +4899,15 @@ function openAddModal(editId = null) {
   formDirty = false; // the population above doesn't count as a user edit
   const addSheet = document.getElementById('modal-add');
   if (addSheet) addSheet.scrollTop = 0;
-  openModal('modal-add');
-  requestAnimationFrame(() => {
-    if (addSheet) addSheet.scrollTop = 0;
-  });
+  if (editId) {
+    mountEditFormInDetailDrawer();
+    const detailSheet = document.getElementById('modal-item');
+    if (detailSheet) detailSheet.scrollTop = 0;
+    openModal('modal-item');
+  } else {
+    openModal('modal-add');
+    requestAnimationFrame(() => { if (addSheet) addSheet.scrollTop = 0; });
+  }
 }
 
 /* ============================================================
@@ -4892,13 +4975,23 @@ function openUnsavedPrompt(context) {
 }
 function closeModal() {
   const activeBeforePersist = document.querySelector('.modal-sheet.is-active:not(.is-behind)') || document.querySelector('.modal-sheet.is-active');
-  if (activeBeforePersist?.id === 'modal-add' && formDirty) { openUnsavedPrompt('item'); return; }
+  if ((activeBeforePersist?.id === 'modal-add' || (activeBeforePersist?.id === 'modal-item' && editingInDetailDrawer)) && formDirty) { openUnsavedPrompt('item'); return; }
   if (activeBeforePersist?.id === 'modal-wishlist' && wishlistDirty) { openUnsavedPrompt('wishlist'); return; }
   persistTransientForms();
 
   const activeSheet = document.querySelector('.modal-sheet.is-active:not(.is-behind)') || document.querySelector('.modal-sheet.is-active');
   if (!activeSheet) {
     forceCloseModal();
+    return;
+  }
+
+  // Shared detail drawer: switch from edit form back to details without opening another sheet.
+  if (activeSheet?.id === 'modal-item' && editingInDetailDrawer) {
+    const returnId = editingItemId;
+    unmountEditFormFromDetailDrawer();
+    editingItemId = null;
+    formDirty = false;
+    if (returnId) renderItemDetail(returnId);
     return;
   }
 
@@ -5288,6 +5381,8 @@ function animateCalendarMonthChange(direction, onComplete) {
     return;
   }
   isCalAnimating = true;
+  const targetMonth = getAdjacentMonth(uiCalMonth.y, uiCalMonth.m, direction === 'next' ? 1 : -1);
+  warmCalendarMonthImages(targetMonth.y, targetMonth.m, 'high');
   track.style.transition = 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)';
   const targetX = direction === 'next' ? '-66.666667%' : '0%';
   track.style.transform = `translateX(${targetX})`;
@@ -7489,8 +7584,9 @@ function wireEvents() {
     formDirty = false;
     if (editingItemId) {
       const returnId = editingItemId;
-      const cameFromDetail = modalStack.some(m => m.id === 'modal-item');
+      const cameFromDetail = editingInDetailDrawer || modalStack.some(m => m.id === 'modal-item');
       const detailReturnTo = modalReturnTo;
+      unmountEditFormFromDetailDrawer();
       editingItemId = null;
       // Close every layer first, including an unsaved-changes prompt, before reopening details.
       // This prevents the prompt/overlay from remaining above the returned detail sheet.
@@ -7657,6 +7753,20 @@ function wireEvents() {
     } else state.drafts.addItem = null;
     saveState();
     unsavedContext = null;
+    if (editingInDetailDrawer) {
+      const returnId = editingItemId;
+      unmountEditFormFromDetailDrawer();
+      editingItemId = null;
+      formDirty = false;
+      const prompt = document.getElementById('modal-unsaved');
+      prompt?.classList.remove('is-shown');
+      setTimeout(() => prompt?.classList.remove('is-active'), 220);
+      const detailSheet = document.getElementById('modal-item');
+      detailSheet?.classList.remove('is-behind');
+      if (detailSheet) detailSheet.style.zIndex = '610';
+      if (returnId) renderItemDetail(returnId);
+      return;
+    }
     forceCloseModal({ skipPersist: true });
   });
   document.getElementById('btnUnsavedSave').addEventListener('click', () => {
@@ -7665,7 +7775,7 @@ function wireEvents() {
     const saved = context === 'wishlist' ? saveWishlistForm() : saveItemForm();
     if (saved === false) {
       if (context === 'wishlist') openModal('modal-wishlist');
-      else openModal('modal-add');
+      else openModal(editingInDetailDrawer ? 'modal-item' : 'modal-add');
     }
   });
 

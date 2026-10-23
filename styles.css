@@ -4938,3 +4938,9 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 #view-more > .more-section-block:nth-of-type(3) { order: 1; }
 #view-more > hr:nth-of-type(1) { order: 2.5; }
 #view-more > hr:nth-of-type(2) { order: 1.5; }
+
+/* Edit a garment inside its existing detail drawer; no second sheet. */
+#modal-item.is-editing-item { overflow-y: auto; }
+#modal-item.is-editing-item > .item-detail-body[hidden] { display: none !important; }
+#modal-item.is-editing-item > .modal-head { position: sticky; top: 0; z-index: 3; background: var(--color-surface, #fff); }
+#modal-item.is-editing-item > #addItemForm { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
