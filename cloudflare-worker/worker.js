@@ -153,12 +153,15 @@ export default {
       // 4. 日常輕量狀態同步與去重歷史版本（保留最近 20 個不同內容版本）
       if (path === "/api/state/history" && request.method === "GET") {
         const history = await env.WARDROBE_STORE.get("app_state_history", "json") || [];
+        const historyBytes = new TextEncoder().encode(JSON.stringify(history)).length;
         return new Response(JSON.stringify({
           success: true,
-          limit: 20,
+          limit: 10,
           count: history.length,
+          historyBytes,
           versions: history.map(({ id, savedAt, hash, state }) => ({
-            id, savedAt, hash, itemCount: Array.isArray(state?.items) ? state.items.length : 0
+            id, savedAt, hash, itemCount: Array.isArray(state?.items) ? state.items.length : 0,
+            bytes: new TextEncoder().encode(JSON.stringify(state || {})).length
           }))
         }), { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" } });
       }
@@ -254,14 +257,28 @@ export default {
             const hasThisVersion = history.some(entry => entry.hash === previousHash);
             const snapshotDue = !lastSnapshotAt || Date.now() - lastSnapshotAt >= snapshotIntervalMs;
             if (!hasThisVersion && snapshotDue) {
-              history.unshift({
+              const nextHistory = [{
                 id: `${current.updatedAt || Date.now()}-${previousHash.slice(0, 12)}`,
                 savedAt: Number(current.updatedAt) || Date.now(),
                 hash: previousHash,
                 state: current
-              });
-              await env.WARDROBE_STORE.put("app_state_history", JSON.stringify(history.slice(0, 20)));
-              console.log(JSON.stringify({ event: "kv_write_audit", route: "/api/state", key: "app_state_history", outcome: "put", requestId, bytes: new TextEncoder().encode(JSON.stringify(history.slice(0, 20))).length }));
+              }, ...history];
+              // KV 單一值有大小上限；不能只按版本數裁切，因每份衣櫥快照都可能很大。
+              // 保留最多 10 份，並將整包限制在 16 MiB，為 JSON/KV 上限留足空間。
+              const maxHistoryBytes = 16 * 1024 * 1024;
+              let trimmedHistory = nextHistory.slice(0, 10);
+              let historyPayload = JSON.stringify(trimmedHistory);
+              while (trimmedHistory.length > 1 && new TextEncoder().encode(historyPayload).length > maxHistoryBytes) {
+                trimmedHistory.pop();
+                historyPayload = JSON.stringify(trimmedHistory);
+              }
+              const historyBytes = new TextEncoder().encode(historyPayload).length;
+              if (historyBytes > maxHistoryBytes) {
+                console.warn(JSON.stringify({ event: "kv_write_audit", route: "/api/state", key: "app_state_history", outcome: "skipped_too_large", requestId, bytes: historyBytes }));
+              } else {
+                await env.WARDROBE_STORE.put("app_state_history", historyPayload);
+                console.log(JSON.stringify({ event: "kv_write_audit", route: "/api/state", key: "app_state_history", outcome: "put", requestId, bytes: historyBytes, snapshots: trimmedHistory.length }));
+              }
             }
           }
           body.updatedAt = Date.now();
@@ -641,6 +658,7 @@ export default {
 
       return new Response("Not Found", { status: 404, headers: corsHeaders });
     } catch (err) {
+      console.error(JSON.stringify({ event: "worker_error", route: path, method: request.method, message: String(err?.message || err), name: err?.name || "Error" }));
       return new Response(JSON.stringify({ error: err.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
