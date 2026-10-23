@@ -31,7 +31,66 @@ export default {
         });
       }
 
-      // 2. 從 Notion 日記完整回填洗衣日期（唯讀查詢，不改動 Notion 日記）
+      // 2. 中央氣象署今明 36 小時預報。API key 僅存 Worker Secret，不傳回前端。
+      if (path === "/api/weather-forecast" && request.method === "GET") {
+        if (!env.CWA_API_KEY) {
+          return new Response(JSON.stringify({ success: false, error: "CWA_API_KEY_NOT_CONFIGURED" }), {
+            status: 503, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
+          });
+        }
+        const allowedCounties = new Set(["臺北市", "新北市", "桃園市", "臺中市", "臺南市", "高雄市", "基隆市", "新竹市", "嘉義市", "新竹縣", "苗栗縣", "彰化縣", "南投縣", "雲林縣", "嘉義縣", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣"]);
+        const county = (url.searchParams.get("county") || "桃園市").replace(/^台/, "臺");
+        if (!allowedCounties.has(county)) {
+          return new Response(JSON.stringify({ success: false, error: "UNSUPPORTED_COUNTY" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+        const cwaUrl = new URL("https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001");
+        cwaUrl.searchParams.set("Authorization", env.CWA_API_KEY);
+        cwaUrl.searchParams.set("format", "JSON");
+        cwaUrl.searchParams.set("locationName", county);
+        const cwaRes = await fetch(cwaUrl.toString(), { headers: { "Accept": "application/json" } });
+        if (!cwaRes.ok) {
+          return new Response(JSON.stringify({ success: false, error: "CWA_UPSTREAM_FAILED", status: cwaRes.status }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
+          });
+        }
+        const cwaJson = await cwaRes.json();
+        const location = cwaJson.records?.location?.find(item => item.locationName === county) || cwaJson.records?.location?.[0];
+        if (!location) {
+          return new Response(JSON.stringify({ success: false, error: "CWA_LOCATION_NOT_FOUND" }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
+          });
+        }
+        const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(new Date());
+        const tomorrowDate = new Date(`${today}T12:00:00+08:00`);
+        tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+        const tomorrow = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(tomorrowDate);
+        const getElement = name => location.weatherElement?.find(element => element.elementName === name)?.time || [];
+        const valueForTomorrow = name => {
+          const entry = getElement(name).find(time => String(time.startTime || "").slice(0, 10) === tomorrow);
+          if (!entry) return null;
+          const parameter = entry.parameter || {};
+          const raw = parameter.parameterName ?? parameter.parameterValue;
+          const numeric = Number(raw);
+          return Number.isFinite(numeric) ? numeric : (raw == null ? null : String(raw));
+        };
+        return new Response(JSON.stringify({
+          success: true,
+          source: "CWA F-C0032-001",
+          county: location.locationName,
+          issuedAt: cwaJson.records?.datasetInfo?.issueTime || null,
+          today,
+          tomorrow,
+          tomorrowMin: valueForTomorrow("MinT"),
+          tomorrowMax: valueForTomorrow("MaxT"),
+          tomorrowWeather: valueForTomorrow("Wx"),
+          tomorrowPoP: valueForTomorrow("PoP"),
+          fetchedAt: Date.now()
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=1800" } });
+      }
+
+      // 3. 從 Notion 日記完整回填洗衣日期（唯讀查詢，不改動 Notion 日記）
       if (path === "/api/laundry-history-import" && request.method === "GET") {
         if (!env.NOTION_TOKEN) {
           return new Response(JSON.stringify({ error: "Notion token not configured on Worker" }), {
@@ -91,7 +150,7 @@ export default {
         });
       }
 
-      // 3. 日常輕量狀態同步與去重歷史版本（保留最近 20 個不同內容版本）
+      // 4. 日常輕量狀態同步與去重歷史版本（保留最近 20 個不同內容版本）
       if (path === "/api/state/history" && request.method === "GET") {
         const history = await env.WARDROBE_STORE.get("app_state_history", "json") || [];
         return new Response(JSON.stringify({
@@ -203,7 +262,7 @@ export default {
         }
       }
 
-      // 4. 獨立單品照片儲存池（動靜分離：只有新加入衣服或換照片才上傳，終身快取）
+      // 5. 獨立單品照片儲存池（動靜分離：只有新加入衣服或換照片才上傳，終身快取）
       if (path.startsWith("/api/image/")) {
         const imageId = path.replace("/api/image/", "");
         if (!imageId) return new Response("Missing image id", { status: 400, headers: corsHeaders });
@@ -231,7 +290,7 @@ export default {
         }
       }
 
-      // 5. 生活耗材雙向同步（與 Notion 生活標籤追蹤資料庫雙向對齊）
+      // 6. 生活耗材雙向同步（與 Notion 生活標籤追蹤資料庫雙向對齊）
       if (path === "/api/sync-consumables") {
         if (!env.NOTION_TOKEN || !env.NOTION_LIFE_DB_ID) {
           return new Response(JSON.stringify({ error: "Notion credentials not configured on Worker" }), {

@@ -566,7 +566,7 @@ function defaultState() {
     profile: {
       name: '',
       avatar: '',
-      weather: { city: '', latitude: null, longitude: null, timezone: 'auto', current: null, updatedAt: 0 },
+      weather: { city: '', latitude: null, longitude: null, timezone: 'auto', current: null, updatedAt: 0, tempDropThreshold: 4, alertEnabled: true, forecast: null, forecastStatus: '' },
       outfitLayout: normalizeOutfitLayout(OUTFIT_LAYOUT_DEFAULTS),
       washThresholds: { bottom: 3, outer: 5, shoes: 8, hat: 8, accessory: 8 },
       categoryAspect: { top: '1:1', bottom: '3:4', outer: '1:1', shoes: '1:1', hat: '1:1', accessory: '1:1' },
@@ -750,7 +750,7 @@ function normalizeLoadedState() {
   state.profile = state.profile || {};
   delete state.profile.cardImageScale;
   state.profile.avatar = typeof state.profile.avatar === 'string' ? state.profile.avatar : '';
-  state.profile.weather = Object.assign({ city: '', area: '', latitude: null, longitude: null, timezone: 'auto', current: null, updatedAt: 0, tempOffset: 0, tempUnit: 'C' }, state.profile.weather || {});
+  state.profile.weather = Object.assign({ city: '', area: '', latitude: null, longitude: null, timezone: 'auto', current: null, updatedAt: 0, tempOffset: 0, tempUnit: 'C', tempDropThreshold: 4, alertEnabled: true, forecast: null, forecastStatus: '' }, state.profile.weather || {});
   state.profile.outfitLayout = normalizeOutfitLayout(state.profile.outfitLayout);
   state.laundry = Object.assign({ lastWashDate: todayStr(), cycleDays: 2, snoozedUntil: null, history: [] }, state.laundry || {});
   state.laundry.history = Array.isArray(state.laundry.history) ? state.laundry.history : [];
@@ -857,6 +857,8 @@ function inferActionLabel(before, after) {
     if (a.material !== b.material) {
       return `修改「${a.name}」材質`;
     }
+    if (a.notes !== b.notes) return `修改「${a.name}」備註`;
+    if ((a.washThresholdOverride ?? null) !== (b.washThresholdOverride ?? null)) return `修改「${a.name}」清洗門檻`;
   }
   // Detect tag additions or removals
   const bTags = new Set(bItems.flatMap(i => i.tags || []));
@@ -1447,6 +1449,14 @@ function getNotifications() {
     if (isTowelId(c.id) && state.activeTowel !== c.id) return; // standby towel: no reminder
     if (isOverdue(c)) list.push({ type: 'consumable', id: c.id, text: `${c.name} 已經用了 ${daysUsed(c)} 天，該更換了`, icon: c.icon });
   });
+  const weather = state.profile.weather || {};
+  const currentTemp = Number(weather.current?.temperature_2m);
+  const tomorrowMin = Number(weather.forecast?.tomorrowMin);
+  const threshold = Math.max(1, Number(weather.tempDropThreshold) || 4);
+  const drop = currentTemp - tomorrowMin;
+  if (weather.alertEnabled !== false && weather.forecast?.tomorrowMin != null && Number.isFinite(currentTemp) && Number.isFinite(tomorrowMin) && drop >= threshold) {
+    list.push({ type: 'weather', id: 'weather-drop', icon: 'cloud', text: `${weatherAreaLabel(weather)} 明日明顯降溫，預報低溫 ${tomorrowMin}°C（較目前低 ${Math.round(drop)}°C）`, currentTemp, tomorrowMin, drop: Math.round(drop), location: weatherAreaLabel(weather), weatherCode: weather.current?.weather_code });
+  }
   const pendingConsumables = getPendingLaundryConsumables();
   if (isLaundryDueToday() || pendingConsumables.length) {
     const overdueDays = Math.max(0, daysBetween(nextWashDate(), todayStr()));
@@ -1861,7 +1871,13 @@ function syncWeatherSettings() {
   const offsetValue = document.getElementById('weatherTempOffsetValue');
   const btnUnitC = document.getElementById('btnTempUnitC');
   const btnUnitF = document.getElementById('btnTempUnitF');
+  const alertEnabled = document.getElementById('weatherAlertEnabled');
+  const dropThreshold = document.getElementById('weatherDropThreshold');
+  const forecastStatus = document.getElementById('weatherForecastStatus');
   const w = state.profile.weather || {};
+  if (alertEnabled) alertEnabled.checked = w.alertEnabled !== false;
+  if (dropThreshold) dropThreshold.value = String([2, 3, 4, 5, 6, 8].includes(Number(w.tempDropThreshold)) ? Number(w.tempDropThreshold) : 4);
+  if (forecastStatus) forecastStatus.textContent = w.forecastStatus === 'missing-key' ? '尚未啟用：需要把授權碼設為 Cloudflare Worker Secret。' : w.forecastStatus === 'unavailable' ? '目前無法取得預報，請確認授權碼與網路後重試。' : (w.forecast?.tomorrowMin != null ? `已連線中央氣象署・明日預報低溫 ${w.forecast.tomorrowMin}°C` : '等待中央氣象署預報連線。');
   if (input) input.value = w.city || '';
   if (status) {
     const area = weatherAreaLabel(w);
@@ -2029,6 +2045,46 @@ function updateWeatherPreview() {
     btnReset.classList.toggle('is-hidden', !state.weatherSimulation);
   }
 }
+function getCwaCounty(weather = state.profile.weather || {}) {
+  const raw = `${weather.area || ''} ${weather.city || ''}`.toLowerCase();
+  const map = [
+    ['桃園市', ['桃園', 'taoyuan', 'zhongli', '中壢']], ['臺北市', ['臺北', '台北', 'taipei']],
+    ['新北市', ['新北', 'new taipei']], ['臺中市', ['臺中', '台中', 'taichung']],
+    ['臺南市', ['臺南', '台南', 'tainan']], ['高雄市', ['高雄', 'kaohsiung']],
+    ['新竹市', ['新竹市', 'hsinchu city']], ['新竹縣', ['新竹縣', 'hsinchu county']],
+    ['基隆市', ['基隆', 'keelung']], ['宜蘭縣', ['宜蘭', 'yilan']], ['花蓮縣', ['花蓮', 'hualien']],
+    ['臺東縣', ['臺東', '台東', 'taitung']], ['苗栗縣', ['苗栗', 'miaoli']], ['彰化縣', ['彰化', 'changhua']],
+    ['南投縣', ['南投', 'nantou']], ['雲林縣', ['雲林', 'yunlin']], ['嘉義市', ['嘉義市', 'chiayi city']],
+    ['嘉義縣', ['嘉義縣', 'chiayi county']], ['屏東縣', ['屏東', 'pingtung']], ['澎湖縣', ['澎湖', 'penghu']],
+    ['金門縣', ['金門', 'kinmen']], ['連江縣', ['連江', 'lienchiang']]
+  ];
+  return map.find(([, aliases]) => aliases.some(alias => raw.includes(alias)))?.[0] || '桃園市';
+}
+async function refreshWeatherForecast(force = false) {
+  const w = state.profile.weather || {};
+  if (!w.city || !w.current) return;
+  if (!force && w.forecast?.fetchedAt && Date.now() - Number(w.forecast.fetchedAt) < 30 * 60 * 1000) return;
+  try {
+    const county = getCwaCounty(w);
+    const response = await fetch(`${CLOUDFLARE_WORKER_URL}/api/weather-forecast?county=${encodeURIComponent(county)}`, { cache: 'no-store' });
+    if (response.status === 503) {
+      w.forecastStatus = 'missing-key';
+      syncWeatherSettings();
+      return;
+    }
+    if (!response.ok) throw new Error('CWA forecast unavailable');
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error || 'CWA forecast unavailable');
+    w.forecast = result;
+    w.forecastStatus = 'ready';
+    renderNotifications();
+    syncWeatherSettings();
+  } catch (error) {
+    w.forecastStatus = 'unavailable';
+    syncWeatherSettings();
+  }
+}
+
 async function refreshWeather(force = false) {
   if (state.weatherSimulation && !force) {
     renderWeather();
@@ -2039,7 +2095,7 @@ async function refreshWeather(force = false) {
   }
   const w = state.profile.weather || {};
   if (w.latitude == null || w.longitude == null) { syncWeatherSettings(); renderWeather(); return; }
-  if (!force && w.current && Date.now() - Number(w.updatedAt || 0) < 30 * 60 * 1000) { renderWeather(); return; }
+  if (!force && w.current && Date.now() - Number(w.updatedAt || 0) < 30 * 60 * 1000) { renderWeather(); refreshWeatherForecast(false); return; }
   const status = document.getElementById('weatherStatus');
   if (status) status.textContent = `${w.city}・正在更新天氣…`;
   try {
@@ -2051,6 +2107,7 @@ async function refreshWeather(force = false) {
     saveState();
     renderHeader();
     syncWeatherSettings();
+    await refreshWeatherForecast(force);
   } catch (e) {
     if (status) status.textContent = `${w.city}・天氣暫時無法更新，稍後可再試。`;
     renderWeather();
@@ -3300,6 +3357,23 @@ function openConsumableDetail(id) {
   openModal('modal-consumable');
 }
 
+function openWeatherAlert(notification = null) {
+  const weather = state.profile.weather || {};
+  const current = Number(notification?.currentTemp ?? weather.current?.temperature_2m);
+  const tomorrow = Number(notification?.tomorrowMin ?? weather.forecast?.tomorrowMin);
+  const location = notification?.location || weatherAreaLabel(weather);
+  const currentEl = document.getElementById('weatherAlertTemperatures');
+  const locationEl = document.getElementById('weatherAlertLocation');
+  const copyEl = document.getElementById('weatherAlertCopy');
+  if (locationEl) locationEl.textContent = location;
+  if (currentEl) currentEl.textContent = `${Number.isFinite(current) ? Math.round(current) : '—'}° → ${Number.isFinite(tomorrow) ? Math.round(tomorrow) : '—'}°`;
+  if (copyEl) {
+    const drop = Number.isFinite(current) && Number.isFinite(tomorrow) ? Math.round(current - tomorrow) : 0;
+    copyEl.textContent = drop > 0 ? `明日預報低溫比目前低 ${drop}°C，建議準備薄外套；若有降雨，也記得帶傘。` : '明日氣溫可能有變化，出門前建議再確認天氣。';
+  }
+  openModal('modal-weather-alert');
+}
+
 /* ---- Notifications ---- */
 function renderNotifications() {
   const notifs = getNotifications();
@@ -3322,9 +3396,9 @@ function renderNotifications() {
     if (n.type === 'item') {
       thumbHtml = n.thumb.image ? `<img class="notif-thumb" src="${n.thumb.image}" alt="">` : `<span class="notif-thumb">${categoryIcon(n.thumb.category)}</span>`;
     } else {
-      thumbHtml = `<span class="notif-thumb">${ICONS[n.icon] || ''}</span>`;
+      thumbHtml = `<span class="notif-thumb">${n.type === 'weather' ? '☁' : (ICONS[n.icon] || '')}</span>`;
     }
-    const actionLabel = n.type === 'item' ? '丟進洗衣籃' : n.type === 'laundry' ? '查看' : '處理';
+    const actionLabel = n.type === 'item' ? '丟進洗衣籃' : (n.type === 'laundry' || n.type === 'weather') ? '查看' : '處理';
     row.innerHTML = `${thumbHtml}<p class="notif-text">${escapeHtml(n.text)}</p><span class="notif-action">${actionLabel}</span>`;
     row.addEventListener('click', () => {
       if (n.type === 'item') {
@@ -3340,6 +3414,9 @@ function renderNotifications() {
       } else if (n.type === 'laundry') {
         closeModal();
         openLaundryModal();
+      } else if (n.type === 'weather') {
+        closeModal();
+        openWeatherAlert(n);
       }
     });
     list.appendChild(row);
@@ -4438,6 +4515,7 @@ function attachOutfitEditorDrag(el, slot) {
 }
 let studioActiveSlot = 'top';
 let studioPointerDrag = null;
+let outfitStudioInitialLayout = null;
 
 function renderOutfitStudio() {
   const overlay = document.getElementById('pageOutfitStudio');
@@ -4496,6 +4574,7 @@ function renderOutfitStudio() {
 }
 
 function openOutfitStudio() {
+  outfitStudioInitialLayout = cloneState(state.profile.outfitLayout || OUTFIT_LAYOUT_DEFAULTS);
   studioActiveSlot = state.today.top ? 'top' : 'hat';
   const overlay = document.getElementById('pageOutfitStudio');
   if (!overlay) return;
@@ -4506,9 +4585,19 @@ function openOutfitStudio() {
 function closeOutfitStudio() {
   const overlay = document.getElementById('pageOutfitStudio');
   if (overlay) overlay.hidden = true;
+  outfitStudioInitialLayout = null;
   saveState({ action: '調整穿搭版面' });
   renderHome();
   toast('穿搭版面設定已儲存');
+}
+function cancelOutfitStudio() {
+  const overlay = document.getElementById('pageOutfitStudio');
+  if (overlay) overlay.hidden = true;
+  if (outfitStudioInitialLayout) state.profile.outfitLayout = cloneState(outfitStudioInitialLayout);
+  outfitStudioInitialLayout = null;
+  saveState({ skipHistory: true });
+  renderHome();
+  toast('已取消本次版面調整');
 }
 
 function selectStudioSlot(slot) {
@@ -4518,6 +4607,7 @@ function selectStudioSlot(slot) {
 
 function wireOutfitStudioEvents() {
   document.getElementById('btnStudioDone')?.addEventListener('click', closeOutfitStudio);
+  document.getElementById('btnStudioClose')?.addEventListener('click', cancelOutfitStudio);
 
   document.querySelectorAll('#studioSlotTabs .outfit-editor-slot-tab').forEach(btn => {
     btn.addEventListener('click', () => selectStudioSlot(btn.dataset.studioTab));
@@ -5605,16 +5695,19 @@ function openFilterModal(context = 'wardrobe') {
   if (btnInvert) {
     btnInvert.classList.toggle('is-active', !!uiWardrobeFilters.invert);
     if (invertLabel) {
-      invertLabel.textContent = uiWardrobeFilters.invert ? '反向排除模式：已開啟（反轉結果）' : '反向排除模式：關閉';
+      invertLabel.textContent = uiWardrobeFilters.invert ? '反向排除模式：已開啟（顯示不符合所選條件的單品）' : '反向排除模式：關閉';
     }
     if (!btnInvert._hasInvertBound) {
       btnInvert._hasInvertBound = true;
       btnInvert.addEventListener('click', () => {
+        const hasCriteria = uiWardrobeFilters.status !== 'all' || uiWardrobeFilters.tags.length > 0 || uiWardrobeFilters.colors.length > 0 || uiWardrobeFilters.brands.length > 0;
+        if (!uiWardrobeFilters.invert && !hasCriteria) {
+          toast('先選擇至少一項篩選條件，再啟用反向排除');
+          return;
+        }
         uiWardrobeFilters.invert = !uiWardrobeFilters.invert;
         btnInvert.classList.toggle('is-active', !!uiWardrobeFilters.invert);
-        if (invertLabel) {
-          invertLabel.textContent = uiWardrobeFilters.invert ? '反向排除模式：已開啟（反轉結果）' : '反向排除模式：關閉';
-        }
+        if (invertLabel) invertLabel.textContent = uiWardrobeFilters.invert ? '反向排除模式：已開啟（顯示不符合所選條件的單品）' : '反向排除模式：關閉';
         refreshFilteredViews();
       });
     }
@@ -5655,9 +5748,21 @@ function openFilterModal(context = 'wardrobe') {
   const colorRow = document.getElementById('filterColorChips');
   if (colorRow) {
     colorRow.innerHTML = '';
-    COLOR_FAMILIES.forEach(fam => {
-      const famName = typeof fam === 'string' ? fam : fam.name;
-      const famHex = typeof fam === 'object' && fam.hex ? fam.hex : '#888';
+    const familyHexes = new Map(COLOR_FAMILIES.map(fam => [typeof fam === 'string' ? fam : fam.name, typeof fam === 'object' && fam.hex ? fam.hex : '#888']));
+    const actualFamilies = new Map();
+    state.items.filter(it => it.status !== 'retired').forEach(it => {
+      const family = normalizeItemColorFamily(it);
+      if (!family) return;
+      const hex = it.colorHex || familyHexes.get(family) || '#888';
+      if (!actualFamilies.has(family)) actualFamilies.set(family, hex);
+    });
+    const orderedFamilies = Array.from(actualFamilies.entries()).sort((a, b) => {
+      const ai = COLOR_FAMILIES.findIndex(f => (typeof f === 'string' ? f : f.name) === a[0]);
+      const bi = COLOR_FAMILIES.findIndex(f => (typeof f === 'string' ? f : f.name) === b[0]);
+      if (ai >= 0 || bi >= 0) return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
+      return a[0].localeCompare(b[0], 'zh-Hant');
+    });
+    orderedFamilies.forEach(([famName, famHex]) => {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'chip chip-color' + (uiWardrobeFilters.colors.includes(famName) ? ' is-active' : '');
@@ -7760,6 +7865,21 @@ function wireEvents() {
     const loc = e.currentTarget._locations?.[Number(btn.dataset.weatherIndex)];
     selectWeatherLocation(loc);
   });
+  document.getElementById('weatherAlertEnabled')?.addEventListener('change', e => {
+    state.profile.weather.alertEnabled = !!e.target.checked;
+    saveState({ action: e.target.checked ? '開啟明日降溫提醒' : '關閉明日降溫提醒' });
+    renderNotifications();
+  });
+  document.getElementById('weatherDropThreshold')?.addEventListener('change', e => {
+    state.profile.weather.tempDropThreshold = Math.max(1, Number(e.target.value) || 4);
+    saveState({ action: `設定降溫提醒門檻為 ${state.profile.weather.tempDropThreshold}°C` });
+    renderNotifications();
+  });
+  document.getElementById('btnWeatherAlertWardrobe')?.addEventListener('click', () => {
+    closeModal();
+    activateView('wardrobe');
+  });
+
   document.getElementById('btnWeatherRefresh')?.addEventListener('click', () => {
     state.weatherSimulation = null;
     refreshWeather(true);
@@ -7797,6 +7917,14 @@ function wireEvents() {
 
   document.getElementById('btnUndo').addEventListener('click', undoState);
   document.getElementById('btnRedo').addEventListener('click', redoState);
+  document.addEventListener('keydown', e => {
+    if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+    if (e.key.toLowerCase() !== 'z') return;
+    const target = e.target;
+    if (target?.matches?.('input, textarea, select, [contenteditable="true"]')) return;
+    e.preventDefault();
+    if (e.shiftKey) redoState(); else undoState();
+  });
 
   document.getElementById('settingsForm').addEventListener('submit', e => {
     e.preventDefault();
@@ -8654,6 +8782,8 @@ function renderSandboxPickerItems(type) {
   }
 
   if (!isWishlist) items = items.filter(it => itemMatchesFilters(it));
+  const filterBadge = document.getElementById('sandboxPickerFilterBadge');
+  if (filterBadge) filterBadge.hidden = isWishlist || !isFilterActive();
   items = items.slice().sort((a, b) => {
     if (sandboxPickerSort === 'name') return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
     if (sandboxPickerSort === 'modified') return Number(b.modifiedAt || b.createdAt || 0) - Number(a.modifiedAt || a.createdAt || 0);
@@ -8873,7 +9003,6 @@ function wireDisplaySimulations() {
   applyGlobalDisplayStyles();
 
   document.getElementById('btnOpenDisplayFigure')?.addEventListener('click', openDisplayFigureSim);
-  document.getElementById('btnOpenWeatherSettings')?.addEventListener('click', () => openModal('modal-weather-settings'));
 
   const scaleSlider = document.getElementById('sliderFigureBoardScale');
   const scaleVal = document.getElementById('valFigureBoardScale');
@@ -9091,7 +9220,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261023_99').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261023_100').then(reg => {
         reg.update().catch(() => {});
         if (reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });

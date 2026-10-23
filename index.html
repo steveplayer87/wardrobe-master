@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261023_99">
+<link rel="stylesheet" href="styles.css?v=20261023_100">
 </head>
 <body>
 
@@ -198,7 +198,7 @@
           </div>
         </div>
         <div class="search-row is-hidden" id="searchRow">
-          <input type="text" id="searchInput" placeholder="搜尋名稱、價格、日期…">
+          <input type="text" id="searchInput" placeholder="搜尋名稱、品牌、標籤、顏色…">
           <button class="search-clear-btn" id="btnSearchClear">取消</button>
         </div>
       </div>
@@ -803,6 +803,16 @@
     </div>
   </div>
 
+  <div class="modal-sheet weather-alert-modal" id="modal-weather-alert" data-modal>
+    <div class="modal-handle"></div>
+    <div class="modal-head"><h2>明日穿搭提醒</h2><button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+    <div class="weather-alert-art" aria-hidden="true"><span class="weather-alert-icon">🧊</span><span class="weather-alert-icon">🧥</span><span class="weather-alert-icon">🌡️</span><span class="weather-alert-icon">☁️</span></div>
+    <p class="weather-alert-location" id="weatherAlertLocation">桃園市中壢區</p>
+    <p class="weather-alert-temperatures" id="weatherAlertTemperatures">26° → 20°</p>
+    <p class="weather-alert-copy" id="weatherAlertCopy">明天明顯降溫，建議準備薄外套，出門前再確認天氣。</p>
+    <div class="weather-alert-actions"><button type="button" class="btn-secondary" data-close>稍後再看</button><button type="button" class="btn-primary" id="btnWeatherAlertWardrobe">前往衣櫥</button></div>
+  </div>
+
   <!-- Weather Settings Modal -->
   <div class="modal-sheet modal-sheet-tall" id="modal-weather-settings" data-modal>
     <div class="modal-handle"></div>
@@ -871,6 +881,22 @@
         </div>
         <div class="weather-search-results" id="weatherSearchResults"></div>
         <p class="settings-helper" id="weatherStatus" style="margin-top:8px;">選擇城市後，景觀窗會顯示目前天氣。</p>
+      </div>
+
+      <hr class="weather-divider">
+
+      <div class="weather-alert-settings">
+        <h3 class="weather-section-title">明日降溫提醒</h3>
+        <label class="weather-alert-toggle"><input type="checkbox" id="weatherAlertEnabled" checked><span>明天明顯降溫時提醒我</span></label>
+        <div class="weather-alert-threshold-row">
+          <label for="weatherDropThreshold">降溫幅度</label>
+          <select id="weatherDropThreshold" class="sort-select" aria-label="降溫提醒門檻">
+            <option value="2">2°C 以上</option><option value="3">3°C 以上</option><option value="4" selected>4°C 以上</option><option value="5">5°C 以上</option><option value="6">6°C 以上</option><option value="8">8°C 以上</option>
+          </select>
+        </div>
+        <p class="settings-helper">以目前氣溫與明日預報低溫比較。提醒會出現在提醒中心。</p>
+        <p class="settings-helper" id="weatherForecastStatus">等待中央氣象署預報連線。</p>
+        <a class="weather-key-link" href="https://opendata.cwa.gov.tw/user/authkey" target="_blank" rel="noopener noreferrer">取得中央氣象署 API 授權碼 ↗</a>
       </div>
 
       <hr class="weather-divider">
@@ -1363,7 +1389,7 @@
         <option value="recent">最近新增</option><option value="modified">最近修改</option>
         <option value="wearCount">穿著次數</option><option value="lastWorn">最近穿著</option><option value="name">名稱</option>
       </select>
-      <div class="sort-row-right"><button class="icon-only-btn" id="btnSandboxPickerFilter" aria-label="篩選"><span data-icon="filter"></span></button></div>
+      <div class="sort-row-right"><button class="icon-only-btn" id="btnSandboxPickerFilter" aria-label="篩選"><span data-icon="filter"></span><span class="filter-badge" id="sandboxPickerFilterBadge" hidden></span></button></div>
     </div>
     <div class="search-row" id="sandboxPickerSearchRow" style="margin-bottom:12px;">
       <input type="text" id="sandboxPickerSearchInput" placeholder="搜尋名稱、品牌、標籤、顏色…">
@@ -1443,8 +1469,9 @@
     <div class="header-text">
       <h1 class="header-greeting">穿搭版面設定</h1>
     </div>
-    <div class="header-actions">
-      <button type="button" class="btn-primary studio-done-btn" id="btnStudioDone">完成</button>
+    <div class="header-actions studio-header-actions">
+      <button type="button" class="studio-icon-action studio-confirm-action" id="btnStudioDone" aria-label="套用調整" title="套用調整"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></button>
+      <button type="button" class="studio-icon-action studio-close-action" id="btnStudioClose" aria-label="取消並關閉" title="取消並關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
   </header>
 
@@ -1542,7 +1569,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v96', K='wm_seen_version', seen=null;
+  var V='v100', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1552,7 +1579,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261023_99"></script>
-<script src="app.js?v=20261023_99"></script>
+<script src="seed-items.js?v=20261023_100"></script>
+<script src="app.js?v=20261023_100"></script>
 </body>
 </html>
