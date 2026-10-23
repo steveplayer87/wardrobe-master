@@ -4920,11 +4920,12 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 
 
 /* Calendar images: stable box and deferred decoding to reduce layout flashes. */
-.cal-thumb-img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center top !important; }
+.cal-thumb-img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
+.cal-thumb-bottom.is-shorts .cal-thumb-img { object-position: center top; }
 .cal-thumb { align-self: flex-start; }
 
 /* Align the home overflow control to the glass board's bottom edge. */
-#app.is-home-view .figure-link-row { bottom: 0 !important; right: 6px !important; }
+#app.is-home-view .figure-link-row { position: relative !important; inset: auto !important; margin: -42px 0 0 auto !important; height: 42px; padding-right: 6px; display: flex; justify-content: flex-end; align-items: flex-end; }
 
 /* Keep the outfit preview square and fit the stage without an internal scroll. */
 #modal-display-figure .display-sim-stage { aspect-ratio: 1 / 1; min-height: 0; padding: 10px; margin-bottom: 10px; }
@@ -4932,10 +4933,11 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 #modal-display-figure .display-sim-controls { padding: 12px; }
 
 /* In More, swap the first and last feature blocks without changing their JS IDs. */
-#view-more { display: flex; flex-direction: column; }
-#view-more > .more-section-block:nth-of-type(1) { order: 3; }
-#view-more > .more-section-block:nth-of-type(2) { order: 2; }
-#view-more > .more-section-block:nth-of-type(3) { order: 1; }
+#view-more { display: none; flex-direction: column; }
+#view-more.is-active { display: flex; }
+#view-more > .more-section-block:not(#skincareBlock):not(#consumablesBlock) { order: 3; }
+#view-more > #skincareBlock { order: 2; }
+#view-more > #consumablesBlock { order: 1; }
 #view-more > hr:nth-of-type(1) { order: 2.5; }
 #view-more > hr:nth-of-type(2) { order: 1.5; }
 
@@ -4944,3 +4946,31 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 #modal-item.is-editing-item > .item-detail-body[hidden] { display: none !important; }
 #modal-item.is-editing-item > .modal-head { position: sticky; top: 0; z-index: 3; background: var(--color-surface, #fff); }
 #modal-item.is-editing-item > #addItemForm { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+
+/* Segmented controls use a shared sliding thumb so the selection visibly moves. */
+.segment { position: relative; isolation: isolate; overflow: hidden; }
+.segment::before { content: ''; position: absolute; z-index: 0; left: 3px; top: 3px; bottom: 3px; width: calc((100% - 6px) / 2); border-radius: 9px; background: var(--color-surface); box-shadow: var(--shadow-card); transform: translateX(0); transition: transform 220ms cubic-bezier(.2,.8,.2,1); }
+.segment:has(.segment-btn:nth-child(2).is-active)::before { transform: translateX(100%); }
+.segment-btn { position: relative; z-index: 1; background: transparent !important; box-shadow: none !important; transition: color 180ms ease; }
+.segment-btn.is-active { color: var(--color-ink); }
+/* Give chips in the temporary rack breathing room; laundry towel chips use this same chip geometry. */
+#tempRackList, #basketList { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
+#modal-laundry .laundry-consumable-list { gap: 8px; margin-top: 12px; }
+#modal-laundry .laundry-consumable-row { gap: 5px; border-radius: 20px; padding: 4px 9px 4px 4px; }
+#modal-laundry .laundry-consumable-row .rack-chip-thumb { width: 20px; height: 20px; border-radius: 50%; padding: 4px; }
+#modal-laundry .laundry-consumable-row .laundry-chip-status { font-size: 10px; }
+/* Weather settings should composite independently, preventing unrelated wardrobe imagery flashing through during dismissal. */
+#modal-weather-settings { isolation: isolate; backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: translateZ(0); }
+#modal-weather-settings .weather-modal-content { background: var(--color-bg); }
+
+/* The settings preview is a true square crop of the home outfit board, fully visible above its controls. */
+#modal-display-figure { max-height: 92dvh; overflow-y: auto; }
+#modal-display-figure .display-sim-stage-wrap { align-items: stretch; min-height: 0; }
+#modal-display-figure .display-sim-stage { width: min(100%, 42dvh); max-width: 100%; aspect-ratio: 1 / 1; height: auto; min-height: 0; align-self: center; flex: 0 0 auto; }
+#modal-display-figure .display-sim-controls { flex: 0 0 auto; padding: 10px 12px; }
+#modal-display-figure .display-sim-controls .settings-label-row { margin-top: 6px !important; }
+#modal-display-figure .display-sim-controls input[type="range"] { margin: 4px 0 8px; }
+#modal-display-figure .display-sim-controls #btnOpenOutfitEditorFromSim { margin-top: 8px !important; }
+/* Keep modal transitions isolated from the unrelated page below them. */
+.modal-overlay { isolation: isolate; }
+.modal-sheet { backface-visibility: hidden; -webkit-backface-visibility: hidden; }

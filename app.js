@@ -2736,9 +2736,9 @@ function renderMonthGrid(grid, y, m) {
       ].filter(({ item }) => item);
       thumbsHtml = `<span class="cal-thumbs">${thumbItems.map(({ item, className }) => {
         const cleanImg = transparentCleanCache.get(item.image) || item.image;
-        const pos = 'center top';
+        const pos = isShorts && item === bottomItem ? 'center top' : 'center';
         const imgTag = cleanImg
-          ? `<img src="${escapeHtml(cleanImg)}" class="cal-thumb-img" alt="" loading="lazy" decoding="async" fetchpriority="low" style="object-position:${pos};" />`
+          ? `<img src="${escapeHtml(cleanImg)}" class="cal-thumb-img" alt="" loading="eager" decoding="async" fetchpriority="high" style="object-position:${pos};" />`
           : categoryIcon(item.category);
         return `<span class="cal-thumb ${className}" data-item-id="${item.id}">${imgTag}</span>`;
       }).join('')}</span>`;
@@ -5233,6 +5233,11 @@ function openLaundryModal() {
   const last = state.laundry.lastWashDate;
   const daysSince = Math.max(0, daysBetween(last, todayStr()));
   const next = nextWashDate();
+  const postponeBase = next > todayStr() ? next : todayStr();
+  const postponeDate = addDays(postponeBase, 1);
+  const postponeDay = new Date(postponeDate + 'T00:00:00').getDay();
+  const postponeButton = document.getElementById('btnLaundryPostpone');
+  if (postponeButton) postponeButton.textContent = `延後一天洗（禮拜${['日','一','二','三','四','五','六'][postponeDay]}）`;
   document.getElementById('laundryStats').innerHTML = `
     <div class="detail-stat"><b>${daysSince}</b><span>距上次洗衣天數</span></div>
     <div class="detail-stat"><b>${fmtDate(next)}</b><span>下次預計洗衣</span></div>
@@ -5383,7 +5388,7 @@ function animateCalendarMonthChange(direction, onComplete) {
   isCalAnimating = true;
   const targetMonth = getAdjacentMonth(uiCalMonth.y, uiCalMonth.m, direction === 'next' ? 1 : -1);
   warmCalendarMonthImages(targetMonth.y, targetMonth.m, 'high');
-  track.style.transition = 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)';
+  track.style.transition = 'transform 0.093s cubic-bezier(0.2, 0.7, 0.2, 1)';
   const targetX = direction === 'next' ? '-66.666667%' : '0%';
   track.style.transform = `translateX(${targetX})`;
   setTimeout(() => {
@@ -5399,7 +5404,7 @@ function animateCalendarMonthChange(direction, onComplete) {
     renderHistory();
     isCalAnimating = false;
     if (onComplete) onComplete();
-  }, 290);
+  }, 100);
 }
 
 function wireCalendarSwipe() {
@@ -5436,7 +5441,7 @@ function wireCalendarSwipe() {
     dragging = false;
     if (horizontal) {
       const dx = currentX - startX;
-      const threshold = 45;
+      const threshold = Math.max(24, area.clientWidth * 0.20);
       if (Math.abs(dx) > threshold) {
         animateCalendarMonthChange(dx < 0 ? 'next' : 'prev');
       } else {
@@ -5482,6 +5487,17 @@ function enableSwipeToClose(sheet) {
     sheet.classList.remove('is-dragging');
     const dy = currentY - startY;
     if (dy > threshold) {
+      if (sheet.id === 'modal-item' && editingInDetailDrawer) {
+        unmountEditFormFromDetailDrawer();
+        editingItemId = null;
+        formDirty = false;
+        modalReturnTo = null;
+        forceCloseModal({ skipPersist: true });
+        sheet.style.transform = '';
+        sheet.style.transition = '';
+        startY = 0; currentY = 0;
+        return;
+      }
       sheet.style.transition = 'transform var(--dur-sheet-close) var(--ease-sheet)';
       sheet.style.transform = 'translateY(100%)';
       setTimeout(() => {
@@ -7584,15 +7600,21 @@ function wireEvents() {
     formDirty = false;
     if (editingItemId) {
       const returnId = editingItemId;
-      const cameFromDetail = editingInDetailDrawer || modalStack.some(m => m.id === 'modal-item');
+      const wasEditingInPlace = editingInDetailDrawer;
+      const cameFromDetail = wasEditingInPlace || modalStack.some(m => m.id === 'modal-item');
       const detailReturnTo = modalReturnTo;
       unmountEditFormFromDetailDrawer();
       editingItemId = null;
-      // Close every layer first, including an unsaved-changes prompt, before reopening details.
-      // This prevents the prompt/overlay from remaining above the returned detail sheet.
-      forceCloseModal({ skipPersist: true });
-      modalReturnTo = detailReturnTo;
-      if (cameFromDetail) openItemDetail(returnId);
+      if (wasEditingInPlace) {
+        // The modal-item sheet never closed; update its contents without a second entrance animation.
+        modalReturnTo = detailReturnTo;
+        openItemDetail(returnId);
+      } else {
+        // Close every layer first, including an unsaved-changes prompt, before reopening details.
+        forceCloseModal({ skipPersist: true });
+        modalReturnTo = detailReturnTo;
+        if (cameFromDetail) openItemDetail(returnId);
+      }
     } else {
       forceCloseModal({ skipPersist: true });
     }
