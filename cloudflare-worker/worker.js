@@ -276,8 +276,13 @@ export default {
               if (historyBytes > maxHistoryBytes) {
                 console.warn(JSON.stringify({ event: "kv_write_audit", route: "/api/state", key: "app_state_history", outcome: "skipped_too_large", requestId, bytes: historyBytes }));
               } else {
-                await env.WARDROBE_STORE.put("app_state_history", historyPayload);
-                console.log(JSON.stringify({ event: "kv_write_audit", route: "/api/state", key: "app_state_history", outcome: "put", requestId, bytes: historyBytes, snapshots: trimmedHistory.length }));
+                // 歷史快照是附加功能：即使歷史寫入失敗，也不可阻斷主狀態保存。
+                try {
+                  await env.WARDROBE_STORE.put("app_state_history", historyPayload);
+                  console.log(JSON.stringify({ event: "kv_write_audit", route: "/api/state", key: "app_state_history", outcome: "put", requestId, bytes: historyBytes, snapshots: trimmedHistory.length }));
+                } catch (historyError) {
+                  console.error(JSON.stringify({ event: "kv_write_audit", route: "/api/state", key: "app_state_history", outcome: "put_failed", requestId, bytes: historyBytes, message: String(historyError?.message || historyError) }));
+                }
               }
             }
           }
