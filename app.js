@@ -1441,9 +1441,10 @@ function postponeLaundry() {
 /* ---------------------------- Notifications (derived) ---------------------------- */
 function getNotifications() {
   const list = [];
-  state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i)).forEach(i => {
-    list.push({ type: 'item', id: i.id, text: `${i.name} 該洗了`, thumb: i });
-  });
+  const dirtyItems = state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i));
+  // Laundry is a basket-level task. Do not create one stale notification per
+  // item; the single laundry reminder always opens the basket where the user
+  // can mark the load done or postpone it.
   state.consumables.forEach(c => {
     if (c.laundryPending) return;
     if (isTowelId(c.id) && state.activeTowel !== c.id) return; // standby towel: no reminder
@@ -1458,10 +1459,8 @@ function getNotifications() {
     list.push({ type: 'weather', id: 'weather-drop', icon: 'cloud', text: `${weatherAreaLabel(weather)} 明日明顯降溫，預報低溫 ${tomorrowMin}°C（較目前低 ${Math.round(drop)}°C）`, currentTemp, tomorrowMin, drop: Math.round(drop), location: weatherAreaLabel(weather), weatherCode: weather.current?.weather_code });
   }
   const pendingConsumables = getPendingLaundryConsumables();
-  if (isLaundryDueToday() || pendingConsumables.length) {
-    const overdueDays = Math.max(0, daysBetween(nextWashDate(), todayStr()));
-    const pendingText = pendingConsumables.length ? `洗衣籃有 ${pendingConsumables.length} 件耗材等待清洗` : '';
-    list.push({ type: 'laundry', id: 'laundry', text: pendingText || (overdueDays > 0 ? `已經過了 ${overdueDays} 天沒洗衣服了` : '今天該洗衣服囉'), icon: 'basket' });
+  if (dirtyItems.length || isLaundryDueToday() || pendingConsumables.length) {
+    list.push({ type: 'laundry', id: 'laundry', text: '今天該洗衣服了', icon: 'basket' });
   }
   return list;
 }
@@ -2689,7 +2688,7 @@ function renderMonthGrid(grid, y, m) {
       ].filter(({ item }) => item);
       thumbsHtml = `<span class="cal-thumbs">${thumbItems.map(({ item, className }) => {
         const cleanImg = transparentCleanCache.get(item.image) || item.image;
-        const pos = className.includes('cal-thumb-bottom') ? 'center top' : 'center bottom';
+        const pos = 'center top';
         const imgTag = cleanImg
           ? `<img src="${escapeHtml(cleanImg)}" class="cal-thumb-img" alt="" style="object-position:${pos};" />`
           : categoryIcon(item.category);
@@ -3398,15 +3397,10 @@ function renderNotifications() {
     } else {
       thumbHtml = `<span class="notif-thumb">${n.type === 'weather' ? '☁' : (ICONS[n.icon] || '')}</span>`;
     }
-    const actionLabel = n.type === 'item' ? '丟進洗衣籃' : (n.type === 'laundry' || n.type === 'weather') ? '查看' : '處理';
+    const actionLabel = (n.type === 'laundry' || n.type === 'weather') ? '查看' : '處理';
     row.innerHTML = `${thumbHtml}<p class="notif-text">${escapeHtml(n.text)}</p><span class="notif-action">${actionLabel}</span>`;
     row.addEventListener('click', () => {
-      if (n.type === 'item') {
-        openConfirm('要丟進洗衣籃嗎？', n.text, [
-          { label: '取消', kind: 'secondary' },
-          { label: '丟進洗衣籃', kind: 'primary', onClick: () => sendToBasketNow(n.id) },
-        ]);
-      } else if (n.type === 'consumable') {
+      if (n.type === 'consumable') {
         openConfirm('確定要處理嗎？', n.text, [
           { label: '取消', kind: 'secondary' },
           { label: '確定', kind: 'primary', onClick: () => handleConsumableReset(n.id) },

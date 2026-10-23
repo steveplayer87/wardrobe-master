@@ -430,6 +430,7 @@ svg { width: 100%; height: 100%; display: block; }
   box-sizing: border-box;
 }
 .cal-cell {
+  height: 68px;
   min-height: 68px;
   border-radius: 10px;
   background: var(--color-surface);
@@ -437,6 +438,7 @@ svg { width: 100%; height: 100%; display: block; }
   display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
   gap: 2px;
   padding: 3px 2px 4px;
+  overflow: hidden;
   position: relative;
 }
 .cal-cell.is-empty { background: none; box-shadow: none; }
