@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261022_98">
+<link rel="stylesheet" href="styles.css?v=20261023_99">
 </head>
 <body>
 
@@ -184,6 +184,7 @@
             <option value="recent">最近新增</option>
             <option value="wearCount">穿著次數</option>
             <option value="lastWorn">最近穿著</option>
+            <option value="modified">最近修改</option>
             <option value="name">名稱</option>
           </select>
           <div class="sort-row-right">
@@ -385,6 +386,7 @@
         <option value="recent">最近新增</option>
         <option value="wearCount">穿著次數</option>
         <option value="lastWorn">最近穿著</option>
+        <option value="modified">最近修改</option>
         <option value="name">名稱</option>
       </select>
       <div class="sort-row-right">
@@ -440,7 +442,11 @@
       <div class="field brand-field">
         <span>品牌（選填）</span>
         <div class="brand-input-row">
-          <input type="text" id="fieldBrand" placeholder="例如：UNIQLO、Nike、GU" autocomplete="organization">
+          <div class="brand-input-shell" id="brandInputShell">
+            <span class="brand-inline-icon is-hidden" id="brandInlineIcon" aria-hidden="true"></span>
+            <input type="text" id="fieldBrand" placeholder="例如：UNIQLO、Nike、GU" autocomplete="organization">
+            <button type="button" class="brand-clear-btn" id="btnClearBrand" aria-label="清除品牌" title="清除品牌" hidden>×</button>
+          </div>
           <button type="button" class="btn-secondary brand-search-btn" id="btnBrandSearch"><span data-icon="search"></span><span>搜尋圖示</span></button>
         </div>
         <div class="brand-established-wrap" id="brandEstablishedWrap" hidden>
@@ -474,8 +480,8 @@
 
       <div class="field is-hidden" id="lengthToggleWrap">長短
         <div class="segment" id="lengthToggle">
-          <button type="button" class="segment-btn" data-len="長">長</button>
           <button type="button" class="segment-btn" data-len="短">短</button>
+          <button type="button" class="segment-btn" data-len="長">長</button>
         </div>
       </div>
 
@@ -497,6 +503,14 @@
           <input type="number" id="fieldPrice" placeholder="選填" min="0">
         </label>
       </div>
+
+      <label class="field">清洗門檻（次，選填）
+        <input type="number" id="fieldWashThreshold" min="1" step="1" placeholder="留空使用分類設定">
+        <small class="settings-helper">設定後優先使用這件單品的穿著次數門檻；留空則沿用分類設定。</small>
+      </label>
+      <label class="field">備註
+        <textarea id="fieldNotes" rows="3" placeholder="記錄這件單品的尺寸、搭配或保養注意事項…"></textarea>
+      </label>
 
       <label class="checkbox-row" id="archiveCheckboxRow">
         <input type="checkbox" id="fieldArchiveDirect">
@@ -580,6 +594,10 @@
         <button type="button" class="filter-more-btn" id="btnManageTags" title="管理標籤">···</button>
       </div>
       <div class="chip-row chip-row-form" id="filterTagChips"></div>
+    </div>
+    <div class="filter-section" id="savedFilterSection">
+      <div class="filter-section-header"><p class="filter-label">已儲存的篩選群組</p><button type="button" class="filter-more-btn" id="btnSaveFilterGroup" title="儲存目前篩選">＋儲存</button></div>
+      <div class="chip-row chip-row-form" id="savedFilterGroups"></div>
     </div>
     <div class="settings-actions">
       <button class="btn-secondary" id="btnFilterClear">清除篩選</button>
@@ -1340,8 +1358,15 @@
     <div class="modal-handle"></div>
     <div class="modal-head"><h2 id="sandboxPickerTitle">選擇單品</h2><button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
     <div class="chip-row chip-row-form" id="sandboxPickerCategoryChips"></div>
+    <div class="sort-row" style="margin-bottom:10px;">
+      <select class="sort-select" id="sandboxPickerSortSelect" aria-label="排序單品">
+        <option value="recent">最近新增</option><option value="modified">最近修改</option>
+        <option value="wearCount">穿著次數</option><option value="lastWorn">最近穿著</option><option value="name">名稱</option>
+      </select>
+      <div class="sort-row-right"><button class="icon-only-btn" id="btnSandboxPickerFilter" aria-label="篩選"><span data-icon="filter"></span></button></div>
+    </div>
     <div class="search-row" id="sandboxPickerSearchRow" style="margin-bottom:12px;">
-      <input type="text" id="sandboxPickerSearchInput" placeholder="搜尋名稱、標籤…">
+      <input type="text" id="sandboxPickerSearchInput" placeholder="搜尋名稱、品牌、標籤、顏色…">
     </div>
     <div class="picker-grid item-grid" id="sandboxPickerGrid"></div>
     <p class="empty-hint" id="sandboxPickerEmpty" hidden>尚無單品可加入</p>
@@ -1527,7 +1552,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261022_98"></script>
-<script src="app.js?v=20261022_98"></script>
+<script src="seed-items.js?v=20261023_99"></script>
+<script src="app.js?v=20261023_99"></script>
 </body>
 </html>

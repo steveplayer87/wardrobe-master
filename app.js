@@ -1102,6 +1102,9 @@ function ensureNewDay() {
 
 /* ---------------------------- Wear / laundry logic ---------------------------- */
 function findItem(id) { return state.items.find(i => i.id === id); }
+function isPreCutoffDirtyToday(item, now = new Date()) {
+  return !!item && item.status === 'dirty' && item.forceBasketToday !== todayStr() && (item.lastWornDate === todayStr() || item.wornToday) && now.getHours() < 20;
+}
 function getThreshold(category) {
   const t = state.profile.washThresholds || {};
   const v = t[category];
@@ -1110,6 +1113,10 @@ function getThreshold(category) {
 }
 function computeStatusAfterWear(item) {
   if ((item.wearCount || 0) <= 0) return 'clean';
+  const override = item.washThresholdOverride;
+  if (override !== null && override !== undefined && Number.isFinite(Number(override)) && Number(override) > 0) {
+    return item.wearCount >= Number(override) ? 'dirty' : 'resting';
+  }
   if (item.category === 'top') return 'dirty';
   const threshold = getThreshold(item.category);
   if (item.category === 'bottom') {
@@ -1124,6 +1131,7 @@ function applyWear(itemId) {
   const item = findItem(itemId);
   if (!item || item.wornToday) return;
   const previousStatus = item.status;
+  item.forceBasketToday = null;
   item.wearCount = (item.wearCount || 0) + 1;
   item.totalWearCount = (item.totalWearCount || 0) + 1;
   item.lastWornDate = todayStr();
@@ -1226,6 +1234,7 @@ function sendToBasketNow(itemId) {
   if (!item) return;
   if (item.status !== 'dirty') item.basketAt = todayStr();
   item.status = 'dirty';
+  item.forceBasketToday = todayStr();
   item.restingSince = null;
   saveState();
   renderAll();
@@ -1259,6 +1268,7 @@ function wearOnceMore(itemId) {
   const item = findItem(itemId);
   if (!item) return;
   item.status = 'resting';
+  item.forceBasketToday = null;
   item.restingSince = todayStr();
   item.basketAt = null;
   saveState();
@@ -1384,7 +1394,7 @@ function completeConsumableLaundry(c, date = todayStr()) {
   c.laundryAt = null;
 }
 function completeLaundryDone(targetDate = todayStr()) {
-  const dirtyItems = state.items.filter(item => item.status === 'dirty');
+  const dirtyItems = state.items.filter(item => item.status === 'dirty' && !isPreCutoffDirtyToday(item));
   const pendingConsumables = getPendingLaundryConsumables();
   dirtyItems.forEach(item => recordItemWash(item, targetDate));
   pendingConsumables.forEach(c => completeConsumableLaundry(c, targetDate));
@@ -1402,7 +1412,7 @@ function completeLaundryDone(targetDate = todayStr()) {
   toast(`已記錄 ${formatDayWithWeekday(targetDate)} 洗衣服完成`);
 }
 function markLaundryDone(targetDate = todayStr()) {
-  const boostedItems = state.items.filter(item => item.status === 'dirty' && item.extraWash);
+  const boostedItems = state.items.filter(item => item.status === 'dirty' && !isPreCutoffDirtyToday(item) && item.extraWash);
   if (boostedItems.length) {
     const names = boostedItems.slice(0, 8).map(item => item.name).join('、');
     const suffix = boostedItems.length > 8 ? ` 等 ${boostedItems.length} 件` : '';
@@ -1429,7 +1439,7 @@ function postponeLaundry() {
 /* ---------------------------- Notifications (derived) ---------------------------- */
 function getNotifications() {
   const list = [];
-  state.items.filter(i => i.status === 'dirty').forEach(i => {
+  state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i)).forEach(i => {
     list.push({ type: 'item', id: i.id, text: `${i.name} 該洗了`, thumb: i });
   });
   state.consumables.forEach(c => {
@@ -1690,11 +1700,20 @@ function findBrandIconMatches(query, catalog) {
 }
 function renderBrandSelectedPreview() {
   const preview = document.getElementById('brandSelectedPreview');
-  if (!preview) return;
-  if (!pendingBrandIcon) { preview.classList.add('is-hidden'); preview.innerHTML = ''; return; }
-  preview.classList.remove('is-hidden');
-  preview.innerHTML = `${brandIconMarkup({ brandIcon: pendingBrandIcon }, 'medium')}<span>${escapeHtml(pendingBrandName || document.getElementById('fieldBrand')?.value.trim() || '')}</span><small>已選擇品牌圖示</small>`;
+  if (preview) { preview.classList.add('is-hidden'); preview.innerHTML = ''; }
+  const iconWrap = document.getElementById('brandInlineIcon');
+  const shell = document.getElementById('brandInputShell');
+  const clear = document.getElementById('btnClearBrand');
+  const input = document.getElementById('fieldBrand');
+  const hasIcon = !!pendingBrandIcon;
+  if (iconWrap) {
+    iconWrap.innerHTML = hasIcon ? brandIconMarkup({ brandIcon: pendingBrandIcon }, 'medium') : '';
+    iconWrap.classList.toggle('is-hidden', !hasIcon);
+  }
+  if (shell) shell.classList.toggle('has-brand-icon', hasIcon);
+  if (clear) clear.hidden = !(input?.value || pendingBrandName || pendingBrandIcon);
 }
+
 async function searchBrandIcons() {
   const input = document.getElementById('fieldBrand');
   const results = document.getElementById('brandSearchResults');
@@ -2164,8 +2183,8 @@ function renderHome() {
     outerBadge.hidden = !state.today.outer;
   }
 
-  const rack = state.items.filter(i => i.status === 'resting');
-  const basket = state.items.filter(i => i.status === 'dirty');
+  const rack = state.items.filter(i => i.status === 'resting' || isPreCutoffDirtyToday(i));
+  const basket = state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i));
   const pendingConsumables = getPendingLaundryConsumables();
   const towel = state.consumables.find(c => c.id === state.activeTowel) || state.consumables.find(c => isTowelId(c.id));
   const towelDays = towel ? daysUsed(towel) : 0;
@@ -2249,7 +2268,7 @@ function renderChipList(listId, emptyId, items, opts) {
 function openRackOverview() {
   const grid = document.getElementById('rackOverviewGrid');
   const empty = document.getElementById('rackOverviewEmpty');
-  const items = state.items.filter(i => i.status === 'resting');
+  const items = state.items.filter(i => i.status === 'resting' || isPreCutoffDirtyToday(i));
   grid.innerHTML = '';
   empty.hidden = items.length !== 0;
 
@@ -2340,6 +2359,15 @@ function renderCategoryChips() {
   row.appendChild(addChip);
 }
 
+function normalizeItemColorFamily(item) {
+  const raw = String(item?.colorFamily || item?.color || '').trim();
+  const aliases = { '黑':'黑色', '白':'白色', '灰':'灰色', '藏青':'藍色', '藍':'藍色', '灰牛仔':'藍色', '米':'米/杏色', '棕':'棕色', '綠':'綠色', '紅':'紅色', '粉紅':'粉色', '粉':'粉色', '黃':'黃色', '橘':'橘色', '紫':'紫色', '多色':'多色' };
+  if (aliases[raw]) return aliases[raw];
+  if (COLOR_FAMILIES.some(f => f.name === raw)) return raw;
+  if (item?.colorHex) return classifyColorFamily(item.colorHex);
+  return raw;
+}
+
 function itemMatchesFilters(item) {
   const hasStatus = uiWardrobeFilters.status !== 'all';
   const hasTags = uiWardrobeFilters.tags.length > 0;
@@ -2350,10 +2378,8 @@ function itemMatchesFilters(item) {
 
   const statusMatch = !hasStatus || item.status === uiWardrobeFilters.status;
   const tagMatch = !hasTags || uiWardrobeFilters.tags.every(t => (item.tags || []).includes(t));
-  const colorMatch = !hasColors || (
-    (item.colorFamily && uiWardrobeFilters.colors.includes(item.colorFamily)) ||
-    (item.color && uiWardrobeFilters.colors.includes(item.color))
-  );
+  const itemFamily = normalizeItemColorFamily(item);
+  const colorMatch = !hasColors || uiWardrobeFilters.colors.includes(itemFamily);
   const brandMatch = !hasBrands || (
     item.brand && uiWardrobeFilters.brands.includes(item.brand)
   );
@@ -2377,6 +2403,7 @@ function getVisibleWardrobeItems() {
   return items.slice().sort((a, b) => {
     if (uiWardrobeSort === 'wearCount') return (b.wearCount||0) - (a.wearCount||0);
     if (uiWardrobeSort === 'lastWorn') return (b.lastWornDate||'').localeCompare(a.lastWornDate||'');
+    if (uiWardrobeSort === 'modified') return (Number(b.modifiedAt || b.createdAt || 0) - Number(a.modifiedAt || a.createdAt || 0));
     if (uiWardrobeSort === 'name') return a.name.localeCompare(b.name, 'zh-Hant');
     return (b.createdAt||0) - (a.createdAt||0);
   });
@@ -2422,9 +2449,14 @@ function washHistoryEntry(entry) {
   return { date: entry?.date || '', basketAt: entry?.basketAt || null, extraWash: !!entry?.extraWash };
 }
 function washBoostMarkup(item, opts) {
-  if (!opts || (!opts.laundryMode && !opts.rackMode) || !['dirty', 'resting'].includes(item.status)) return '';
-  const active = !!item.extraWash;
-  return `<span class="wash-boost-toggle${active ? ' is-active' : ''}" data-wash-boost="${escapeHtml(item.id)}" role="button" tabindex="0" aria-pressed="${active}" title="${active ? '取消加強清洗' : '標記加強清洗'}"><span class="wash-boost-icon">${ICONS.washBoost}</span><span>${active ? '已標記加強清洗' : '加強清洗'}</span></span>`;
+  if (!opts || (!opts.laundryMode && !opts.rackMode)) return '';
+  if (opts.rackMode && ['resting', 'dirty'].includes(item.status)) {
+    return `<span class="wash-boost-toggle" data-item-card-action="send-basket" role="button" tabindex="0" title="丟進洗衣籃"><span class="wash-boost-icon">${ICONS.washBoost}</span><span>丟進洗衣籃</span></span>`;
+  }
+  if (opts.laundryMode && item.status === 'dirty') {
+    return `<span class="wash-boost-toggle" data-item-card-action="wear-once-more" role="button" tabindex="0" title="移回暫存衣架"><span class="wash-boost-icon">${ICONS.washBoost}</span><span>移回暫存衣架</span></span>`;
+  }
+  return '';
 }
 function buildItemCard(item, opts) {
   opts = opts || {};
@@ -2505,15 +2537,21 @@ function buildItemCard(item, opts) {
   card.addEventListener('touchend', cancelLongPress);
   card.addEventListener('touchcancel', cancelLongPress);
 
-  const boostToggle = card.querySelector('[data-wash-boost]');
-  if (boostToggle) {
-    const stopBoostEvent = e => {
+  const cardAction = card.querySelector('[data-item-card-action]');
+  if (cardAction) {
+    const runCardAction = e => {
       e.preventDefault();
       e.stopPropagation();
-      toggleExtraWash(item.id);
+      if (cardAction.dataset.itemCardAction === 'send-basket') {
+        sendToBasketNow(item.id);
+        if (document.getElementById('modal-rack-overview')?.classList.contains('is-active')) openRackOverview();
+      } else if (cardAction.dataset.itemCardAction === 'wear-once-more') {
+        wearOnceMore(item.id);
+        if (document.getElementById('modal-laundry')?.classList.contains('is-active')) openLaundryModal();
+      }
     };
-    boostToggle.addEventListener('click', stopBoostEvent);
-    boostToggle.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') stopBoostEvent(e); });
+    cardAction.addEventListener('click', runCardAction);
+    cardAction.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') runCardAction(e); });
   }
   card.addEventListener('click', () => {
     if (longPressFired) { longPressFired = false; return; }
@@ -2854,7 +2892,24 @@ function openDayDetail(dateStr, entry) {
     </div>
     <div class="day-detail-skincare-list">${skincareListHtml}</div>`;
 
-  body.innerHTML = outfitContentHtml + skincareSectionHtml;
+  const hasLaundryRecord = laundryHistoryDates().has(dateStr);
+  const laundryToggleHtml = `<label class="checkbox-row day-laundry-toggle"><input type="checkbox" id="toggleDayLaundry" ${hasLaundryRecord ? 'checked' : ''}><span>這天有洗衣服</span></label>`;
+  body.innerHTML = laundryToggleHtml + outfitContentHtml + skincareSectionHtml;
+
+  const laundryToggle = document.getElementById('toggleDayLaundry');
+  if (laundryToggle) laundryToggle.addEventListener('change', () => {
+    state.laundry = state.laundry || { lastWashDate: todayStr(), cycleDays: 2, snoozedUntil: null, history: [] };
+    state.laundry.history = Array.isArray(state.laundry.history) ? state.laundry.history : [];
+    if (laundryToggle.checked) {
+      if (!laundryHistoryDates().has(dateStr)) recordLaundryEvent(dateStr);
+    } else {
+      state.laundry.history = state.laundry.history.filter(entry => (typeof entry === 'string' ? entry : entry?.date) !== dateStr);
+    }
+    syncLatestLaundryDate();
+    saveState({ action: `${laundryToggle.checked ? '補登' : '取消'} ${formatDayWithWeekday(dateStr)} 洗衣紀錄` });
+    renderHistory();
+    renderHome();
+  });
 
   body.querySelectorAll('.day-detail-row[data-item-id]').forEach(row => {
     row.addEventListener('click', () => openItemDetail(row.dataset.itemId));
@@ -3740,6 +3795,7 @@ function openItemDetail(itemId) {
   const deodList = Array.isArray(item.deodorizeHistory) ? item.deodorizeHistory : [];
   const stainList = Array.isArray(item.stainHistory) ? item.stainHistory : [];
   const lastDeod = deodList[0] || null;
+  const openedFromRackOrLaundry = ['modal-rack-overview', 'modal-laundry'].includes(modalReturnTo);
 
   body.innerHTML = `
     <div class="detail-photo-wrap" id="detailPhotoContainer">
@@ -3784,7 +3840,7 @@ function openItemDetail(itemId) {
       <div class="detail-stat"><b>${item.totalWearCount||0}</b><span>累計穿著</span></div>
       <div class="detail-stat"><b>${item.lastWornDate ? fmtDate(item.lastWornDate) : '—'}</b><span>最近穿著</span></div>
     </div>
-    <div class="detail-actions" id="detailActionsPrimary"></div>
+    <div class="detail-actions${openedFromRackOrLaundry ? ' is-hidden' : ''}" id="detailActionsPrimary"></div>
 
     <div class="care-section-title">
       <span>日常護理與保養</span>
@@ -3801,6 +3857,7 @@ function openItemDetail(itemId) {
       </button>
     </div>
 
+    ${item.notes ? `<div class="detail-meta detail-notes"><b>備註</b><p>${escapeHtml(item.notes)}</p></div>` : ''}
     <div class="detail-meta">
       ${item.purchaseDate ? `購買日期：${fmtDate(item.purchaseDate)}<br>` : ''}
       ${item.price != null ? `價格：$${item.price}<br>` : ''}
@@ -4130,6 +4187,8 @@ function autoSaveAddItemDraft() {
     colorFamily: pendingColor.family || '',
     purchaseDate: document.getElementById('fieldPurchaseDate')?.value || '',
     price: document.getElementById('fieldPrice')?.value ? Number(document.getElementById('fieldPrice').value) : null,
+    notes: document.getElementById('fieldNotes')?.value || '',
+    washThresholdOverride: document.getElementById('fieldWashThreshold')?.value ? Number(document.getElementById('fieldWashThreshold').value) : null,
     archiveDirect: !!document.getElementById('fieldArchiveDirect')?.checked,
     image: pendingPhoto,
     imageBack: pendingPhotoBack,
@@ -4609,6 +4668,8 @@ function openAddModal(editId = null) {
     document.getElementById('fieldName').value = savedDraft.name || '';
     document.getElementById('fieldPurchaseDate').value = savedDraft.purchaseDate || '';
     document.getElementById('fieldPrice').value = savedDraft.price ?? '';
+    document.getElementById('fieldNotes').value = savedDraft.notes || '';
+    document.getElementById('fieldWashThreshold').value = savedDraft.washThresholdOverride ?? '';
     document.getElementById('fieldArchiveDirect').checked = !!savedDraft.archiveDirect;
     pendingPhoto = savedDraft.image || null;
     pendingPhotoBack = savedDraft.imageBack || null;
@@ -4621,6 +4682,10 @@ function openAddModal(editId = null) {
     setPhotoPreview(document.getElementById('photoPreviewWrap'), pendingPhoto, '上傳照片（可一次選2張，第2張當背面）');
     if (hintWrap) hintWrap.hidden = !pendingPhotoBack;
     document.getElementById('btnReadjustPhoto').classList.toggle('is-hidden', !pendingPhoto || !editId);
+  }
+
+  if (!editId && !pendingTags.some(t => LENGTH_TAGS.includes(t)) && ['top', 'bottom'].includes(pendingCategory)) {
+    pendingTags.push('短');
   }
 
   if (editId) {
@@ -4642,6 +4707,8 @@ function openAddModal(editId = null) {
     document.getElementById('fieldBrand').value = item.brand || '';
     document.getElementById('fieldPurchaseDate').value = item.purchaseDate || '';
     document.getElementById('fieldPrice').value = item.price ?? '';
+    document.getElementById('fieldNotes').value = item.notes || '';
+    document.getElementById('fieldWashThreshold').value = item.washThresholdOverride ?? '';
     if (item.image) {
       pendingPhoto = item.image;
       const wrap = document.getElementById('photoPreviewWrap');
@@ -4752,10 +4819,10 @@ function closeModal() {
   // If canceling out of editing an item, return straight to that item's detail sheet!
   if (activeSheet?.id === 'modal-add' && editingItemId) {
     const returnId = editingItemId;
+    const detailReturnTo = modalReturnTo;
     editingItemId = null;
-    modalStack = modalStack.filter(m => m.id !== 'modal-add' && m.id !== 'modal-item');
-    activeSheet.classList.remove('is-shown');
-    setTimeout(() => { activeSheet.classList.remove('is-active'); }, 280);
+    forceCloseModal({ skipPersist: true });
+    modalReturnTo = detailReturnTo;
     openItemDetail(returnId);
     return;
   }
@@ -4764,7 +4831,7 @@ function closeModal() {
   if (backfillDraft && activeSheet?.id === 'modal-tryon') {
     renderBackfillModal();
     activeSheet.classList.remove('is-shown');
-    setTimeout(() => { activeSheet.classList.remove('is-active'); }, 280);
+    setTimeout(() => { activeSheet.classList.remove('is-active'); }, 220);
     openModal('modal-backfill', { fromStack: true });
     return;
   }
@@ -4773,7 +4840,7 @@ function closeModal() {
     const target = modalReturnTo;
     modalReturnTo = null;
     activeSheet.classList.remove('is-shown');
-    setTimeout(() => { activeSheet.classList.remove('is-active'); }, 280);
+    setTimeout(() => { activeSheet.classList.remove('is-active'); }, 220);
     if (target === 'modal-item' && editingItemId) {
       const returnId = editingItemId;
       editingItemId = null;
@@ -4792,7 +4859,7 @@ function closeModal() {
       setTimeout(() => {
         activeSheet.classList.remove('is-active');
         activeSheet.style.zIndex = '';
-      }, 300);
+      }, 220);
 
       const prevSheet = document.getElementById(prev.id);
       if (prevSheet) {
@@ -4846,7 +4913,7 @@ function renderLaundryOverview() {
   const grid = document.getElementById('laundryOverviewGrid');
   const empty = document.getElementById('laundryOverviewEmpty');
   if (!grid || !empty) return;
-  const items = state.items.filter(i => i.status === 'dirty');
+  const items = state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i));
   const pendingConsumables = getPendingLaundryConsumables();
   grid.innerHTML = '';
   empty.hidden = items.length !== 0 || pendingConsumables.length !== 0;
@@ -5234,7 +5301,7 @@ function enableSwipeToClose(sheet) {
     sheet.classList.remove('is-dragging');
     const dy = currentY - startY;
     if (dy > threshold) {
-      sheet.style.transition = 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
+      sheet.style.transition = 'transform var(--dur-sheet-close) var(--ease-sheet)';
       sheet.style.transform = 'translateY(100%)';
       setTimeout(() => {
         closeModal();
@@ -5296,6 +5363,7 @@ function renderTryonGridFor(slot, category) {
   options = options.slice().sort((a, b) => {
     if (tryonSort === 'wearCount') return (b.wearCount||0) - (a.wearCount||0);
     if (tryonSort === 'lastWorn') return (b.lastWornDate||'').localeCompare(a.lastWornDate||'');
+    if (tryonSort === 'modified') return Number(b.modifiedAt || b.createdAt || 0) - Number(a.modifiedAt || a.createdAt || 0);
     if (tryonSort === 'name') return a.name.localeCompare(b.name, 'zh-Hant');
     return (b.createdAt||0) - (a.createdAt||0);
   });
@@ -5395,6 +5463,30 @@ function openExtrasPicker() {
    Writes straight into ootdHistory; does not touch live wear counts,
    except it does bump totalWearCount so 常穿排行 stays consistent.
    ============================================================ */
+function attachSegmentSwipe(segmentId, onLengthSwipe = null) {
+  const segment = document.getElementById(segmentId);
+  if (!segment || segment._hasSwipeBinding) return;
+  segment._hasSwipeBinding = true;
+  let start = null;
+  segment.addEventListener('touchstart', e => {
+    const t = e.touches?.[0];
+    if (t) start = { x: t.clientX, y: t.clientY };
+  }, { passive: true });
+  segment.addEventListener('touchend', e => {
+    const t = e.changedTouches?.[0];
+    if (!start || !t) { start = null; return; }
+    const dx = t.clientX - start.x, dy = t.clientY - start.y;
+    start = null;
+    if (Math.abs(dx) < 42 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    if (onLengthSwipe) { onLengthSwipe(dx < 0 ? '長' : '短'); e.preventDefault(); return; }
+    const buttons = Array.from(segment.querySelectorAll('.segment-btn'));
+    if (buttons.length < 2) return;
+    const current = Math.max(0, buttons.findIndex(b => b.classList.contains('is-active')));
+    const next = Math.max(0, Math.min(buttons.length - 1, current + (dx < 0 ? 1 : -1)));
+    if (next !== current) { buttons[next].click(); e.preventDefault(); }
+  }, { passive: false });
+}
+
 function switchBackfillTab(tab) {
   const isOutfit = tab === 'outfit';
   const segOutfit = document.getElementById('segBackfillOutfit');
@@ -5442,7 +5534,7 @@ function renderBackfillModal() {
     row.type = 'button';
     row.className = 'day-detail-row';
     const thumb = item
-      ? (item.image ? `<img class="ddr-thumb" src="${item.image}" alt="">` : `<span class="ddr-thumb">${categoryIcon(item.category)}</span>`)
+      ? (item.image ? `<img class="ddr-thumb" src="${item.image}" alt="" loading="eager" decoding="async">` : `<span class="ddr-thumb">${categoryIcon(item.category)}</span>`)
       : `<span class="ddr-thumb">${ICONS[slot] || ''}</span>`;
     row.innerHTML = `${thumb}<div><p class="ddr-cat">${categoryLabel(slot)}</p><p class="ddr-name">${item ? escapeHtml(item.name) : '點選加入'}</p></div>`;
     row.addEventListener('click', () => openTryonPicker(slot));
@@ -5454,19 +5546,57 @@ function renderBackfillModal() {
    FILTER MODAL
    ============================================================ */
 let filterContext = 'wardrobe';
+const SAVED_FILTER_GROUPS_KEY = 'wardrobe_saved_filter_groups_v1';
+function getSavedFilterGroups() {
+  try { const data = JSON.parse(localStorage.getItem(SAVED_FILTER_GROUPS_KEY) || '[]'); return Array.isArray(data) ? data : []; }
+  catch (_) { return []; }
+}
+function saveSavedFilterGroups(groups) {
+  try { localStorage.setItem(SAVED_FILTER_GROUPS_KEY, JSON.stringify(groups)); }
+  catch (_) { toast('儲存篩選群組失敗，請檢查瀏覽器儲存空間'); }
+}
+function renderSavedFilterGroups() {
+  const row = document.getElementById('savedFilterGroups');
+  if (!row) return;
+  const groups = getSavedFilterGroups().slice().sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+  row.innerHTML = '';
+  if (!groups.length) { row.innerHTML = '<span class="empty-hint-sm" style="font-size:12px;color:var(--color-ink-muted);">尚未儲存篩選群組</span>'; return; }
+  groups.forEach(group => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:inline-flex;align-items:center;gap:3px;';
+    const apply = document.createElement('button');
+    apply.type = 'button'; apply.className = 'chip';
+    apply.textContent = `${group.pinned ? '★ ' : ''}${group.name}`;
+    apply.title = '套用此篩選群組';
+    apply.addEventListener('click', () => {
+      uiWardrobeFilters = { status: group.filters.status || 'all', tags: [...(group.filters.tags || [])], colors: [...(group.filters.colors || [])], brands: [...(group.filters.brands || [])], invert: !!group.filters.invert };
+      openFilterModal(filterContext); refreshFilteredViews();
+    });
+    const pin = document.createElement('button');
+    pin.type = 'button'; pin.className = 'chip'; pin.textContent = group.pinned ? '★' : '☆'; pin.title = group.pinned ? '取消釘選' : '釘選群組';
+    pin.addEventListener('click', () => { const next = getSavedFilterGroups().map(g => g.id === group.id ? { ...g, pinned: !g.pinned } : g); saveSavedFilterGroups(next); renderSavedFilterGroups(); });
+    const remove = document.createElement('button');
+    remove.type = 'button'; remove.className = 'chip'; remove.textContent = '×'; remove.title = '刪除群組';
+    remove.addEventListener('click', () => { saveSavedFilterGroups(getSavedFilterGroups().filter(g => g.id !== group.id)); renderSavedFilterGroups(); });
+    wrap.append(apply, pin, remove); row.appendChild(wrap);
+  });
+}
 function refreshFilteredViews() {
   renderWardrobe();
   renderWishlist();
   if (tryonCurrentSlot) renderTryonGridFor(tryonCurrentSlot, tryonCurrentCategory);
+  if (document.getElementById('modal-sandbox-picker')?.classList.contains('is-active')) renderSandboxPickerItems(sandboxPickerType);
 }
 function openFilterModal(context = 'wardrobe') {
   filterContext = context;
+  renderSavedFilterGroups();
   const isWishlist = context === 'wishlist';
   document.getElementById('filterModalTitle').textContent = isWishlist ? '篩選想買單品' : '篩選';
   document.getElementById('filterStatusSection').classList.toggle('is-hidden', isWishlist);
   document.getElementById('filterCategorySection').classList.toggle('is-hidden', !isWishlist);
   document.getElementById('filterColorSection')?.classList.toggle('is-hidden', isWishlist);
   document.getElementById('filterBrandSection')?.classList.toggle('is-hidden', isWishlist);
+  document.getElementById('savedFilterSection')?.classList.toggle('is-hidden', isWishlist);
 
   const invertBar = document.querySelector('.filter-invert-bar');
   if (invertBar) invertBar.classList.toggle('is-hidden', isWishlist);
@@ -6330,6 +6460,14 @@ function wireEvents() {
   document.getElementById('btnBackfill').addEventListener('click', () => openBackfillModal());
   document.getElementById('segBackfillOutfit')?.addEventListener('click', () => switchBackfillTab('outfit'));
   document.getElementById('segBackfillSkincare')?.addEventListener('click', () => switchBackfillTab('skincare'));
+  attachSegmentSwipe('historySegment');
+  attachSegmentSwipe('backfillSegment');
+  attachSegmentSwipe('lengthToggle', targetLength => {
+    if (!['top', 'bottom'].includes(pendingCategory)) return;
+    pendingTags = pendingTags.filter(t => !LENGTH_TAGS.includes(t));
+    pendingTags.push(targetLength);
+    formDirty = true; renderLengthToggle(); renderTagPickerChips(); autoSaveAddItemDraft();
+  });
 
   document.querySelectorAll('#groupSkincareBackfillArea .skincare-chip').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -6605,22 +6743,21 @@ function wireEvents() {
     chip.classList.add('is-active');
     refreshFilteredViews();
   });
+  document.getElementById('btnSaveFilterGroup')?.addEventListener('click', () => {
+    if (filterContext === 'wishlist') { toast('目前儲存群組支援衣櫥篩選'); return; }
+    const name = window.prompt('替這組篩選取個名稱');
+    if (!name || !name.trim()) return;
+    const groups = getSavedFilterGroups();
+    groups.push({ id: uid(), name: name.trim(), pinned: false, updatedAt: Date.now(), filters: { status: uiWardrobeFilters.status, tags: [...uiWardrobeFilters.tags], colors: [...uiWardrobeFilters.colors], brands: [...uiWardrobeFilters.brands], invert: !!uiWardrobeFilters.invert } });
+    saveSavedFilterGroups(groups); renderSavedFilterGroups(); toast('已儲存篩選群組');
+  });
+
   document.getElementById('btnFilterClear').addEventListener('click', () => {
     if (filterContext === 'wishlist') uiWishlistFilters = { category: 'all', tags: [] };
     else uiWardrobeFilters = { status: 'all', tags: [], colors: [], brands: [], invert: false };
     openFilterModal(filterContext);
     refreshFilteredViews();
   });
-  const btnFilterInvert = document.getElementById('btnFilterInvert');
-  if (btnFilterInvert) {
-    btnFilterInvert.addEventListener('click', () => {
-      uiWardrobeFilters.invert = !uiWardrobeFilters.invert;
-      btnFilterInvert.classList.toggle('is-active', uiWardrobeFilters.invert);
-      const invertLabel = document.getElementById('filterInvertLabel');
-      if (invertLabel) invertLabel.textContent = uiWardrobeFilters.invert ? '反向排除模式：已開啟（反轉結果）' : '反向排除模式：關閉';
-      refreshFilteredViews();
-    });
-  }
   document.getElementById('btnFilterApply').addEventListener('click', closeModal);
 
   document.getElementById('btnSearch').addEventListener('click', () => {
@@ -6637,6 +6774,16 @@ function wireEvents() {
     document.getElementById('searchInput').value = '';
     document.getElementById('searchRow').classList.add('is-hidden');
     renderWardrobe();
+  });
+
+  // Sandbox picker: category + sort + filter + search.
+  document.getElementById('sandboxPickerSortSelect')?.addEventListener('change', e => {
+    sandboxPickerSort = e.target.value;
+    renderSandboxPickerItems(sandboxPickerType);
+  });
+  document.getElementById('btnSandboxPickerFilter')?.addEventListener('click', () => {
+    modalReturnTo = 'modal-sandbox-picker';
+    openFilterModal('wardrobe');
   });
 
   // try-on picker: sort + search
@@ -6686,8 +6833,31 @@ function wireEvents() {
     }
     document.getElementById('selectBar').classList.toggle('is-hidden', !on);
     document.getElementById('btnAddItem').classList.toggle('is-hidden', on);
+    // Toggle selection chrome in-place so product photos do not disappear/reload.
+    document.querySelectorAll('#wardrobeGrid .item-card[data-id]').forEach(card => {
+      const item = findItem(card.dataset.id);
+      card.classList.toggle('is-selectable', on);
+      card.classList.remove('is-selected');
+      const oldCheck = card.querySelector('.item-card-check');
+      const oldStatus = card.querySelector('.item-status-dot');
+      if (on) {
+        oldStatus?.remove();
+        if (!oldCheck) {
+          const check = document.createElement('span');
+          check.className = 'item-card-check';
+          card.insertBefore(check, card.querySelector('.item-resting-badge') || card.querySelector('.item-info'));
+        }
+      } else {
+        oldCheck?.remove();
+        if (item && item.status !== 'retired' && !oldStatus) {
+          const status = document.createElement('span');
+          const statusClass = item.status === 'dirty' ? 'is-dirty' : item.status === 'resting' ? 'is-resting' : '';
+          status.className = `item-status-dot ${statusClass}`;
+          card.insertBefore(status, card.querySelector('.item-resting-badge') || card.querySelector('.item-info'));
+        }
+      }
+    });
     updateSelectBarUi();
-    renderWardrobe();
   }
   document.getElementById('btnSelectMode').addEventListener('click', () => setSelectMode(!uiSelectMode));
   document.getElementById('btnSelectCancel')?.addEventListener('click', () => setSelectMode(false));
@@ -6954,6 +7124,20 @@ function wireEvents() {
 
   // brand search (public Simple Icons catalog; a missing icon never blocks saving)
   document.getElementById('btnBrandSearch').addEventListener('click', searchBrandIcons);
+  document.getElementById('btnClearBrand')?.addEventListener('click', () => {
+    const input = document.getElementById('fieldBrand');
+    if (input) input.value = '';
+    pendingBrandName = '';
+    pendingBrandIcon = null;
+    const results = document.getElementById('brandSearchResults');
+    if (results) { results.innerHTML = ''; results._matches = []; }
+    const status = document.getElementById('brandSearchStatus');
+    if (status) status.textContent = '輸入品牌名稱搜尋圖示，或直接點選既有品牌。';
+    formDirty = true;
+    renderBrandSelectedPreview();
+    autoSaveAddItemDraft();
+    input?.focus();
+  });
   document.getElementById('fieldBrand').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); searchBrandIcons(); } });
   document.getElementById('fieldBrand').addEventListener('input', e => {
     const typed = e.target.value.trim();
@@ -7072,7 +7256,7 @@ function wireEvents() {
     autoSaveAddItemDraft();
   });
 
-  ['fieldName', 'fieldPurchaseDate', 'fieldPrice', 'fieldArchiveDirect', 'fieldMaterialCustom'].forEach(id => {
+  ['fieldName', 'fieldPurchaseDate', 'fieldPrice', 'fieldArchiveDirect', 'fieldMaterialCustom', 'fieldNotes', 'fieldWashThreshold'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('input', () => { formDirty = true; autoSaveAddItemDraft(); });
@@ -7136,6 +7320,9 @@ function wireEvents() {
     const purchaseDate = document.getElementById('fieldPurchaseDate').value;
     const priceVal = document.getElementById('fieldPrice').value;
     const price = priceVal ? Number(priceVal) : null;
+    const notes = document.getElementById('fieldNotes').value.trim();
+    const thresholdInput = document.getElementById('fieldWashThreshold').value;
+    const washThresholdOverride = thresholdInput === '' ? null : Math.max(1, Math.floor(Number(thresholdInput)));
     const archiveDirect = document.getElementById('fieldArchiveDirect').checked;
     const brand = document.getElementById('fieldBrand').value.trim();
     pendingBrandName = brand;
@@ -7146,21 +7333,27 @@ function wireEvents() {
 
     if (editingItemId) {
       const item = findItem(editingItemId);
+      const thresholdChanged = (item.washThresholdOverride ?? null) !== washThresholdOverride;
       Object.assign(item, {
-        name, category, tags, material, purchaseDate, price,
+        name, category, tags, material, purchaseDate, price, notes, washThresholdOverride,
         color, colorHex, colorFamily,
         image: pendingPhoto || item.image,
         imageBack: pendingPhotoBack,
-        brand, brandIcon
+        brand, brandIcon, modifiedAt: Date.now()
       });
+      if (thresholdChanged && item.status !== 'retired') {
+        item.status = computeStatusAfterWear(item);
+        item.restingSince = item.status === 'resting' ? (item.restingSince || todayStr()) : null;
+        item.basketAt = item.status === 'dirty' ? (item.basketAt || todayStr()) : null;
+      }
       toast('已儲存修改');
     } else {
       state.items.push({
-        id: uid(), name, category, tags, material, purchaseDate, price,
+        id: uid(), name, category, tags, material, purchaseDate, price, notes, washThresholdOverride,
         color, colorHex, colorFamily,
         image: pendingPhoto, imageBack: pendingPhotoBack, brand, brandIcon,
         wearCount: 0, totalWearCount: 0, status: archiveDirect ? 'retired' : 'clean',
-        lastWornDate: null, wornToday: false, wearHistory: [], createdAt: Date.now(),
+        lastWornDate: null, wornToday: false, wearHistory: [], createdAt: Date.now(), modifiedAt: Date.now(),
         deodorizeHistory: [], stainHistory: [],
       });
       toast(archiveDirect ? '已加入典藏' : '已加入衣櫥');
@@ -7172,15 +7365,13 @@ function wireEvents() {
     if (editingItemId) {
       const returnId = editingItemId;
       const cameFromDetail = modalStack.some(m => m.id === 'modal-item');
+      const detailReturnTo = modalReturnTo;
       editingItemId = null;
-      const addSheet = document.getElementById('modal-add');
-      if (addSheet) {
-        addSheet.classList.remove('is-active', 'is-shown', 'is-behind', 'is-dragging');
-        addSheet.style.transform = ''; addSheet.style.transition = ''; addSheet.style.zIndex = '';
-      }
-      modalStack = modalStack.filter(m => m.id !== 'modal-add' && m.id !== 'modal-item');
+      // Close every layer first, including an unsaved-changes prompt, before reopening details.
+      // This prevents the prompt/overlay from remaining above the returned detail sheet.
+      forceCloseModal({ skipPersist: true });
+      modalReturnTo = detailReturnTo;
       if (cameFromDetail) openItemDetail(returnId);
-      else forceCloseModal({ skipPersist: true });
     } else {
       forceCloseModal({ skipPersist: true });
     }
@@ -8385,9 +8576,12 @@ function createNewSandbox() {
 
 let sandboxPickerFilter = 'all';
 let sandboxPickerQuery = '';
+let sandboxPickerSort = 'recent';
+let sandboxPickerType = 'wardrobe';
 
 function openSandboxPicker(type) {
   const isWishlist = type === 'wishlist';
+  sandboxPickerType = type;
   const title = document.getElementById('sandboxPickerTitle');
   const chips = document.getElementById('sandboxPickerCategoryChips');
   const searchInput = document.getElementById('sandboxPickerSearchInput');
@@ -8397,6 +8591,9 @@ function openSandboxPicker(type) {
   if (title) title.textContent = isWishlist ? '加入想買單品至沙盒' : '加入衣櫥單品至沙盒';
   sandboxPickerFilter = 'all';
   sandboxPickerQuery = '';
+  sandboxPickerSort = 'recent';
+  const sortInput = document.getElementById('sandboxPickerSortSelect');
+  if (sortInput) sortInput.value = 'recent';
   if (searchInput) searchInput.value = '';
 
   if (chips) {
@@ -8451,9 +8648,19 @@ function renderSandboxPickerItems(type) {
       const name = (it.name || '').toLowerCase();
       const brand = (it.brand || '').toLowerCase();
       const tags = (it.tags || []).join(' ').toLowerCase();
-      return name.includes(sandboxPickerQuery) || brand.includes(sandboxPickerQuery) || tags.includes(sandboxPickerQuery);
+      const color = [it.color, it.colorFamily].filter(Boolean).join(' ').toLowerCase();
+      return name.includes(sandboxPickerQuery) || brand.includes(sandboxPickerQuery) || tags.includes(sandboxPickerQuery) || color.includes(sandboxPickerQuery);
     });
   }
+
+  if (!isWishlist) items = items.filter(it => itemMatchesFilters(it));
+  items = items.slice().sort((a, b) => {
+    if (sandboxPickerSort === 'name') return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
+    if (sandboxPickerSort === 'modified') return Number(b.modifiedAt || b.createdAt || 0) - Number(a.modifiedAt || a.createdAt || 0);
+    if (sandboxPickerSort === 'wearCount') return Number(b.wearCount || 0) - Number(a.wearCount || 0);
+    if (sandboxPickerSort === 'lastWorn') return String(b.lastWornDate || '').localeCompare(String(a.lastWornDate || ''));
+    return Number(b.createdAt || 0) - Number(a.createdAt || 0);
+  });
 
   if (empty) empty.hidden = items.length !== 0;
 
@@ -8884,7 +9091,7 @@ async function init() {
       window.location.reload();
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js?v=20261022_98').then(reg => {
+      navigator.serviceWorker.register('sw.js?v=20261023_99').then(reg => {
         reg.update().catch(() => {});
         if (reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
