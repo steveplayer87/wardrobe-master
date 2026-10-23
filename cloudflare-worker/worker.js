@@ -184,6 +184,8 @@ export default {
           });
         }
         if (request.method === "POST") {
+          const requestId = request.headers.get("cf-ray") || crypto.randomUUID();
+          const startedAt = Date.now();
           const body = await request.json();
           const current = await env.WARDROBE_STORE.get("app_state_text", "json");
           // Safety net for already-open older clients: never accept an upload that silently drops
@@ -239,6 +241,7 @@ export default {
             const nextHash = await contentHash(body);
             if (previousHash === nextHash) {
               // 內容未變更時不重寫 KV，也不更新時間戳；避免無效寫入與歷史版本檢查。
+              console.log(JSON.stringify({ event: "kv_write_audit", route: "/api/state", outcome: "unchanged", requestId, elapsedMs: Date.now() - startedAt }));
               return new Response(JSON.stringify({ success: true, unchanged: true, updatedAt: current.updatedAt || null }), {
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
               });
@@ -258,10 +261,13 @@ export default {
                 state: current
               });
               await env.WARDROBE_STORE.put("app_state_history", JSON.stringify(history.slice(0, 20)));
+              console.log(JSON.stringify({ event: "kv_write_audit", route: "/api/state", key: "app_state_history", outcome: "put", requestId, bytes: new TextEncoder().encode(JSON.stringify(history.slice(0, 20))).length }));
             }
           }
           body.updatedAt = Date.now();
-          await env.WARDROBE_STORE.put("app_state_text", JSON.stringify(body));
+          const statePayload = JSON.stringify(body);
+          await env.WARDROBE_STORE.put("app_state_text", statePayload);
+          console.log(JSON.stringify({ event: "kv_write_audit", route: "/api/state", key: "app_state_text", outcome: "put", requestId, bytes: new TextEncoder().encode(statePayload).length, elapsedMs: Date.now() - startedAt, itemCount: Array.isArray(body.items) ? body.items.length : 0 }));
           return new Response(JSON.stringify({ success: true, updatedAt: body.updatedAt }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
@@ -289,7 +295,16 @@ export default {
 
         if (request.method === "POST") {
           const body = await request.text();
+          // 照片 ID 由內容雜湊產生，理應不可變；跨裝置重傳相同照片時先比對，避免重複 KV put。
+          const existing = await env.WARDROBE_STORE.get("img_" + imageId);
+          if (existing === body) {
+            console.log(JSON.stringify({ event: "kv_write_audit", route: "/api/image", key: "img_" + imageId, outcome: "unchanged", bytes: body.length }));
+            return new Response(JSON.stringify({ success: true, id: imageId, unchanged: true }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
           await env.WARDROBE_STORE.put("img_" + imageId, body);
+          console.log(JSON.stringify({ event: "kv_write_audit", route: "/api/image", key: "img_" + imageId, outcome: "put", bytes: body.length }));
           return new Response(JSON.stringify({ success: true, id: imageId }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" }
           });
