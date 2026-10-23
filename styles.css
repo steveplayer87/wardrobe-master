@@ -4966,7 +4966,7 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 /* The settings preview is a true square crop of the home outfit board, fully visible above its controls. */
 #modal-display-figure { max-height: 92dvh; overflow-y: auto; }
 #modal-display-figure .display-sim-stage-wrap { align-items: stretch; min-height: 0; }
-#modal-display-figure .display-sim-stage { width: min(100%, 42dvh); max-width: 100%; aspect-ratio: 1 / 1; height: auto; min-height: 0; align-self: center; flex: 0 0 auto; }
+#modal-display-figure .display-sim-stage { width: min(100%, 36dvh); max-width: 100%; aspect-ratio: 1 / 1; height: auto; min-height: 0; align-self: center; flex: 0 0 auto; }
 #modal-display-figure .display-sim-controls { flex: 0 0 auto; padding: 10px 12px; }
 #modal-display-figure .display-sim-controls .settings-label-row { margin-top: 6px !important; }
 #modal-display-figure .display-sim-controls input[type="range"] { margin: 4px 0 8px; }
