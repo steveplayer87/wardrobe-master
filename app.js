@@ -5973,6 +5973,7 @@ const CLOUD_SYNC_PENDING_KEY = 'wm_cloud_sync_pending_v1';
 const CLOUD_SYNC_FINGERPRINT_KEY = 'wm_cloud_sync_fingerprint_v1';
 const CLOUD_SYNC_LAST_AT_KEY = 'wm_cloud_sync_last_at_v1';
 const CLOUD_SYNC_SAFETY_KEY = 'wm_cloud_sync_safety_blocked_v1';
+const CLOUD_SYNC_RETRY_COUNT_KEY = 'wm_cloud_sync_retry_count_v1';
 let cloudAutoSyncReady = false;
 let cloudAutoSyncTimer = null;
 let cloudAutoSyncInFlight = false;
@@ -6087,17 +6088,21 @@ async function runAutoCloudSync() {
   cloudAutoSyncInFlight = true;
   setCloudSyncStatus('syncing');
   const snapshot = JSON.parse(JSON.stringify(state));
+  let allowFollowup = true;
+  let retryScheduled = false;
   try {
     const fingerprint = await cloudSyncFingerprint(snapshot);
     // 非同步欄位（例如即時天氣）變動時，指紋可能不變；不可因 pending 標記而重複寫 KV。
     // 指紋相同代表雲端需要保存的內容已同步，清除無效待同步標記即可。
     if (fingerprint === cloudLastFingerprint) {
       localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
+      localStorage.removeItem(CLOUD_SYNC_RETRY_COUNT_KEY);
       setCloudSyncStatus('synced');
       return;
     }
     const safety = await checkCloudSyncSafety(snapshot);
     if (!safety.safe) {
+      allowFollowup = false;
       if (safety.offline) setCloudSyncStatus('offline');
       else {
         localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
@@ -6112,19 +6117,31 @@ async function runAutoCloudSync() {
     localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, fingerprint);
     localStorage.setItem(CLOUD_SYNC_LAST_AT_KEY, String(Date.now()));
     localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
+    localStorage.removeItem(CLOUD_SYNC_RETRY_COUNT_KEY);
     setCloudSyncStatus('synced');
   } catch (err) {
-    console.warn('Automatic cloud sync will retry:', err);
+    console.warn('Automatic cloud sync failed; retry will use backoff:', err);
     try { localStorage.setItem(CLOUD_SYNC_PENDING_KEY, '1'); } catch (_) {}
     setCloudSyncStatus(navigator.onLine ? 'error' : 'offline');
+    allowFollowup = false;
     clearTimeout(cloudAutoSyncTimer);
-    if (navigator.onLine && !localStorage.getItem(CLOUD_SYNC_SAFETY_KEY)) cloudAutoSyncTimer = setTimeout(runAutoCloudSync, 5 * 60 * 1000);
+    if (navigator.onLine && !localStorage.getItem(CLOUD_SYNC_SAFETY_KEY)) {
+      const retryCount = Math.min((Number(localStorage.getItem(CLOUD_SYNC_RETRY_COUNT_KEY)) || 0) + 1, 8);
+      try { localStorage.setItem(CLOUD_SYNC_RETRY_COUNT_KEY, String(retryCount)); } catch (_) {}
+      const retryDelay = Math.min(5 * 60 * 1000 * (2 ** (retryCount - 1)), 60 * 60 * 1000);
+      cloudAutoSyncTimer = setTimeout(runAutoCloudSync, retryDelay);
+      retryScheduled = true;
+      console.warn(`Cloud sync retry ${retryCount} scheduled in ${Math.round(retryDelay / 60000)} minute(s)`);
+    }
   } finally {
     cloudAutoSyncInFlight = false;
-    try {
-      const currentFingerprint = await cloudSyncFingerprint(state);
-      if (currentFingerprint !== cloudLastFingerprint) scheduleAutoCloudSync(500);
-    } catch (_) {}
+    // 失敗時不可在此立即重排，否則會清掉上面的退避計時器，造成高頻重試。
+    if (allowFollowup && !retryScheduled && !localStorage.getItem(CLOUD_SYNC_SAFETY_KEY)) {
+      try {
+        const currentFingerprint = await cloudSyncFingerprint(state);
+        if (currentFingerprint !== cloudLastFingerprint) scheduleAutoCloudSync(500);
+      } catch (_) {}
+    }
   }
 }
 
@@ -6470,7 +6487,11 @@ async function backupWardrobeToCloud(options = {}) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(textData)
     });
-    if (!stateRes.ok) throw new Error('文字狀態儲存失敗');
+    if (!stateRes.ok) {
+      let detail = '';
+      try { detail = (await stateRes.text()).slice(0, 500); } catch (_) {}
+      throw new Error(`文字狀態儲存失敗 HTTP ${stateRes.status}${detail ? ': ' + detail : ''}`);
+    }
 
     if (!silent) toast('雲端備份成功！已同步至 Cloudflare');
     return true;
