@@ -1240,6 +1240,7 @@ function sendToBasketNow(itemId) {
   item.restingSince = null;
   saveState();
   renderAll();
+  renderNotifications();
   toast(`${item.name} 已丟進洗衣籃`);
 }
 function sendToTempRackNow(itemId) {
@@ -1459,7 +1460,8 @@ function getNotifications() {
     list.push({ type: 'weather', id: 'weather-drop', icon: 'cloud', text: `${weatherAreaLabel(weather)} 明日明顯降溫，預報低溫 ${tomorrowMin}°C（較目前低 ${Math.round(drop)}°C）`, currentTemp, tomorrowMin, drop: Math.round(drop), location: weatherAreaLabel(weather), weatherCode: weather.current?.weather_code });
   }
   const pendingConsumables = getPendingLaundryConsumables();
-  if (dirtyItems.length || isLaundryDueToday() || pendingConsumables.length) {
+  const laundrySnoozed = !!state.laundry?.snoozedUntil && state.laundry.snoozedUntil > todayStr();
+  if (!laundrySnoozed && (dirtyItems.length || isLaundryDueToday() || pendingConsumables.length)) {
     list.push({ type: 'laundry', id: 'laundry', text: '今天該洗衣服了', icon: 'basket' });
   }
   return list;
@@ -2690,7 +2692,7 @@ function renderMonthGrid(grid, y, m) {
         const cleanImg = transparentCleanCache.get(item.image) || item.image;
         const pos = 'center top';
         const imgTag = cleanImg
-          ? `<img src="${escapeHtml(cleanImg)}" class="cal-thumb-img" alt="" style="object-position:${pos};" />`
+          ? `<img src="${escapeHtml(cleanImg)}" class="cal-thumb-img" alt="" loading="lazy" decoding="async" fetchpriority="low" style="object-position:${pos};" />`
           : categoryIcon(item.category);
         return `<span class="cal-thumb ${className}" data-item-id="${item.id}">${imgTag}</span>`;
       }).join('')}</span>`;
@@ -5004,7 +5006,7 @@ function renderLaundryOverview() {
   items.forEach(item => grid.appendChild(buildItemCard(item, { laundryMode: true, returnTo: 'modal-laundry' })));
   const consumableGrid = document.getElementById('laundryConsumableGrid');
   if (consumableGrid) {
-    consumableGrid.innerHTML = pendingConsumables.map(c => `<button type="button" class="laundry-consumable-row" data-consumable-id="${escapeHtml(c.id)}"><span class="laundry-consumable-icon">${ICONS[c.icon] || ''}</span><span class="laundry-consumable-name"><b>${escapeHtml(c.name)}</b><small>等待清洗中</small></span><span class="laundry-consumable-arrow">${ICONS.chevronRight || '›'}</span></button>`).join('');
+    consumableGrid.innerHTML = pendingConsumables.map(c => `<button type="button" class="rack-chip rack-chip-consumable laundry-consumable-row" data-consumable-id="${escapeHtml(c.id)}"><span class="rack-chip-thumb">${ICONS[c.icon] || ''}</span><span class="rack-chip-text">${escapeHtml(c.name)}</span><small class="laundry-chip-status">等待清洗</small></button>`).join('');
     consumableGrid.querySelectorAll('[data-consumable-id]').forEach(row => row.addEventListener('click', () => {
       modalReturnTo = 'modal-laundry';
       openConsumableDetail(row.dataset.consumableId);

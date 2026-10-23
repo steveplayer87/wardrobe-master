@@ -426,6 +426,9 @@ svg { width: 100%; height: 100%; display: block; }
   flex: 0 0 33.333333%;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(6, 68px);
+  grid-auto-rows: 68px;
+  align-content: start;
   gap: 4px;
   box-sizing: border-box;
 }
@@ -2439,9 +2442,10 @@ body.night-page input[type="range"]::-moz-range-track {
 
 
 /* Laundry basket pending consumables */
-.laundry-consumable-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 0; }
-.laundry-consumable-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 11px; border: 1px solid #E4E8F0; border-radius: 15px; background: #FBFCFE; text-align: left; }
-.laundry-consumable-row:active { background: var(--color-surface-2); }
+.laundry-consumable-list { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 12px 0 0; }
+.laundry-consumable-row { display: inline-flex; width: auto; min-width: 0; padding: 4px 9px 4px 4px; text-align: left; }
+.laundry-consumable-row:active { filter: brightness(0.97); }
+.laundry-chip-status { font-size: 9px; opacity: .72; white-space: nowrap; }
 .laundry-consumable-icon { display: flex; width: 32px; height: 32px; flex: 0 0 auto; align-items: center; justify-content: center; border-radius: 11px; background: #EAF0FB; color: var(--color-denim); }
 .laundry-consumable-icon svg { width: 20px; height: 20px; }
 .laundry-consumable-name { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
@@ -4913,3 +4917,24 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 
 .weather-key-link { display: inline-flex; margin-top: 5px; color: var(--color-denim); font-size: 12px; font-weight: 700; text-decoration: none; }
 .weather-key-link:active { opacity: .7; }
+
+
+/* Calendar images: stable box and deferred decoding to reduce layout flashes. */
+.cal-thumb-img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center top !important; }
+.cal-thumb { align-self: flex-start; }
+
+/* Align the home overflow control to the glass board's bottom edge. */
+#app.is-home-view .figure-link-row { bottom: 0 !important; right: 6px !important; }
+
+/* Keep the outfit preview square and fit the stage without an internal scroll. */
+#modal-display-figure .display-sim-stage { aspect-ratio: 1 / 1; min-height: 0; padding: 10px; margin-bottom: 10px; }
+#modal-display-figure .display-sim-stage-wrap { gap: 8px; }
+#modal-display-figure .display-sim-controls { padding: 12px; }
+
+/* In More, swap the first and last feature blocks without changing their JS IDs. */
+#view-more { display: flex; flex-direction: column; }
+#view-more > .more-section-block:nth-of-type(1) { order: 3; }
+#view-more > .more-section-block:nth-of-type(2) { order: 2; }
+#view-more > .more-section-block:nth-of-type(3) { order: 1; }
+#view-more > hr:nth-of-type(1) { order: 2.5; }
+#view-more > hr:nth-of-type(2) { order: 1.5; }
