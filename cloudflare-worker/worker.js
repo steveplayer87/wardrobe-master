@@ -244,7 +244,13 @@ export default {
               });
             }
             const history = await env.WARDROBE_STORE.get("app_state_history", "json") || [];
-            if (!history.some(entry => entry.hash === previousHash)) {
+            // 寫入歷史快照限流：同一個 15 分鐘區間只保存第一個版本，避免每次小修改都額外消耗一次 KV put。
+            // 主狀態仍即時保存；歷史保留最多 20 個不同內容版本。
+            const lastSnapshotAt = Number(history[0]?.savedAt) || 0;
+            const snapshotIntervalMs = 15 * 60 * 1000;
+            const hasThisVersion = history.some(entry => entry.hash === previousHash);
+            const snapshotDue = !lastSnapshotAt || Date.now() - lastSnapshotAt >= snapshotIntervalMs;
+            if (!hasThisVersion && snapshotDue) {
               history.unshift({
                 id: `${current.updatedAt || Date.now()}-${previousHash.slice(0, 12)}`,
                 savedAt: Number(current.updatedAt) || Date.now(),

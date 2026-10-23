@@ -6070,7 +6070,7 @@ async function cloudSyncFingerprint(source = state) {
   return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function scheduleAutoCloudSync(delay = 1800) {
+function scheduleAutoCloudSync(delay = 4000) {
   if (!cloudAutoSyncReady) return;
   try { localStorage.setItem(CLOUD_SYNC_PENDING_KEY, '1'); } catch (_) {}
   setCloudSyncStatus(navigator.onLine ? 'pending' : 'offline');
@@ -6089,7 +6089,10 @@ async function runAutoCloudSync() {
   const snapshot = JSON.parse(JSON.stringify(state));
   try {
     const fingerprint = await cloudSyncFingerprint(snapshot);
-    if (fingerprint === cloudLastFingerprint && localStorage.getItem(CLOUD_SYNC_PENDING_KEY) !== '1') {
+    // 非同步欄位（例如即時天氣）變動時，指紋可能不變；不可因 pending 標記而重複寫 KV。
+    // 指紋相同代表雲端需要保存的內容已同步，清除無效待同步標記即可。
+    if (fingerprint === cloudLastFingerprint) {
+      localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
       setCloudSyncStatus('synced');
       return;
     }
