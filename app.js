@@ -19,6 +19,8 @@ const ICONS = {
   filter: `<svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="9" cy="6" r="2" fill="var(--color-surface)" stroke="currentColor" stroke-width="1.6"/><circle cx="16" cy="12" r="2" fill="var(--color-surface)" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="18" r="2" fill="var(--color-surface)" stroke="currentColor" stroke-width="1.6"/></svg>`,
   search: `<svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="1.7"/><path d="M19 19 15.2 15.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
   top: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>`,
+  inner: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3 4 8v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-3-5H7z"/><path d="M9 3v4a3 3 0 0 0 6 0V3"/></svg>`,
+  thermal: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/><path d="M12 11v6M9.5 13.5l5 0"/></svg>`,
   bottom: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12l1 6.5-1.8 11a1 1 0 0 1-1 .8h-2a1 1 0 0 1-1-.8L12 12l-1.2 9a1 1 0 0 1-1 .8H7.8a1 1 0 0 1-1-.8L5 10l1-6.5Z"/><path d="M6 7.5h12"/></svg>`,
   outer: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 4.5 16 3a4 4 0 0 0-8 0L3.6 4.5A2 2 0 0 0 2 6.5V10c0 .6.4 1 1 1h2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9h2c.6 0 1-.4 1-1V6.5a2 2 0 0 0-1.6-2z"/><path d="M12 7v15"/><path d="M8 3v4.5l4 2.5 4-2.5V3"/></svg>`,
   shoes: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8c0-3.5 1.5-4.5 3-4.5s3 1 3 4.5c0 3-.8 6-.8 8.5 0 2.5-.7 3.5-2.2 3.5S5.8 19 5.8 16.5C5.8 14 5 11.5 5 8Z"/><path d="M5.2 8.5h5.6M5.1 11.5h5.8"/><path d="M13 8c0-3.5 1.5-4.5 3-4.5s3 1 3 4.5c0 3-.8 6-.8 8.5 0 2.5-.7 3.5-2.2 3.5s-2.2-1-2.2-3.5c0-2.5-.8-5-.8-8.5Z"/><path d="M13.2 8.5h5.6M13.1 11.5h5.8"/></svg>`,
@@ -218,7 +220,7 @@ function classifyColorFamily(hex) {
   }
 }
 const FIXED_CATEGORIES = ['top', 'bottom', 'outer', 'shoes', 'hat', 'accessory'];
-const CATEGORY_LABEL = { top: '上衣', bottom: '褲子', outer: '外套', shoes: '鞋子', hat: '帽子', accessory: '配件' };
+const CATEGORY_LABEL = { top: '上衣', bottom: '褲子', outer: '外套', shoes: '鞋子', hat: '帽子', accessory: '配件', inner: '內衣', thermal: '保暖衣' };
 const ASPECT_RATIOS = { '1:1': 1, '3:4': 0.75, '2:3': 2/3 };
 const ASPECT_LABELS = { '1:1': '方形', '3:4': '直式', '2:3': '窄長' };
 function getCategoryAspectKey(category) {
@@ -229,7 +231,8 @@ function getCategoryAspectRatio(category) {
 }
 const MAIN_SLOTS = ['top', 'bottom', 'shoes'];
 const EXTRA_SLOTS = ['outer', 'hat', 'accessory'];
-const ALL_SLOTS = MAIN_SLOTS.concat(EXTRA_SLOTS);
+const UNDERWEAR_SLOTS = ['inner', 'thermal'];
+const ALL_SLOTS = MAIN_SLOTS.concat(EXTRA_SLOTS).concat(UNDERWEAR_SLOTS);
 const HOME_SLOT_RATIOS = { hat: 2.2, top: 1.08, bottom: 0.78, shoes: 1.45 };
 const OUTFIT_SHORTS_RATIO = 1.15;
 const OUTFIT_LAYOUT_DEFAULTS = {
@@ -573,7 +576,7 @@ function defaultState() {
     },
     items: JSON.parse(JSON.stringify(typeof SEED_ITEMS !== 'undefined' ? SEED_ITEMS : [])),
     customCategories: [],
-    today: { date: todayStr(), top: null, bottom: null, shoes: null, outer: null, hat: null, accessory: null },
+    today: { date: todayStr(), top: null, bottom: null, shoes: null, outer: null, hat: null, accessory: null, inner: null, thermal: null },
     ootdHistory: [],
     consumables: CONSUMABLE_DEFS.map(c => ({ id: c.id, name: c.name, cycleDays: c.cycleDays, icon: c.icon, startDate: todayStr(), history: [] })),
     activeTowel: 'towelA',
@@ -3295,7 +3298,7 @@ function openSkincareModal(editId = null, defaultDate = null) {
 function renderConsumables() {
   const grid = document.getElementById('consumableGrid');
   grid.innerHTML = '';
-  state.consumables.forEach(c => {
+  state.consumables.filter(c => !isTowelId(c.id)).forEach(c => {
     const towel = isTowelId(c.id);
     const isActive = !towel || state.activeTowel === c.id;
     const used = daysUsed(c);
@@ -4947,6 +4950,7 @@ function openModal(id, opts = {}) {
   });
 }
 function forceCloseModal(options = {}) {
+  backfillShowHiddenSlots = false;
   if (!options.skipPersist) persistTransientForms();
   const overlay = document.getElementById('modalOverlay');
   if (overlay) overlay.classList.remove('is-open');
@@ -5542,6 +5546,43 @@ function selectSlotItem(slot, itemId) {
 let tryonCurrentSlot = null, tryonCurrentCategory = null;
 let tryonSearchQuery = '';
 let tryonSort = 'recent';
+let tryonTitleClickTimer = null;
+let tryonTitleClickCount = 0;
+
+function handleTryonTitleClick() {
+  if (!['top', 'inner', 'thermal'].includes(tryonCurrentSlot)) return;
+  tryonTitleClickCount++;
+  if (tryonTitleClickCount === 1) {
+    tryonTitleClickTimer = setTimeout(() => {
+      // 單擊：top <-> inner 切換
+      if (tryonCurrentSlot === 'top') {
+        switchToTryonSlot('inner');
+      } else if (tryonCurrentSlot === 'inner') {
+        switchToTryonSlot('top');
+      } else if (tryonCurrentSlot === 'thermal') {
+        switchToTryonSlot('top');
+      }
+      tryonTitleClickCount = 0;
+    }, 260);
+  } else if (tryonTitleClickCount >= 2) {
+    clearTimeout(tryonTitleClickTimer);
+    tryonTitleClickCount = 0;
+    // 雙擊：切換到隱藏的第三頁 選擇保暖衣
+    switchToTryonSlot('thermal');
+  }
+}
+
+function switchToTryonSlot(slot) {
+  tryonCurrentSlot = slot;
+  tryonCurrentCategory = slot;
+  const titleEl = document.getElementById('tryonTitle');
+  if (titleEl) {
+    titleEl.textContent = `選擇${categoryLabel(slot)}`;
+  }
+  resetTryonToolbar();
+  renderTryonGridFor(slot, slot);
+}
+
 function renderTryonGridFor(slot, category) {
   tryonCurrentSlot = slot;
   tryonCurrentCategory = category;
@@ -5550,7 +5591,23 @@ function renderTryonGridFor(slot, category) {
   grid.innerHTML = '';
   const isBackfill = !!backfillDraft;
   let options = state.items.filter(i => {
-    if (i.category !== category) return false;
+    if (category === 'inner') {
+      const matchCat = i.category === 'inner';
+      const matchNameOrTag = (i.category === 'top' || !i.category) && (
+        (i.tags || []).some(t => t.includes('內衣') || t.includes('背心') || t.includes('內搭') || t.includes('吊帶') || t.includes('涼感')) ||
+        i.name.includes('內衣') || i.name.includes('背心') || i.name.includes('內搭') || i.name.includes('吊帶') || i.name.includes('涼感')
+      );
+      if (!matchCat && !matchNameOrTag) return false;
+    } else if (category === 'thermal') {
+      const matchCat = i.category === 'thermal';
+      const matchNameOrTag = (i.category === 'top' || i.category === 'bottom' || !i.category) && (
+        (i.tags || []).some(t => t.includes('保暖') || t.includes('發熱') || t.includes('衛生衣') || t.includes('熱')) ||
+        i.name.includes('保暖') || i.name.includes('發熱') || i.name.includes('衛生衣')
+      );
+      if (!matchCat && !matchNameOrTag) return false;
+    } else {
+      if (i.category !== category) return false;
+    }
     if (i.status === 'retired') return false;
     if (isBackfill) return true;
     return i.status !== 'dirty';
@@ -5611,7 +5668,14 @@ function resetTryonToolbar() {
 }
 function openTryonPicker(slot) {
   document.getElementById('tryonCategoryChips').classList.add('is-hidden');
-  document.getElementById('tryonTitle').textContent = `選擇${categoryLabel(slot)}`;
+  const titleBtn = document.getElementById('tryonTitleBtn');
+  const titleEl = document.getElementById('tryonTitle');
+  if (titleBtn) {
+    titleBtn.classList.toggle('is-switchable', ['top', 'inner', 'thermal'].includes(slot));
+  }
+  if (titleEl) {
+    titleEl.textContent = `選擇${categoryLabel(slot)}`;
+  }
   resetTryonToolbar();
   renderTryonGridFor(slot, slot);
   openModal('modal-tryon');
@@ -5705,6 +5769,8 @@ function switchBackfillTab(tab) {
   }
 }
 
+let backfillShowHiddenSlots = false;
+
 function openBackfillModal(presetDate, initialTab = 'outfit') {
   const date = presetDate || todayStr();
   const isToday = date === todayStr();
@@ -5714,6 +5780,7 @@ function openBackfillModal(presetDate, initialTab = 'outfit') {
   }
   backfillDraft = { date };
   ALL_SLOTS.forEach(s => { backfillDraft[s] = existing ? (existing[s] || null) : null; });
+  backfillShowHiddenSlots = !!(backfillDraft.inner || backfillDraft.thermal);
   renderBackfillModal();
   switchBackfillTab(initialTab);
   openModal('modal-backfill');
@@ -5724,7 +5791,14 @@ function renderBackfillModal() {
   if (title) title.textContent = `${formatDayWithWeekday(backfillDraft.date)} 穿搭`;
   const wrap = document.getElementById('backfillRows');
   wrap.innerHTML = '';
-  ALL_SLOTS.forEach(slot => {
+
+  const slotsToRender = ['hat', 'top', 'bottom', 'shoes', 'outer', 'accessory'];
+  if (backfillShowHiddenSlots || backfillDraft.inner || backfillDraft.thermal) {
+    const topIdx = slotsToRender.indexOf('top');
+    slotsToRender.splice(topIdx + 1, 0, 'inner', 'thermal');
+  }
+
+  slotsToRender.forEach(slot => {
     const itemId = backfillDraft[slot];
     const item = itemId ? findItem(itemId) : null;
     const row = document.createElement('button');
@@ -5734,7 +5808,41 @@ function renderBackfillModal() {
       ? (item.image ? `<img class="ddr-thumb" src="${item.image}" alt="" loading="eager" decoding="async">` : `<span class="ddr-thumb">${categoryIcon(item.category)}</span>`)
       : `<span class="ddr-thumb">${ICONS[slot] || ''}</span>`;
     row.innerHTML = `${thumb}<div><p class="ddr-cat">${categoryLabel(slot)}</p><p class="ddr-name">${item ? escapeHtml(item.name) : '點選加入'}</p></div>`;
-    row.addEventListener('click', () => openTryonPicker(slot));
+
+    if (slot === 'top') {
+      let pressTimer = null;
+      let isLongPress = false;
+      const startPress = () => {
+        isLongPress = false;
+        pressTimer = setTimeout(() => {
+          isLongPress = true;
+          if (navigator.vibrate) navigator.vibrate(40);
+          backfillShowHiddenSlots = true;
+          renderBackfillModal();
+          toast('已展開內衣與保暖衣');
+        }, 500);
+      };
+      const cancelPress = () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+      };
+      row.addEventListener('pointerdown', startPress);
+      row.addEventListener('pointerup', cancelPress);
+      row.addEventListener('pointerleave', cancelPress);
+      row.addEventListener('pointercancel', cancelPress);
+      row.addEventListener('click', (e) => {
+        if (isLongPress) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        openTryonPicker('top');
+      });
+    } else {
+      row.addEventListener('click', () => openTryonPicker(slot));
+    }
     wrap.appendChild(row);
   });
 }
@@ -6687,6 +6795,7 @@ function wireEvents() {
   document.querySelectorAll('.figure-slot').forEach(btn => {
     btn.addEventListener('click', () => openTryonPicker(btn.getAttribute('data-slot')));
   });
+  document.getElementById('tryonTitleBtn')?.addEventListener('click', handleTryonTitleClick);
   document.getElementById('figureExtrasLink').addEventListener('click', openExtrasPicker);
   const clearOotdButton = document.getElementById('btnClearOotd');
   if (clearOotdButton) clearOotdButton.addEventListener('click', () => {
@@ -6764,16 +6873,27 @@ function wireEvents() {
       toast('至少選一件單品');
       return;
     }
+    // 未選擇單品的內衣或保暖衣自動清理，不留空記錄
+    if (!backfillDraft.inner) delete backfillDraft.inner;
+    if (!backfillDraft.thermal) delete backfillDraft.thermal;
+    backfillShowHiddenSlots = false;
+
     const isToday = backfillDraft.date === todayStr();
     const entry = { date: backfillDraft.date };
     ALL_SLOTS.forEach(s => {
-      entry[s] = backfillDraft[s] || null;
+      if (backfillDraft[s]) {
+        entry[s] = backfillDraft[s];
+      } else if (['inner', 'thermal'].includes(s)) {
+        // 不留空 null
+      } else {
+        entry[s] = null;
+      }
     });
 
     // 1. Commit outfit to history immediately so user never loses entry
     if (isToday) {
       ALL_SLOTS.forEach(s => {
-        setTodaySlot(s, entry[s]);
+        setTodaySlot(s, entry[s] || null);
       });
     } else {
       ALL_SLOTS.forEach(s => {
@@ -6795,7 +6915,16 @@ function wireEvents() {
     const lastWash = state.laundry?.lastWashDate || '';
     const shouldAsk = !isToday && (!lastWash || entry.date >= lastWash);
     const itemsToAsk = shouldAsk
-      ? ALL_SLOTS.map(s => entry[s] ? findItem(entry[s]) : null).filter(it => it && it.status === 'clean')
+      ? ALL_SLOTS.map(s => entry[s] ? findItem(entry[s]) : null).filter(it => {
+          if (!it || it.status !== 'clean') return false;
+          // 若設定中此分類選了不提醒（門檻為 0 或 Infinity），絕不彈窗詢問
+          const threshold = getThreshold(it.category);
+          if (threshold === Infinity || threshold === 0) return false;
+          if (state.profile?.washThresholds?.[it.category] === 0) return false;
+          // 鞋子、帽子、配件若未達門檻，始終維持 clean，不彈窗打擾
+          if (['shoes', 'hat', 'accessory'].includes(it.category) && (it.wearCount || 0) < threshold) return false;
+          return true;
+        })
       : [];
 
     if (itemsToAsk.length === 0) {
