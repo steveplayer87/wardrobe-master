@@ -1628,7 +1628,7 @@ function getImageTrimBounds(imgUrl, callback) {
 // caller; these helpers only render safe, consistent identity/photo markup.
 function itemPhotoMarkup(item) {
   return item.image
-    ? `<img class="item-photo-image" src="${escapeHtml(item.image)}" alt="" loading="lazy">`
+    ? `<img class="item-photo-image" src="${escapeHtml(item.image)}" alt="" loading="eager" decoding="async">`
     : thumbInner(item);
 }
 function itemCardBrandMarkup(item, size = 'tiny') {
