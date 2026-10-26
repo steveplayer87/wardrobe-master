@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261026_109">
+<link rel="stylesheet" href="styles.css?v=20261026_110">
 </head>
 <body>
 
@@ -778,6 +778,30 @@
               <button type="button" class="tc-step-btn tc-minus" data-cat="accessory" aria-label="減少">−</button>
               <span class="tc-val-unit"><strong class="tc-val" id="valThresholdAccessory">8</strong><span class="tc-unit"> 次</span></span>
               <button type="button" class="tc-step-btn tc-plus" data-cat="accessory" aria-label="增加">+</button>
+            </div>
+          </div>
+
+          <div class="threshold-card" data-cat="pajamaTop">
+            <div class="tc-left">
+              <span class="tc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l8-3 8 3v4a2 2 0 0 1-2 2h-1v7H7v-7H6a2 2 0 0 1-2-2V7z"/><path d="M12 4v16"/><path d="M9 10h6"/></svg></span>
+              <span class="tc-label">睡衣</span>
+            </div>
+            <div class="tc-stepper">
+              <button type="button" class="tc-step-btn tc-minus" data-cat="pajamaTop" aria-label="減少">−</button>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdPajamaTop">3</strong><span class="tc-unit"> 次</span></span>
+              <button type="button" class="tc-step-btn tc-plus" data-cat="pajamaTop" aria-label="增加">+</button>
+            </div>
+          </div>
+
+          <div class="threshold-card" data-cat="pajamaBottom">
+            <div class="tc-left">
+              <span class="tc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l1 7-2 11h-3l-2-8-2 8H7L5 10l1-7z"/><path d="M6 7h12"/></svg></span>
+              <span class="tc-label">睡褲</span>
+            </div>
+            <div class="tc-stepper">
+              <button type="button" class="tc-step-btn tc-minus" data-cat="pajamaBottom" aria-label="減少">−</button>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdPajamaBottom">3</strong><span class="tc-unit"> 次</span></span>
+              <button type="button" class="tc-step-btn tc-plus" data-cat="pajamaBottom" aria-label="增加">+</button>
             </div>
           </div>
         </div>
@@ -1579,7 +1603,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261026_109"></script>
-<script src="app.js?v=20261026_109"></script>
+<script src="seed-items.js?v=20261026_110"></script>
+<script src="app.js?v=20261026_110"></script>
 </body>
 </html>

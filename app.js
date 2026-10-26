@@ -26,6 +26,8 @@ const ICONS = {
   shoes: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8c0-3.5 1.5-4.5 3-4.5s3 1 3 4.5c0 3-.8 6-.8 8.5 0 2.5-.7 3.5-2.2 3.5S5.8 19 5.8 16.5C5.8 14 5 11.5 5 8Z"/><path d="M5.2 8.5h5.6M5.1 11.5h5.8"/><path d="M13 8c0-3.5 1.5-4.5 3-4.5s3 1 3 4.5c0 3-.8 6-.8 8.5 0 2.5-.7 3.5-2.2 3.5s-2.2-1-2.2-3.5c0-2.5-.8-5-.8-8.5Z"/><path d="M13.2 8.5h5.6M13.1 11.5h5.8"/></svg>`,
   hat: `<svg viewBox="0 0 24 24" fill="none"><path d="M4.5 15.5c0-4.5 3.3-8 7.5-8s7.5 3.5 7.5 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M2.5 15.5h19" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
   accessory: `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M12 12v8.5M9.5 20.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  pajamaTop: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l8-3 8 3v4a2 2 0 0 1-2 2h-1v7H7v-7H6a2 2 0 0 1-2-2V7z"/><path d="M12 4v16"/><path d="M9 10h6"/></svg>`,
+  pajamaBottom: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l1 7-2 11h-3l-2-8-2 8H7L5 10l1-7z"/><path d="M6 7h12"/></svg>`,
   custom: `<svg viewBox="0 0 24 24" fill="none"><path d="M11 3.5H6a2.5 2.5 0 0 0-2.5 2.5v5c0 .6.2 1.1.6 1.5l8 8a2 2 0 0 0 2.8 0l5-5a2 2 0 0 0 0-2.8l-8-8c-.4-.4-.9-.6-1.5-.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/></svg>`,
   retired: `<svg viewBox="0 0 24 24" fill="none"><rect x="4" y="7" width="16" height="13" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 7l2.5-3.5h11L20 7" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 11.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
   rack: `<svg viewBox="0 0 24 24" fill="none"><path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 4.5a1.6 1.6 0 1 1 1.3 2.5L12 8.2 4 13.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M12 8.2l8 5.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
@@ -219,8 +221,8 @@ function classifyColorFamily(hex) {
     return '其他';
   }
 }
-const FIXED_CATEGORIES = ['top', 'bottom', 'outer', 'shoes', 'hat', 'accessory'];
-const CATEGORY_LABEL = { top: '上衣', bottom: '褲子', outer: '外套', shoes: '鞋子', hat: '帽子', accessory: '配件', inner: '內衣', thermal: '保暖衣' };
+const FIXED_CATEGORIES = ['top', 'bottom', 'outer', 'shoes', 'hat', 'accessory', 'pajamaTop', 'pajamaBottom'];
+const CATEGORY_LABEL = { top: '上衣', bottom: '褲子', outer: '外套', shoes: '鞋子', hat: '帽子', accessory: '配件', inner: '內衣', thermal: '保暖衣', pajamaTop: '睡衣', pajamaBottom: '睡褲' };
 const ASPECT_RATIOS = { '1:1': 1, '3:4': 0.75, '2:3': 2/3 };
 const ASPECT_LABELS = { '1:1': '方形', '3:4': '直式', '2:3': '窄長' };
 function getCategoryAspectKey(category) {
@@ -232,7 +234,8 @@ function getCategoryAspectRatio(category) {
 const MAIN_SLOTS = ['top', 'bottom', 'shoes'];
 const EXTRA_SLOTS = ['outer', 'hat', 'accessory'];
 const UNDERWEAR_SLOTS = ['inner', 'thermal'];
-const ALL_SLOTS = MAIN_SLOTS.concat(EXTRA_SLOTS).concat(UNDERWEAR_SLOTS);
+const PAJAMA_SLOTS = ['pajamaTop', 'pajamaBottom'];
+const ALL_SLOTS = MAIN_SLOTS.concat(EXTRA_SLOTS).concat(UNDERWEAR_SLOTS).concat(PAJAMA_SLOTS);
 const HOME_SLOT_RATIOS = { hat: 2.2, top: 1.08, bottom: 0.78, shoes: 1.45 };
 const OUTFIT_SHORTS_RATIO = 1.15;
 const OUTFIT_LAYOUT_DEFAULTS = {
@@ -571,12 +574,12 @@ function defaultState() {
       avatar: '',
       weather: { city: '', latitude: null, longitude: null, timezone: 'auto', current: null, updatedAt: 0, tempDropThreshold: 4, alertEnabled: true, forecast: null, forecastStatus: '' },
       outfitLayout: normalizeOutfitLayout(OUTFIT_LAYOUT_DEFAULTS),
-      washThresholds: { bottom: 3, outer: 5, shoes: 8, hat: 8, accessory: 8 },
+      washThresholds: { bottom: 3, outer: 5, shoes: 8, hat: 8, accessory: 8, pajamaTop: 3, pajamaBottom: 3 },
       categoryAspect: { top: '1:1', bottom: '3:4', outer: '1:1', shoes: '1:1', hat: '1:1', accessory: '1:1' },
     },
     items: JSON.parse(JSON.stringify(typeof SEED_ITEMS !== 'undefined' ? SEED_ITEMS : [])),
     customCategories: [],
-    today: { date: todayStr(), top: null, bottom: null, shoes: null, outer: null, hat: null, accessory: null, inner: null, thermal: null },
+    today: { date: todayStr(), top: null, bottom: null, shoes: null, outer: null, hat: null, accessory: null, inner: null, thermal: null, pajamaTop: null, pajamaBottom: null },
     ootdHistory: [],
     consumables: CONSUMABLE_DEFS.map(c => ({ id: c.id, name: c.name, cycleDays: c.cycleDays, icon: c.icon, startDate: todayStr(), history: [] })),
     activeTowel: 'towelA',
@@ -1124,8 +1127,8 @@ function computeStatusAfterWear(item) {
   }
   if (item.category === 'top') return 'dirty';
   const threshold = getThreshold(item.category);
-  if (item.category === 'bottom') {
-    // only tops (immediate) and pants (threshold) use the temp-rack/resting stage
+  if (item.category === 'bottom' || item.category === 'pajamaTop' || item.category === 'pajamaBottom') {
+    // tops (immediate dirty), pants & pajamas (threshold) use the temp-rack/resting stage
     return item.wearCount >= threshold ? 'dirty' : 'resting';
   }
   // outer/shoes/hat/accessory: no "resting" holding stage — clean until the
@@ -2245,6 +2248,14 @@ function renderHome() {
   }
 
   const rack = state.items.filter(i => i.status === 'resting' || isPreCutoffDirtyToday(i));
+  // 睡衣與睡褲在暫存衣架中自動排在最下面
+  rack.sort((a, b) => {
+    const isPajamaA = ['pajamaTop', 'pajamaBottom'].includes(a.category) || (a.tags || []).some(t => t.includes('睡衣') || t.includes('睡褲')) || a.name.includes('睡衣') || a.name.includes('睡褲');
+    const isPajamaB = ['pajamaTop', 'pajamaBottom'].includes(b.category) || (b.tags || []).some(t => t.includes('睡衣') || t.includes('睡褲')) || b.name.includes('睡衣') || b.name.includes('睡褲');
+    if (isPajamaA && !isPajamaB) return 1;
+    if (!isPajamaA && isPajamaB) return -1;
+    return 0;
+  });
   const basket = state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i));
   const pendingConsumables = getPendingLaundryConsumables();
   const towel = state.consumables.find(c => c.id === state.activeTowel) || state.consumables.find(c => isTowelId(c.id));
@@ -2368,8 +2379,10 @@ let uiSearchQuery = '';
 let uiSelectMode = false;
 let uiSelectedIds = new Set();
 
+const PRESET_SYSTEM_TAGS = ['.內衣', '.保暖衣'];
+
 function allTagsUsed() {
-  const set = new Set();
+  const set = new Set(PRESET_SYSTEM_TAGS);
   state.items.forEach(i => (i.tags || []).forEach(t => set.add(t)));
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-Hant'));
 }
@@ -4362,6 +4375,8 @@ function readSettingsDraft() {
     shoes: readVal('valThresholdShoes', state.profile.washThresholds?.shoes ?? 8),
     hat: readVal('valThresholdHat', state.profile.washThresholds?.hat ?? 8),
     accessory: readVal('valThresholdAccessory', state.profile.washThresholds?.accessory ?? 8),
+    pajamaTop: readVal('valThresholdPajamaTop', state.profile.washThresholds?.pajamaTop ?? 3),
+    pajamaBottom: readVal('valThresholdPajamaBottom', state.profile.washThresholds?.pajamaBottom ?? 3),
   };
   const towelDays = readVal('valThresholdTowel', 7);
   state.consumables.forEach(c => { if (isTowelId(c.id)) c.cycleDays = towelDays; });
@@ -5591,20 +5606,18 @@ function renderTryonGridFor(slot, category) {
   grid.innerHTML = '';
   const isBackfill = !!backfillDraft;
   let options = state.items.filter(i => {
-    if (category === 'inner') {
-      const matchCat = i.category === 'inner';
-      const matchNameOrTag = (i.category === 'top' || !i.category) && (
-        (i.tags || []).some(t => t.includes('內衣') || t.includes('背心') || t.includes('內搭') || t.includes('吊帶') || t.includes('涼感')) ||
-        i.name.includes('內衣') || i.name.includes('背心') || i.name.includes('內搭') || i.name.includes('吊帶') || i.name.includes('涼感')
-      );
-      if (!matchCat && !matchNameOrTag) return false;
-    } else if (category === 'thermal') {
-      const matchCat = i.category === 'thermal';
-      const matchNameOrTag = (i.category === 'top' || i.category === 'bottom' || !i.category) && (
-        (i.tags || []).some(t => t.includes('保暖') || t.includes('發熱') || t.includes('衛生衣') || t.includes('熱')) ||
-        i.name.includes('保暖') || i.name.includes('發熱') || i.name.includes('衛生衣')
-      );
-      if (!matchCat && !matchNameOrTag) return false;
+    if (category === 'inner' || category === 'thermal') {
+      // 目前不限定二三頁會出現的上衣品相：所有上衣、以及標註內衣/保暖衣者均可選擇
+      const match = i.category === 'top' || i.category === 'inner' || i.category === 'thermal' ||
+        (i.tags || []).some(t => t.includes('內衣') || t.includes('保暖衣') || t.includes('發熱') || t.includes('涼感')) ||
+        i.name.includes('內衣') || i.name.includes('保暖衣') || i.name.includes('發熱');
+      if (!match) return false;
+    } else if (category === 'pajamaTop') {
+      const match = i.category === 'pajamaTop' || (i.tags || []).some(t => t.includes('睡衣')) || i.name.includes('睡衣');
+      if (!match) return false;
+    } else if (category === 'pajamaBottom') {
+      const match = i.category === 'pajamaBottom' || (i.tags || []).some(t => t.includes('睡褲')) || i.name.includes('睡褲');
+      if (!match) return false;
     } else {
       if (i.category !== category) return false;
     }
@@ -5696,12 +5709,12 @@ function addExtrasClearAction() {
   clearWrap.appendChild(clearButton);
 }
 function openExtrasPicker() {
-  document.getElementById('tryonTitle').textContent = '選擇外套、配件或帽子';
+  document.getElementById('tryonTitle').textContent = '選擇其他單品';
   resetTryonToolbar();
   const chipsWrap = document.getElementById('tryonCategoryChips');
   chipsWrap.classList.remove('is-hidden');
   chipsWrap.innerHTML = '';
-  ['outer', 'accessory', 'hat'].forEach((cat, i) => {
+  ['outer', 'accessory', 'hat', 'pajamaTop', 'pajamaBottom'].forEach((cat, i) => {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'chip' + (i === 0 ? ' is-active' : '');
@@ -5792,7 +5805,7 @@ function renderBackfillModal() {
   const wrap = document.getElementById('backfillRows');
   wrap.innerHTML = '';
 
-  const slotsToRender = ['hat', 'top', 'bottom', 'shoes', 'outer', 'accessory'];
+  const slotsToRender = ['hat', 'top', 'bottom', 'shoes', 'outer', 'accessory', 'pajamaTop', 'pajamaBottom'];
   if (backfillShowHiddenSlots || backfillDraft.inner || backfillDraft.thermal) {
     const topIdx = slotsToRender.indexOf('top');
     slotsToRender.splice(topIdx + 1, 0, 'inner', 'thermal');
@@ -9187,6 +9200,8 @@ function syncThresholdCardsUI() {
   setCardVal('valThresholdShoes', t.shoes ?? 8);
   setCardVal('valThresholdHat', t.hat ?? 8);
   setCardVal('valThresholdAccessory', t.accessory ?? 8);
+  setCardVal('valThresholdPajamaTop', t.pajamaTop ?? 3);
+  setCardVal('valThresholdPajamaBottom', t.pajamaBottom ?? 3);
   const towel = state.consumables?.find(c => isTowelId(c.id));
   setCardVal('valThresholdTowel', towel ? towel.cycleDays : 7);
 }

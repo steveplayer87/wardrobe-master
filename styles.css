@@ -755,6 +755,10 @@ svg { width: 100%; height: 100%; display: block; }
 /* =========================== Modals =========================== */
 .modal-overlay { position: fixed; inset: 0; background: rgba(20,24,38,0.44); display: flex; align-items: flex-end; justify-content: center; opacity: 0; pointer-events: none; transition: opacity var(--dur-sheet-close) var(--ease-sheet); z-index: 600; }
 .modal-overlay.is-open { opacity: 1; pointer-events: auto; }
+#modal-tryon {
+  height: 86dvh;
+  min-height: 75dvh;
+}
 .modal-sheet {
   position: absolute !important;
   bottom: 0 !important;
