@@ -2420,7 +2420,7 @@ let uiSearchQuery = '';
 let uiSelectMode = false;
 let uiSelectedIds = new Set();
 
-const PRESET_SYSTEM_TAGS = ['.內衣', '.保暖衣'];
+const PRESET_SYSTEM_TAGS = ['.內衣', '.保暖衣', '.睡衣', '.睡褲'];
 
 function allTagsUsed() {
   const set = new Set(PRESET_SYSTEM_TAGS);
@@ -5657,10 +5657,10 @@ function renderTryonGridFor(slot, category) {
         i.name.includes('內衣') || i.name.includes('保暖衣') || i.name.includes('發熱');
       if (!match) return false;
     } else if (category === 'pajamaTop') {
-      const match = i.category === 'pajamaTop' || (i.tags || []).some(t => t.includes('睡衣')) || i.name.includes('睡衣');
+      const match = i.category === 'pajamaTop' || i.category === 'top' || (i.tags || []).some(t => t.includes('睡衣')) || i.name.includes('睡衣');
       if (!match) return false;
     } else if (category === 'pajamaBottom') {
-      const match = i.category === 'pajamaBottom' || (i.tags || []).some(t => t.includes('睡褲')) || i.name.includes('睡褲');
+      const match = i.category === 'pajamaBottom' || i.category === 'bottom' || (i.tags || []).some(t => t.includes('睡褲')) || i.name.includes('睡褲');
       if (!match) return false;
     } else {
       if (i.category !== category) return false;
