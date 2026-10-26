@@ -653,7 +653,102 @@ export default {
         });
       }
 
-      // 7. 手動或 App 重新進入時觸發日記至生活標籤同步；不再使用定時排程
+      // 7. 衣櫥洗衣事件即時回寫指定日期日記「註記」，再同步生活標籤追蹤
+      if (path === "/api/laundry-diary-sync" && request.method === "POST") {
+        if (!env.NOTION_TOKEN) {
+          return new Response(JSON.stringify({ success: false, error: "Notion token not configured on Worker" }), {
+            status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+        const body = await request.json();
+        const date = String(body.date || "").slice(0, 10);
+        const washed = body.washed !== false;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return new Response(JSON.stringify({ success: false, error: "Invalid date" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+        const diaryDbId = env.NOTION_DIARY_DB_ID || "50adbc0959024715a90484ddc73b62d6";
+        const queryRes = await fetch(`https://api.notion.com/v1/databases/${diaryDbId}/query`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${env.NOTION_TOKEN}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" },
+          body: JSON.stringify({ page_size: 20, filter: { property: "Date", date: { equals: date } } })
+        });
+        if (!queryRes.ok) {
+          return new Response(JSON.stringify({ success: false, error: "Failed to query diary date", detail: await queryRes.text() }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+        const queryJson = await queryRes.json();
+        const pages = queryJson.results || [];
+        if (!pages.length) {
+          return new Response(JSON.stringify({ success: false, error: `找不到 ${date} 的 Notion 日記，未建立新頁面` }), {
+            status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+        let updatedPages = 0;
+        for (const page of pages) {
+          const oldTags = (page.properties?.["註記"]?.multi_select || []).map(tag => tag.name).filter(Boolean);
+          const nextTags = washed
+            ? [...new Set([...oldTags, "洗衣服"])]
+            : oldTags.filter(tag => tag !== "洗衣服");
+          if (oldTags.length === nextTags.length && oldTags.every((tag, i) => tag === nextTags[i])) continue;
+          const patchRes = await fetch(`https://api.notion.com/v1/pages/${page.id}`, {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${env.NOTION_TOKEN}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" },
+            body: JSON.stringify({ properties: { "註記": { multi_select: nextTags.map(name => ({ name })) } } })
+          });
+          if (!patchRes.ok) {
+            return new Response(JSON.stringify({ success: false, error: "Failed to update diary tags", detail: await patchRes.text() }), {
+              status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+          updatedPages++;
+        }
+        const lifeSync = await syncAllDiaryToNotion(env);
+        // 若取消的是最新洗衣日記，將生活標籤的日期回算到剩餘紀錄，而不是保留已取消的日期。
+        if (!washed && env.NOTION_LIFE_DB_ID) {
+          const latestRes = await fetch(`https://api.notion.com/v1/databases/${diaryDbId}/query`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${env.NOTION_TOKEN}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" },
+            body: JSON.stringify({
+              page_size: 1,
+              sorts: [{ property: "Date", direction: "descending" }],
+              filter: { property: "註記", multi_select: { contains: "洗衣服" } }
+            })
+          });
+          if (latestRes.ok) {
+            const latestJson = await latestRes.json();
+            const latestDate = latestJson.results?.[0]?.properties?.["Date"]?.date?.start || null;
+            const lifeRes = await fetch(`https://api.notion.com/v1/databases/${env.NOTION_LIFE_DB_ID}/query`, {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${env.NOTION_TOKEN}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" },
+              body: JSON.stringify({ page_size: 100 })
+            });
+            if (lifeRes.ok) {
+              const lifeJson = await lifeRes.json();
+              const laundryTrack = (lifeJson.results || []).find(page => {
+                const title = page.properties?.["項目"]?.title?.[0]?.plain_text || "";
+                return title === "洗衣服" || title.includes("洗衣服");
+              });
+              if (laundryTrack) {
+                await fetch(`https://api.notion.com/v1/pages/${laundryTrack.id}`, {
+                  method: "PATCH",
+                  headers: { "Authorization": `Bearer ${env.NOTION_TOKEN}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" },
+                  body: JSON.stringify({ properties: { "上次日期": { date: latestDate ? { start: latestDate } : null } } })
+                });
+              }
+            }
+          }
+        }
+        const success = !!lifeSync.success;
+        return new Response(JSON.stringify({ success, date, washed, diaryPages: pages.length, updatedPages, lifeSync }), {
+          status: success ? 200 : 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      // 8. 手動或 App 重新進入時觸發日記至生活標籤同步；不再使用定時排程
       if (path === "/api/cron-sync" && request.method === "POST") {
         const result = await syncAllDiaryToNotion(env);
         return new Response(JSON.stringify(result), {

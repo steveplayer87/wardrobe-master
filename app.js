@@ -1402,6 +1402,44 @@ function completeConsumableLaundry(c, date = todayStr()) {
   c.laundryPending = false;
   c.laundryAt = null;
 }
+async function syncLaundryDiaryTag(date, washed = true) {
+  const key = 'wm_pending_laundry_diary_tags_v1';
+  const pending = (() => { try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (_) { return []; } })();
+  const event = { date, washed: !!washed };
+  if (!navigator.onLine) {
+    const next = pending.filter(item => item.date !== date);
+    next.push(event);
+    localStorage.setItem(key, JSON.stringify(next));
+    return false;
+  }
+  try {
+    const response = await fetch(`${CLOUDFLARE_WORKER_URL}/api/laundry-diary-sync`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(event)
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new Error(result.error || `HTTP ${response.status}`);
+    localStorage.setItem(key, JSON.stringify(pending.filter(item => item.date !== date)));
+    return true;
+  } catch (error) {
+    const next = pending.filter(item => item.date !== date);
+    next.push(event);
+    localStorage.setItem(key, JSON.stringify(next));
+    console.warn('洗衣日記同步失敗，已保留待重試：', error);
+    return false;
+  }
+}
+
+async function retryPendingLaundryDiaryTags() {
+  const key = 'wm_pending_laundry_diary_tags_v1';
+  if (!navigator.onLine) return;
+  let pending = [];
+  try { pending = JSON.parse(localStorage.getItem(key) || '[]'); } catch (_) {}
+  for (const event of pending) {
+    const ok = await syncLaundryDiaryTag(event.date, event.washed);
+    if (!ok) break;
+  }
+}
+
 function completeLaundryDone(targetDate = todayStr()) {
   const dirtyItems = state.items.filter(item => item.status === 'dirty' && !isPreCutoffDirtyToday(item));
   const pendingConsumables = getPendingLaundryConsumables();
@@ -1418,6 +1456,9 @@ function completeLaundryDone(targetDate = todayStr()) {
   syncLatestLaundryDate();
   saveState();
   renderAll();
+  syncLaundryDiaryTag(targetDate, true).then(ok => {
+    if (ok) toast(`Notion 已同步 ${formatDayWithWeekday(targetDate)} 日記與生活標籤`);
+  });
   toast(`已記錄 ${formatDayWithWeekday(targetDate)} 洗衣服完成`);
 }
 function markLaundryDone(targetDate = todayStr()) {
@@ -3030,6 +3071,9 @@ function openDayDetail(dateStr, entry) {
     }
     syncLatestLaundryDate();
     saveState({ action: `${laundryToggle.checked ? '補登' : '取消'} ${formatDayWithWeekday(dateStr)} 洗衣紀錄` });
+    syncLaundryDiaryTag(dateStr, laundryToggle.checked).then(ok => {
+      if (ok) toast(`Notion 已同步 ${formatDayWithWeekday(dateStr)} 日記與生活標籤`);
+    });
     renderHistory();
     renderHome();
   });
@@ -9386,7 +9430,10 @@ async function init() {
     refreshWeather(false);
     cloudAutoSyncReady = true;
     // App 啟動時自動同步一次；之後切回前景時最多每 15 分鐘觸發一次，避免頻繁查詢 Notion。
-    if (navigator.onLine) syncNotionLifeTags({ automatic: true });
+    if (navigator.onLine) {
+      syncNotionLifeTags({ automatic: true });
+      retryPendingLaundryDiaryTags();
+    }
     try {
       cloudLastFingerprint = localStorage.getItem(CLOUD_SYNC_FINGERPRINT_KEY) || '';
       const pending = localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1';
@@ -9412,6 +9459,7 @@ async function init() {
     } catch (_) { setCloudSyncStatus('ready'); }
     window.addEventListener('online', () => {
       if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') scheduleAutoCloudSync(300);
+      retryPendingLaundryDiaryTags();
     });
     window.addEventListener('offline', () => {
       if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') setCloudSyncStatus('offline');
