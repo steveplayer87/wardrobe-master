@@ -2345,7 +2345,9 @@ function renderChipList(listId, emptyId, items, opts) {
       const chip = document.createElement('button');
       chip.className = 'rack-chip rack-chip-consumable';
       chip.type = 'button';
-      chip.innerHTML = `<span class="rack-chip-thumb">${ICONS[c.icon] || ''}</span><span class="rack-chip-text">${escapeHtml(c.name)}・等待清洗中</span>`;
+      const cImg = consumableImage(c);
+      const thumbHtml = cImg ? `<img src="${cImg}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : (ICONS[c.icon] || '');
+      chip.innerHTML = `<span class="rack-chip-thumb">${thumbHtml}</span><span class="rack-chip-text">${escapeHtml(c.name)}・等待清洗中</span>`;
       chip.addEventListener('click', e => { e.stopPropagation(); openConsumableDetail(c.id); });
       list.appendChild(chip);
     });
@@ -2404,6 +2406,9 @@ function openRackOverview() {
       chip.innerHTML = `${thumbHtml}<div style="flex:1"><div style="font-weight:600;font-size:14px;color:var(--text-main,#0f172a);">${escapeHtml(towel.name)}</div><div style="font-size:12px;color:var(--text-muted,#64748b);">浴巾已使用 ${daysUsed(towel)} 天・置頂使用中</div></div>`;
       chip.addEventListener('click', () => openConsumableDetail(towel.id));
       pinnedWrap.appendChild(chip);
+      const divider = document.createElement('hr');
+      divider.style.cssText = 'margin:14px 16px 18px;border:none;border-top:1px solid var(--color-line,#e2e8f0);';
+      pinnedWrap.appendChild(divider);
     } else {
       pinnedWrap.hidden = true;
     }
@@ -5140,6 +5145,14 @@ function closeModal() {
   forceCloseModal();
 }
 function openConfirm(title, body, actions) {
+  if (typeof actions === 'function') {
+    const cb = actions;
+    actions = [
+      { label: '取消', kind: 'secondary' },
+      { label: '確定', kind: 'primary', onClick: cb }
+    ];
+  }
+  if (!Array.isArray(actions)) actions = [];
   document.getElementById('confirmTitle').textContent = title;
   const bodyEl = document.getElementById('confirmBody');
   if (typeof body === 'string' && body.includes('<')) {
@@ -5173,20 +5186,43 @@ function openConfirm(title, body, actions) {
 function renderLaundryOverview() {
   const grid = document.getElementById('laundryOverviewGrid');
   const empty = document.getElementById('laundryOverviewEmpty');
+  const pinnedWrap = document.getElementById('laundryPinnedConsumables');
   if (!grid || !empty) return;
   const items = state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i));
   const pendingConsumables = getPendingLaundryConsumables();
   grid.innerHTML = '';
   empty.hidden = items.length !== 0 || pendingConsumables.length !== 0;
-  items.forEach(item => grid.appendChild(buildItemCard(item, { laundryMode: true, returnTo: 'modal-laundry' })));
-  const consumableGrid = document.getElementById('laundryConsumableGrid');
-  if (consumableGrid) {
-    consumableGrid.innerHTML = pendingConsumables.map(c => `<button type="button" class="rack-chip rack-chip-consumable laundry-consumable-row" data-consumable-id="${escapeHtml(c.id)}"><span class="rack-chip-thumb">${ICONS[c.icon] || ''}</span><span class="rack-chip-text">${escapeHtml(c.name)}</span><small class="laundry-chip-status">等待清洗</small></button>`).join('');
-    consumableGrid.querySelectorAll('[data-consumable-id]').forEach(row => row.addEventListener('click', () => {
-      modalReturnTo = 'modal-laundry';
-      openConsumableDetail(row.dataset.consumableId);
-    }));
+
+  if (pinnedWrap) {
+    pinnedWrap.innerHTML = '';
+    if (pendingConsumables.length > 0) {
+      pinnedWrap.hidden = false;
+      pendingConsumables.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'rack-pinned-towel-card';
+        card.style.cssText = 'margin:12px 16px 4px;padding:12px 14px;border-radius:14px;background:var(--card-bg, #fff);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;gap:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.04);';
+        const cImg = consumableImage(c);
+        const thumbHtml = cImg ? `<img src="${cImg}" alt="" style="width:38px;height:38px;object-fit:cover;border-radius:10px;">` : `<span style="width:38px;height:38px;border-radius:10px;background:var(--subtle-bg,#f1f5f9);display:flex;align-items:center;justify-content:center;">${ICONS[c.icon] || ''}</span>`;
+        const subText = isTowelId(c.id) ? `浴巾已使用 ${daysUsed(c)} 天・等待清洗中` : `${escapeHtml(c.name)}・等待清洗中`;
+        card.innerHTML = `${thumbHtml}<div style="flex:1"><div style="font-weight:600;font-size:14px;color:var(--text-main,#0f172a);">${escapeHtml(c.name)}</div><div style="font-size:12px;color:var(--text-muted,#64748b);">${subText}</div></div>`;
+        card.addEventListener('click', () => {
+          modalReturnTo = 'modal-laundry';
+          openConsumableDetail(c.id);
+        });
+        pinnedWrap.appendChild(card);
+      });
+      const divider = document.createElement('hr');
+      divider.style.cssText = 'margin:14px 16px 18px;border:none;border-top:1px solid var(--color-line,#e2e8f0);';
+      pinnedWrap.appendChild(divider);
+    } else {
+      pinnedWrap.hidden = true;
+    }
   }
+
+  const consumableGrid = document.getElementById('laundryConsumableGrid');
+  if (consumableGrid) consumableGrid.innerHTML = '';
+
+  items.forEach(item => grid.appendChild(buildItemCard(item, { laundryMode: true, returnTo: 'modal-laundry' })));
 }
 
 function openLaundryDateChooser() {
@@ -6440,20 +6476,33 @@ async function syncEverythingToCloud() {
   if (!navigator.onLine) { setCloudSyncStatus('offline'); return; }
   const button = document.getElementById('btnSyncLifeConsumables');
   if (button) button.disabled = true;
-  setCloudSyncStatus('syncing', '同步四項生活紀錄與完整衣櫥資料');
+  setCloudSyncStatus('syncing', '同步生活紀錄、Notion 與完整衣櫥資料');
   try {
     const safety = await checkCloudSyncSafety(state);
     if (!safety.safe) {
       if (safety.offline) setCloudSyncStatus('offline');
       else {
         localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
-        setCloudSyncStatus('blocked', safety.message)
-        toast('為避免覆蓋較完整的雲端資料，已暫停同步。請先從雲端還原資料。');
+        setCloudSyncStatus('blocked', safety.message);
+        const remoteCount = safety.remote?.items?.length || 0;
+        openConfirm(
+          '下載雲端資料',
+          `偵測到雲端擁有較完整的衣櫥資料（雲端共 ${remoteCount} 件單品）。<br><br>為避免本地空白或較少的資料覆蓋雲端，已暫停上傳。<br>是否直接從雲端下載並還原完整資料？`,
+          [
+            { label: '先不要', kind: 'secondary' },
+            {
+              label: '下載並還原',
+              kind: 'primary',
+              onClick: () => restoreWardrobeFromCloud({ confirmed: true, remoteState: safety.remote })
+            }
+          ]
+        );
       }
       return;
     }
     localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
     await syncLifeConsumablesWithCloud({ silent: true });
+    await syncNotionLifeTags({ automatic: true });
     const ok = await backupWardrobeToCloud({ silent: true, safetyChecked: true });
     if (!ok) throw new Error('衣櫥資料上傳失敗');
     cloudLastFingerprint = await cloudSyncFingerprint(state);
@@ -6461,7 +6510,7 @@ async function syncEverythingToCloud() {
     localStorage.setItem(CLOUD_SYNC_LAST_AT_KEY, String(Date.now()));
     localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
     setCloudSyncStatus('synced');
-    toast('生活紀錄與衣櫥資料已同步至雲端');
+    toast('生活紀錄、Notion 與衣櫥資料已同步至雲端');
   } catch (err) {
     localStorage.setItem(CLOUD_SYNC_PENDING_KEY, '1');
     setCloudSyncStatus(navigator.onLine ? 'error' : 'offline');
@@ -6793,46 +6842,61 @@ async function backupWardrobeToCloud(options = {}) {
   }
 }
 
-async function restoreWardrobeFromCloud() {
-  openConfirm(
-    '從雲端還原',
-    '確定要從 Cloudflare 雲端還原所有衣櫥資料與生活設定嗎？目前的本地資料將被雲端版本覆蓋。',
-    async () => {
-      toast('正在自 Cloudflare 下載雲端狀態...');
-      try {
-        const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`);
+async function restoreWardrobeFromCloud(options = {}) {
+  const executeRestore = async (cloudState) => {
+    toast('正在自雲端下載完整資料...');
+    try {
+      if (!cloudState) {
+        const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, { cache: 'no-store' });
         if (!res.ok) throw new Error('無法讀取雲端狀態');
-        const cloudState = await res.json();
-        if (!cloudState || !Array.isArray(cloudState.items)) throw new Error('雲端尚無備份資料');
-
-        cloudState.items.forEach(it => {
-          if (it.image && it.image.startsWith('/api/image/')) {
-            it.image = `${CLOUDFLARE_WORKER_URL}${it.image}`;
-          }
-          if (it.imageBack && it.imageBack.startsWith('/api/image/')) {
-            it.imageBack = `${CLOUDFLARE_WORKER_URL}${it.imageBack}`;
-          }
-        });
-
-        Object.keys(state).forEach(k => delete state[k]);
-        Object.assign(state, defaultState(), cloudState);
-        normalizeLoadedState();
-        saveState();
-        renderAll();
-        cloudLastFingerprint = await cloudSyncFingerprint(state);
-        localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, cloudLastFingerprint);
-        localStorage.setItem(CLOUD_SYNC_LAST_AT_KEY, String(Date.now()));
-        localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
-        localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
-        setCloudSyncStatus('synced');
-        toast('雲端還原完成！');
-        closeModal();
-      } catch (err) {
-        console.error('雲端還原失敗:', err);
-        toast('還原失敗：' + err.message);
+        cloudState = await res.json();
       }
+      if (!cloudState || !Array.isArray(cloudState.items)) throw new Error('雲端尚無備份資料');
+
+      cloudState.items.forEach(it => {
+        if (it.image && it.image.startsWith('/api/image/')) {
+          it.image = `${CLOUDFLARE_WORKER_URL}${it.image}`;
+        }
+        if (it.imageBack && it.imageBack.startsWith('/api/image/')) {
+          it.imageBack = `${CLOUDFLARE_WORKER_URL}${it.imageBack}`;
+        }
+      });
+
+      Object.keys(state).forEach(k => delete state[k]);
+      Object.assign(state, defaultState(), cloudState);
+      normalizeLoadedState();
+      saveState();
+      renderAll();
+      cloudLastFingerprint = await cloudSyncFingerprint(state);
+      localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, cloudLastFingerprint);
+      localStorage.setItem(CLOUD_SYNC_LAST_AT_KEY, String(Date.now()));
+      localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
+      localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
+      setCloudSyncStatus('synced');
+      toast('雲端資料已成功下載並還原！');
+      closeModal();
+    } catch (err) {
+      console.error('雲端還原失敗:', err);
+      toast('還原失敗：' + err.message);
     }
-  );
+  };
+
+  if (options && options.confirmed) {
+    await executeRestore(options.remoteState);
+  } else {
+    openConfirm(
+      '從雲端還原',
+      '確定要從 Cloudflare 雲端下載並還原所有衣櫥資料與生活設定嗎？目前的本地資料將被雲端版本覆蓋。',
+      [
+        { label: '取消', kind: 'secondary' },
+        {
+          label: '確認下載還原',
+          kind: 'primary',
+          onClick: () => executeRestore(options?.remoteState)
+        }
+      ]
+    );
+  }
 }
 
 /* ============================================================
@@ -7165,7 +7229,7 @@ function wireEvents() {
     e.target.value = '';
   });
   document.getElementById('btnSyncLifeConsumables')?.addEventListener('click', syncEverythingToCloud);
-  document.getElementById('btnSyncNotionLife')?.addEventListener('click', () => syncNotionLifeTags());
+  document.getElementById('btnDownloadFromCloud')?.addEventListener('click', () => restoreWardrobeFromCloud());
   document.getElementById('btnCloudBackup')?.addEventListener('click', backupWardrobeToCloud);
 
   // wardrobe: sort + filter + search + select mode

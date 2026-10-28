@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261028_113">
+<link rel="stylesheet" href="styles.css?v=20261028_114">
 </head>
 <body>
 
@@ -288,19 +288,15 @@
 
     <!-- ---- More (Hairstyle & consumables live here) ---- -->
     <section class="view" id="view-more">
-      <!-- 髮型記錄 -->
-      <div class="more-section-block" id="haircutBlock">
+      <!-- 生活耗材 -->
+      <div class="more-section-block" id="consumablesBlock">
         <div class="more-section-header">
           <div>
-            <p class="section-title" style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-inline" data-icon="scissors" style="width:18px;height:18px;"></span>髮型記錄</p>
-            <p class="section-intro">記錄造型照片、修剪週期與設計師備忘</p>
+            <p class="section-title">沒有每次洗</p>
+            <p class="section-intro">非每次洗衣都要清潔的用品與更換週期</p>
           </div>
-          <button type="button" class="btn-primary-sm" id="btnOpenAddHaircut">
-            <span class="btn-icon" data-icon="plus"></span><span>新增髮型</span>
-          </button>
         </div>
-        <div class="haircut-cycle-summary" id="haircutCycleSummary"></div>
-        <div class="haircut-gallery-grid" id="haircutGalleryGrid"></div>
+        <div class="consumable-grid" id="consumableGrid"></div>
       </div>
 
       <hr class="more-section-divider">
@@ -325,16 +321,19 @@
 
       <hr class="more-section-divider">
 
-      <!-- 生活耗材 -->
-      <div class="more-section-block" id="consumablesBlock">
+      <!-- 髮型記錄 -->
+      <div class="more-section-block" id="haircutBlock">
         <div class="more-section-header">
           <div>
-            <p class="section-title">沒有每次洗</p>
-            <p class="section-intro">非每次洗衣都要清潔的用品與更換週期</p>
+            <p class="section-title" style="display:inline-flex;align-items:center;gap:6px;"><span class="icon-inline" data-icon="scissors" style="width:18px;height:18px;"></span>髮型記錄</p>
+            <p class="section-intro">記錄造型照片、修剪週期與設計師備忘</p>
           </div>
-
+          <button type="button" class="btn-primary-sm" id="btnOpenAddHaircut">
+            <span class="btn-icon" data-icon="plus"></span><span>新增髮型</span>
+          </button>
         </div>
-        <div class="consumable-grid" id="consumableGrid"></div>
+        <div class="haircut-cycle-summary" id="haircutCycleSummary"></div>
+        <div class="haircut-gallery-grid" id="haircutGalleryGrid"></div>
       </div>
     </section>
 
@@ -640,26 +639,25 @@
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span id="cloudSyncLight" aria-label="雲端同步狀態" style="width:10px;height:10px;flex:0 0 10px;border-radius:50%;background:#9ca3af;box-shadow:0 0 0 3px rgba(156,163,175,.14);"></span>
           <div style="min-width:0;">
-            <div id="cloudSyncLabel" style="font-size:13px;font-weight:650;">雲端同步待命</div>
-            <div id="cloudSyncDetail" style="font-size:11px;color:var(--color-ink-soft);margin-top:3px;">有變更時自動同步</div>
+            <div id="cloudSyncLabel" style="font-size:13px;font-weight:650;">雲端與 Notion 同步待命</div>
+            <div id="cloudSyncDetail" style="font-size:11px;color:var(--color-ink-soft);margin-top:3px;">有變更時自動同步完整衣櫥與生活紀錄</div>
           </div>
         </div>
-        <button type="button" class="btn-primary-sm" id="btnSyncLifeConsumables" style="flex:0 0 auto;white-space:nowrap;">
-          <svg id="iconSyncLifeSpin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
-            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-            <path d="M3 3v5h5"/>
-            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
-            <path d="M16 21h5v-5"/>
-          </svg>
-          <span>立即同步</span>
-        </button>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;margin:0 0 14px;border:1px solid var(--color-line);border-radius:14px;">
-        <div style="min-width:0;">
-          <div style="font-size:13px;font-weight:650;">Notion 生活標籤同步</div>
-          <div style="font-size:11px;color:var(--color-ink-soft);margin-top:3px;">開啟 App 或手動按鈕時執行，不再定時掃描</div>
+        <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto;">
+          <button type="button" class="btn-secondary" id="btnDownloadFromCloud" style="white-space:nowrap;padding:6px 10px;font-size:12px;height:32px;display:inline-flex;align-items:center;gap:4px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>
+            <span>下載還原</span>
+          </button>
+          <button type="button" class="btn-primary-sm" id="btnSyncLifeConsumables" style="white-space:nowrap;height:32px;display:inline-flex;align-items:center;gap:4px;">
+            <svg id="iconSyncLifeSpin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+              <path d="M16 21h5v-5"/>
+            </svg>
+            <span>立即同步</span>
+          </button>
         </div>
-        <button type="button" class="btn-secondary" id="btnSyncNotionLife" style="flex:0 0 auto;white-space:nowrap;">同步 Notion</button>
       </div>
       <div class="settings-profile-card">
         <label class="field settings-nickname-field">暱稱
@@ -1111,6 +1109,7 @@
       </div>
     </div>
     <div class="detail-stats" id="laundryStats"></div>
+    <div id="laundryPinnedConsumables"></div>
     <div class="item-grid laundry-overview-grid" id="laundryOverviewGrid"></div>
     <div class="laundry-consumable-list" id="laundryConsumableGrid"></div>
     <p class="empty-hint" id="laundryOverviewEmpty" hidden>洗衣籃目前是空的</p>
@@ -1593,7 +1592,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v111', K='wm_seen_version', seen=null;
+  var V='v114', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1603,7 +1602,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261028_113"></script>
-<script src="app.js?v=20261028_113"></script>
+<script src="seed-items.js?v=20261028_114"></script>
+<script src="app.js?v=20261028_114"></script>
 </body>
 </html>

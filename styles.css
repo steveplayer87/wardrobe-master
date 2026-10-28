@@ -438,9 +438,8 @@ svg { width: 100%; height: 100%; display: block; }
   border-radius: 10px;
   background: var(--color-surface);
   border: none;
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-  gap: 2px;
-  padding: 3px 2px 4px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  padding: 0;
   overflow: hidden;
   position: relative;
 }
@@ -1057,25 +1056,49 @@ img.notif-thumb { padding: 0; background-color: transparent; }
 .figure-slot.has-photo .figure-thumb { background-color: transparent !important; }
 .figure-slot.is-transparent-slot { display: none !important; }
 .detail-photo { background-color: var(--color-surface-2); background-repeat: no-repeat; background-size: contain; }
-.cal-thumb { background-repeat: no-repeat; background-size: contain; }
-.cal-thumbs { gap: 0; width: 84%; align-items: center; }
+.cal-thumb { background-repeat: no-repeat; background-size: contain; align-self: center; margin-left: auto; margin-right: auto; }
+.cal-thumbs {
+  width: 62%;
+  margin: 15px auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+  pointer-events: none;
+}
 .cal-thumb-top {
-  aspect-ratio: var(--outfit-top-ratio, 1.08);
-  margin-bottom: -6px !important;
+  width: 100%;
+  height: 23px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   z-index: 2;
   position: relative;
+  margin: 0 auto;
+}
+.cal-thumb-top .cal-thumb-img {
+  object-position: center bottom !important;
 }
 .cal-thumb-bottom {
   width: 82%;
-  aspect-ratio: var(--outfit-bottom-ratio, 0.78);
-  margin-top: 0 !important;
+  height: 24px;
+  margin-top: -2px !important;
   z-index: 1;
   position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+.cal-thumb-bottom .cal-thumb-img {
+  object-position: center top !important;
 }
 .cal-thumb-bottom.is-shorts {
   width: 78% !important;
-  aspect-ratio: var(--outfit-shorts-ratio, 1.15) !important;
-  margin-top: -1px !important;
+  height: 14px !important;
+  margin-top: -2px !important;
 }
 .cal-dot-laundry { background: var(--color-denim); }
 .cal-dot-towel { background: var(--color-sage); }
@@ -4967,9 +4990,8 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 
 
 /* Calendar images: stable box and deferred decoding to reduce layout flashes. */
-.cal-thumb-img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
-.cal-thumb-bottom.is-shorts .cal-thumb-img { object-position: center top; }
-.cal-thumb { align-self: flex-start; }
+.cal-thumb-img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.cal-thumb { align-self: center; margin-left: auto; margin-right: auto; }
 
 /* Align the home overflow control to the glass board's bottom edge. */
 #app.is-home-view .figure-link-row { position: relative !important; inset: auto !important; margin: -42px 0 0 auto !important; height: 42px; padding-right: 6px; display: flex; justify-content: flex-end; align-items: flex-end; }
@@ -4979,14 +5001,9 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 #modal-display-figure .display-sim-stage-wrap { gap: 8px; }
 #modal-display-figure .display-sim-controls { padding: 12px; }
 
-/* In More, swap the first and last feature blocks without changing their JS IDs. */
+/* More view block arrangement */
 #view-more { display: none; flex-direction: column; }
 #view-more.is-active { display: flex; }
-#view-more > .more-section-block:not(#skincareBlock):not(#consumablesBlock) { order: 3; }
-#view-more > #skincareBlock { order: 2; }
-#view-more > #consumablesBlock { order: 1; }
-#view-more > hr:nth-of-type(1) { order: 2.5; }
-#view-more > hr:nth-of-type(2) { order: 1.5; }
 
 /* Edit a garment inside its existing detail drawer; no second sheet. */
 #modal-item.is-editing-item { overflow-y: auto; }
