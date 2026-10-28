@@ -299,8 +299,9 @@ function isShortsItem(item) {
 
 /* ---------------------------- Utilities ---------------------------- */
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
-function todayStr() {
-  const d = new Date();
+function todayStr(now = new Date()) {
+  // 方案 B：以凌晨 02:00 作為作息換日切分點（凌晨 2 點前均視為前一天生活日）
+  const d = new Date(now.getTime() - 2 * 3600000);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function daysBetween(a, b) {
@@ -3066,6 +3067,24 @@ function openDayDetail(dateStr, entry) {
     state.laundry.history = Array.isArray(state.laundry.history) ? state.laundry.history : [];
     if (laundryToggle.checked) {
       if (!laundryHistoryDates().has(dateStr)) recordLaundryEvent(dateStr);
+      const dirtyCount = state.items.filter(item => item.status === 'dirty' && !isPreCutoffDirtyToday(item)).length;
+      if (dirtyCount > 0) {
+        openConfirm(
+          '一併洗好洗衣籃衣物？',
+          `偵測到目前洗衣籃內有 ${dirtyCount} 件衣物等待清洗。要一併將這批衣物標記為於 ${formatDayWithWeekday(dateStr)} 洗好並清空洗衣籃嗎？`,
+          [
+            { label: '僅記錄日期', kind: 'secondary', onClick: () => {
+              syncLatestLaundryDate();
+              saveState({ action: `補登 ${formatDayWithWeekday(dateStr)} 洗衣紀錄` });
+              renderHistory();
+              renderHome();
+            }},
+            { label: '一併洗好並清空', kind: 'primary', onClick: () => {
+              completeLaundryDone(dateStr);
+            }}
+          ]
+        );
+      }
     } else {
       state.laundry.history = state.laundry.history.filter(entry => (typeof entry === 'string' ? entry : entry?.date) !== dateStr);
     }
