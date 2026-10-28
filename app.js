@@ -7229,7 +7229,6 @@ function wireEvents() {
     e.target.value = '';
   });
   document.getElementById('btnSyncLifeConsumables')?.addEventListener('click', syncEverythingToCloud);
-  document.getElementById('btnDownloadFromCloud')?.addEventListener('click', () => restoreWardrobeFromCloud());
   document.getElementById('btnCloudBackup')?.addEventListener('click', backupWardrobeToCloud);
 
   // wardrobe: sort + filter + search + select mode
