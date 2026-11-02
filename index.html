@@ -131,6 +131,12 @@
             <div class="cal-grid cal-grid-next" id="calGridNext"></div>
           </div>
         </div>
+        <div class="cal-legend">
+          <span class="cal-legend-item"><span class="cal-event-dot cal-dot-laundry"></span>洗衣</span>
+          <span class="cal-legend-item"><span class="cal-event-dot cal-dot-towel"></span>浴巾</span>
+          <span class="cal-legend-item"><span class="cal-event-dot cal-dot-laundry-boost"></span>加強洗</span>
+          <span class="cal-legend-item"><span class="cal-event-dot cal-dot-skincare"></span>膚況</span>
+        </div>
 
         <p class="stats-heading">本月小統計</p>
         <div class="cal-stats" id="calStats"></div>
@@ -1023,7 +1029,9 @@
         <input type="date" id="backfillDate">
       </label>
       <div class="day-detail-body" id="backfillRows" style="margin-top:12px"></div>
-      <button class="btn-primary" id="btnSaveBackfill" style="margin-top:14px">儲存這天的穿搭</button>
+      <div class="backfill-sticky-footer">
+        <button class="btn-primary" id="btnSaveBackfill">儲存這天的穿搭</button>
+      </div>
     </div>
 
     <!-- 保養補登面板 -->
@@ -1079,7 +1087,9 @@
           <textarea id="fieldSkincareBackfillNotes" rows="3" placeholder="例如：早晚薄擦、切勿用手擠壓、多喝水早點睡…"></textarea>
         </label>
 
-        <button type="submit" class="btn-primary" id="btnSkincareBackfillSubmit" style="margin-top:14px">儲存保養紀錄</button>
+        <div class="backfill-sticky-footer">
+          <button type="submit" class="btn-primary" id="btnSkincareBackfillSubmit">儲存保養紀錄</button>
+        </div>
       </form>
     </div>
   </div>

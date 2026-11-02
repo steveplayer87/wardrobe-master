@@ -6362,6 +6362,15 @@ async function checkCloudSyncSafety(localState = state) {
     if (!response.ok) throw new Error(`Cloud state HTTP ${response.status}`);
     const remote = await response.json();
     const local = localState || {};
+    const acceptedForceAt = Number(localStorage.getItem('wm_cloud_accepted_force_at_v1') || local.forceUpdateAt || 0);
+    if (remote.forceUpdateAt && Number(remote.forceUpdateAt) > acceptedForceAt) {
+      return {
+        safe: false,
+        forced: true,
+        remote,
+        message: '偵測到雲端有管理者強制更新。為保留雲端最新變更，已暫停本地上傳。'
+      };
+    }
     const issues = [];
     const localItems = Array.isArray(local.items) ? local.items : [];
     const remoteItems = Array.isArray(remote.items) ? remote.items : [];
@@ -6387,7 +6396,7 @@ async function checkCloudSyncSafety(localState = state) {
 
 async function cloudSyncFingerprint(source = state) {
   const copy = JSON.parse(JSON.stringify(source || {}));
-  delete copy.updatedAt; delete copy.syncMeta; delete copy.geminiApiKey;
+  delete copy.updatedAt; delete copy.syncMeta; delete copy.geminiApiKey; delete copy.forceUpdateAt; delete copy.forceUpdateReason;
   if (copy.profile?.weather && typeof copy.profile.weather === 'object') {
     delete copy.profile.weather.current; delete copy.profile.weather.updatedAt;
   }
@@ -6481,7 +6490,22 @@ async function syncEverythingToCloud() {
     const safety = await checkCloudSyncSafety(state);
     if (!safety.safe) {
       if (safety.offline) setCloudSyncStatus('offline');
-      else {
+      else if (safety.forced) {
+        localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
+        setCloudSyncStatus('blocked', safety.message);
+        openConfirm(
+          '套用雲端強制更新',
+          `偵測到雲端有較高層級的強制更新紀錄（例如管理者資料校正）。<br><br>為避免本地舊資料覆蓋，已暫停上傳。<br>是否立即下載並套用雲端最新資料？`,
+          [
+            { label: '先不要', kind: 'secondary' },
+            {
+              label: '下載並套用',
+              kind: 'primary',
+              onClick: () => restoreWardrobeFromCloud({ confirmed: true, remoteState: safety.remote })
+            }
+          ]
+        );
+      } else {
         localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
         setCloudSyncStatus('blocked', safety.message);
         const remoteCount = safety.remote?.items?.length || 0;
@@ -6870,6 +6894,9 @@ async function restoreWardrobeFromCloud(options = {}) {
       cloudLastFingerprint = await cloudSyncFingerprint(state);
       localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, cloudLastFingerprint);
       localStorage.setItem(CLOUD_SYNC_LAST_AT_KEY, String(Date.now()));
+      if (cloudState.forceUpdateAt) {
+        localStorage.setItem('wm_cloud_accepted_force_at_v1', String(cloudState.forceUpdateAt));
+      }
       localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
       localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
       setCloudSyncStatus('synced');
