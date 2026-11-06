@@ -2637,7 +2637,7 @@ function buildItemCard(item, opts) {
 
   card.innerHTML = `
     <div class="item-photo">${itemPhotoMarkup(item)}</div>
-    ${uiSelectMode ? `<span class="item-card-check"></span>` : (item.status !== 'retired' ? `<span class="item-status-dot ${statusClass}"></span>` : '')}
+    ${(uiSelectMode || (opts && opts.isLaundrySelectMode)) ? `<span class="item-card-check"></span>` : (item.status !== 'retired' ? `<span class="item-status-dot ${statusClass}"></span>` : '')}
     ${restingBadge}
     <div class="item-info">
       ${infoHtml}
@@ -2677,7 +2677,8 @@ function buildItemCard(item, opts) {
   card.addEventListener('click', () => {
     if (longPressFired) { longPressFired = false; return; }
     if (opts.onClick) { opts.onClick(item); return; }
-    if (uiSelectMode) toggleItemSelection(item.id, card);
+    if (opts.isLaundrySelectMode) toggleLaundryItemSelection(item.id, card);
+    else if (uiSelectMode) toggleItemSelection(item.id, card);
     else {
       if (opts.returnTo) modalReturnTo = opts.returnTo;
       else if (opts.laundryMode) modalReturnTo = 'modal-laundry';
@@ -5183,6 +5184,76 @@ function openConfirm(title, body, actions) {
   });
   openModal('modal-confirm');
 }
+let uiLaundrySelectMode = false;
+let uiLaundrySelectedIds = new Set();
+
+function updateLaundrySelectUi() {
+  const count = uiLaundrySelectedIds.size;
+  const countEl = document.getElementById('laundrySelectCount');
+  if (countEl) countEl.textContent = `已選 ${count} 件`;
+  const btnAll = document.getElementById('btnLaundrySelectAll');
+  if (btnAll) {
+    const dirtyItems = state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i));
+    const allSelected = dirtyItems.length > 0 && dirtyItems.every(i => uiLaundrySelectedIds.has(i.id));
+    btnAll.textContent = allSelected ? '取消全選' : '全選';
+  }
+  const btnCustomWash = document.getElementById('btnLaundryCustomDateWash');
+  if (btnCustomWash) {
+    btnCustomWash.disabled = count === 0;
+    btnCustomWash.textContent = count > 0 ? `指定日期洗衣 (${count})` : '指定日期洗衣';
+  }
+}
+
+function setLaundrySelectMode(on) {
+  uiLaundrySelectMode = on;
+  uiLaundrySelectedIds.clear();
+  const btn = document.getElementById('btnLaundrySelectMode');
+  if (btn) {
+    btn.classList.toggle('is-active', on);
+    btn.textContent = on ? '取消' : '選取';
+  }
+  const barTop = document.getElementById('laundrySelectBarTop');
+  if (barTop) barTop.classList.toggle('is-hidden', !on);
+  const stdActions = document.getElementById('laundryStandardActions');
+  if (stdActions) stdActions.classList.toggle('is-hidden', on);
+  const selActions = document.getElementById('laundrySelectActions');
+  if (selActions) selActions.classList.toggle('is-hidden', !on);
+
+  // Toggle selection chrome in-place so cards stay smooth
+  document.querySelectorAll('#laundryOverviewGrid .item-card[data-id]').forEach(card => {
+    card.classList.toggle('is-selectable', on);
+    card.classList.remove('is-selected');
+    const oldCheck = card.querySelector('.item-card-check');
+    const oldStatus = card.querySelector('.item-status-dot');
+    if (on) {
+      oldStatus?.remove();
+      if (!oldCheck) {
+        const check = document.createElement('span');
+        check.className = 'item-card-check';
+        card.insertBefore(check, card.querySelector('.item-resting-badge') || card.querySelector('.item-info'));
+      }
+    } else {
+      oldCheck?.remove();
+      if (!oldStatus) {
+        const status = document.createElement('span');
+        status.className = 'item-status-dot is-dirty';
+        card.insertBefore(status, card.querySelector('.item-resting-badge') || card.querySelector('.item-info'));
+      }
+    }
+  });
+
+  updateLaundrySelectUi();
+}
+
+function toggleLaundryItemSelection(id, cardEl) {
+  if (uiLaundrySelectedIds.has(id)) uiLaundrySelectedIds.delete(id);
+  else uiLaundrySelectedIds.add(id);
+  const isSelected = uiLaundrySelectedIds.has(id);
+  const el = cardEl || document.querySelector(`#laundryOverviewGrid .item-card[data-id="${id}"]`);
+  if (el) el.classList.toggle('is-selected', isSelected);
+  updateLaundrySelectUi();
+}
+
 function renderLaundryOverview() {
   const grid = document.getElementById('laundryOverviewGrid');
   const empty = document.getElementById('laundryOverviewEmpty');
@@ -5195,7 +5266,7 @@ function renderLaundryOverview() {
 
   if (pinnedWrap) {
     pinnedWrap.innerHTML = '';
-    if (pendingConsumables.length > 0) {
+    if (pendingConsumables.length > 0 && !uiLaundrySelectMode) {
       pinnedWrap.hidden = false;
       pendingConsumables.forEach(c => {
         const card = document.createElement('div');
@@ -5222,7 +5293,120 @@ function renderLaundryOverview() {
   const consumableGrid = document.getElementById('laundryConsumableGrid');
   if (consumableGrid) consumableGrid.innerHTML = '';
 
-  items.forEach(item => grid.appendChild(buildItemCard(item, { laundryMode: true, returnTo: 'modal-laundry' })));
+  items.forEach(item => {
+    const card = buildItemCard(item, {
+      laundryMode: true,
+      isLaundrySelectMode: uiLaundrySelectMode,
+      returnTo: 'modal-laundry'
+    });
+    if (uiLaundrySelectMode) {
+      card.classList.add('is-selectable');
+      if (uiLaundrySelectedIds.has(item.id)) card.classList.add('is-selected');
+    }
+    grid.appendChild(card);
+  });
+}
+
+function openLaundrySelectedDateChooser() {
+  const selectedItems = Array.from(uiLaundrySelectedIds).map(id => findItem(id)).filter(Boolean);
+  if (!selectedItems.length) {
+    toast('請先在洗衣籃勾選要清洗的單品');
+    return;
+  }
+  const defaultDate = addDays(todayStr(), -1);
+  openConfirm(
+    '選擇清洗日期',
+    `<p style="margin-bottom:10px;font-size:13px;color:var(--color-ink-soft);line-height:1.4;">已選取 ${selectedItems.length} 件單品，請選擇這批衣物實際清洗的日期：</p>
+     <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="laundryQuickDates">
+       <button type="button" class="chip" data-days="0">今天</button>
+       <button type="button" class="chip is-active" data-days="1">昨天</button>
+       <button type="button" class="chip" data-days="2">前天</button>
+       <button type="button" class="chip" data-days="3">大前天 (${Number(addDays(todayStr(), -3).slice(8))}號)</button>
+     </div>
+     <input type="date" id="laundryCustomDateInput" max="${todayStr()}" value="${defaultDate}" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:14px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface-2);color:var(--color-ink);">`,
+    [
+      { label: '先不要', kind: 'secondary', returnTo: 'modal-laundry' },
+      { label: '下一步：確認單品', kind: 'primary', onClick: () => {
+        const input = document.getElementById('laundryCustomDateInput');
+        const chosenDate = input?.value || defaultDate;
+        confirmWashSelectedItems(selectedItems, chosenDate);
+      }}
+    ]
+  );
+  setTimeout(() => {
+    const chips = document.querySelectorAll('#laundryQuickDates .chip');
+    const input = document.getElementById('laundryCustomDateInput');
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chips.forEach(c => c.classList.remove('is-active'));
+        chip.classList.add('is-active');
+        const days = Number(chip.dataset.days);
+        const d = addDays(todayStr(), -days);
+        if (input) input.value = d;
+      });
+    });
+    if (input) {
+      input.addEventListener('change', () => {
+        chips.forEach(c => {
+          const days = Number(c.dataset.days);
+          c.classList.toggle('is-active', addDays(todayStr(), -days) === input.value);
+        });
+      });
+    }
+  }, 60);
+}
+
+function confirmWashSelectedItems(selectedItems, dateStr) {
+  const previewHtml = selectedItems.map(item => `
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;background:var(--color-surface-2);margin-bottom:6px;">
+      <span style="width:36px;height:36px;flex:0 0 36px;border-radius:8px;overflow:hidden;background:var(--color-surface);display:flex;align-items:center;justify-content:center;">
+        ${item.image ? `<img src="${item.image}" style="width:100%;height:100%;object-fit:cover;">` : categoryIcon(item.category)}
+      </span>
+      <div style="min-width:0;flex:1;text-align:left;">
+        <div style="font-size:13px;font-weight:700;color:var(--color-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.name)}</div>
+        <div style="font-size:11px;color:var(--color-ink-muted);">${categoryLabel(item.category)}${item.brand ? '・' + escapeHtml(item.brand) : ''}</div>
+      </div>
+    </div>
+  `).join('');
+
+  openConfirm(
+    '確認清洗紀錄',
+    `<p style="margin-bottom:12px;font-size:13px;color:var(--color-ink);line-height:1.45;">
+      確定將以下 <b>${selectedItems.length} 件</b> 單品記錄於 <b>${formatDayWithWeekday(dateStr)}</b> 洗好了嗎？
+    </p>
+    <div style="max-height:220px;overflow-y:auto;margin-bottom:8px;border:1px solid var(--color-line);border-radius:12px;padding:8px;">
+      ${previewHtml}
+    </div>
+    <p style="font-size:11px;color:var(--color-ink-soft);margin:0;">
+      洗衣籃內未選取的其他衣物將繼續保留在洗衣籃中。
+    </p>`,
+    [
+      { label: '取消', kind: 'secondary', returnTo: 'modal-laundry' },
+      { label: '確認洗好', kind: 'primary', onClick: () => {
+        selectedItems.forEach(item => recordItemWash(item, dateStr));
+        recordLaundryEvent(dateStr, {
+          boostedItemIds: selectedItems.filter(i => i.extraWash).map(i => i.id)
+        });
+        if (!state.laundry.lastWashDate || dateStr >= state.laundry.lastWashDate) {
+          state.laundry.lastWashDate = dateStr;
+        }
+        state.laundry.snoozedUntil = null;
+        syncLatestLaundryDate();
+        saveState();
+        renderAll();
+        syncLaundryDiaryTag(dateStr, true).then(ok => {
+          if (ok) toast(`Notion 已同步 ${formatDayWithWeekday(dateStr)} 洗衣標籤`);
+        });
+        setLaundrySelectMode(false);
+        toast(`已將 ${selectedItems.length} 件單品記錄於 ${formatDayWithWeekday(dateStr)} 洗好`);
+        if (state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i)).length === 0) {
+          closeModal();
+        } else {
+          openLaundryModal();
+        }
+      }}
+    ]
+  );
 }
 
 function openLaundryDateChooser() {
@@ -5347,6 +5531,9 @@ function wireLongPressLaundryDone() {
 }
 
 function openLaundryModal() {
+  setLaundrySelectMode(false);
+  const grid = document.getElementById('laundryOverviewGrid');
+  if (grid) grid.innerHTML = '';
   renderLaundryOverview();
   const last = state.laundry.lastWashDate;
   const daysSince = Math.max(0, daysBetween(last, todayStr()));
@@ -8119,6 +8306,17 @@ function wireEvents() {
   document.getElementById('card-rack').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRackOverview(); } });
   wireLongPressLaundryDone();
   document.getElementById('btnLaundryPostpone').addEventListener('click', () => { postponeLaundry(); closeModal(); });
+  document.getElementById('btnLaundrySelectMode')?.addEventListener('click', () => setLaundrySelectMode(!uiLaundrySelectMode));
+  document.getElementById('btnLaundryCancelSelect')?.addEventListener('click', () => setLaundrySelectMode(false));
+  document.getElementById('btnLaundrySelectAll')?.addEventListener('click', () => {
+    const dirtyItems = state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i));
+    const allSelected = dirtyItems.length > 0 && dirtyItems.every(i => uiLaundrySelectedIds.has(i.id));
+    if (allSelected) uiLaundrySelectedIds.clear();
+    else dirtyItems.forEach(i => uiLaundrySelectedIds.add(i.id));
+    updateLaundrySelectUi();
+    renderLaundryOverview();
+  });
+  document.getElementById('btnLaundryCustomDateWash')?.addEventListener('click', openLaundrySelectedDateChooser);
 
   // calendar: swipe between months + jump-to-date + tap title to return to today
   wireCalendarSwipe();

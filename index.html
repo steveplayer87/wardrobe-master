@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261028_115">
+<link rel="stylesheet" href="styles.css?v=20261106_116">
 </head>
 <body>
 
@@ -1106,20 +1106,29 @@
     <div class="modal-head">
       <h2>洗衣日資訊</h2>
       <div class="modal-head-actions">
+        <button type="button" class="select-mode-btn" id="btnLaundrySelectMode">選取</button>
         <button type="button" class="icon-btn" id="btnLaundryHistoryInfo" aria-label="歷史洗衣紀錄" title="歷史洗衣紀錄" style="width:34px;height:34px;box-shadow:none;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         </button>
         <button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </div>
     </div>
+    <div class="select-bar-top is-hidden" id="laundrySelectBarTop" style="margin:8px 16px 0;padding:6px 12px;background:var(--color-surface);border:1px solid var(--color-line);border-radius:12px;">
+      <p id="laundrySelectCount" style="margin:0;font-size:13px;font-weight:800;color:var(--color-ink);">已選 0 件</p>
+      <button type="button" class="btn-select-all" id="btnLaundrySelectAll">全選</button>
+    </div>
     <div class="detail-stats" id="laundryStats"></div>
     <div id="laundryPinnedConsumables"></div>
     <div class="item-grid laundry-overview-grid" id="laundryOverviewGrid"></div>
     <div class="laundry-consumable-list" id="laundryConsumableGrid"></div>
     <p class="empty-hint" id="laundryOverviewEmpty" hidden>洗衣籃目前是空的</p>
-    <div class="settings-actions">
+    <div class="settings-actions" id="laundryStandardActions">
       <button class="btn-secondary" id="btnLaundryPostpone">延後一天洗</button>
       <button class="btn-primary" id="btnLaundryDone" style="margin-top:0">洗好了</button>
+    </div>
+    <div class="settings-actions is-hidden" id="laundrySelectActions">
+      <button class="btn-secondary" id="btnLaundryCancelSelect">取消</button>
+      <button class="btn-primary" id="btnLaundryCustomDateWash" style="margin-top:0" disabled>指定日期洗衣</button>
     </div>
   </div>
 
@@ -1596,7 +1605,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v115', K='wm_seen_version', seen=null;
+  var V='v116', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1606,7 +1615,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261028_115"></script>
-<script src="app.js?v=20261028_115"></script>
+<script src="seed-items.js?v=20261106_116"></script>
+<script src="app.js?v=20261106_116"></script>
 </body>
 </html>
