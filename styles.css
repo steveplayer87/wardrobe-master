@@ -5065,6 +5065,22 @@ input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 
 #modal-laundry .laundry-consumable-row { gap: 5px; border-radius: 20px; padding: 4px 9px 4px 4px; }
 #modal-laundry .laundry-consumable-row .rack-chip-thumb { width: 20px; height: 20px; border-radius: 50%; padding: 4px; }
 #modal-laundry .laundry-consumable-row .laundry-chip-status { font-size: 10px; }
+
+/* Sticky bottom actions bar in Laundry modal */
+#modal-laundry .settings-actions {
+  position: sticky;
+  bottom: calc(-24px - var(--safe-bottom));
+  margin: 16px -20px calc(-24px - var(--safe-bottom));
+  padding: 12px 20px calc(14px + var(--safe-bottom));
+  background: linear-gradient(180deg, rgba(245, 248, 249, 0) 0%, rgba(245, 248, 249, 0.95) 26%, var(--color-bg) 100%);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  z-index: 50;
+}
+#modal-laundry .settings-actions .btn-primary,
+#modal-laundry .settings-actions .btn-secondary {
+  box-shadow: 0 4px 14px rgba(28, 35, 51, 0.12);
+}
 /* Weather settings should composite independently, preventing unrelated wardrobe imagery flashing through during dismissal. */
 #modal-weather-settings { isolation: isolate; backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: translateZ(0); }
 #modal-weather-settings .weather-modal-content { background: var(--color-bg); }

@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261106_116">
+<link rel="stylesheet" href="styles.css?v=20261106_117">
 </head>
 <body>
 
@@ -1113,7 +1113,7 @@
         <button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </div>
     </div>
-    <div class="select-bar-top is-hidden" id="laundrySelectBarTop" style="margin:8px 16px 0;padding:6px 12px;background:var(--color-surface);border:1px solid var(--color-line);border-radius:12px;">
+    <div class="select-bar-top is-hidden" id="laundrySelectBarTop" style="margin:0 0 14px;padding:8px 12px;background:var(--color-surface);border:1px solid var(--color-line);border-radius:12px;">
       <p id="laundrySelectCount" style="margin:0;font-size:13px;font-weight:800;color:var(--color-ink);">已選 0 件</p>
       <button type="button" class="btn-select-all" id="btnLaundrySelectAll">全選</button>
     </div>
@@ -1605,7 +1605,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v116', K='wm_seen_version', seen=null;
+  var V='v117', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1615,7 +1615,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261106_116"></script>
-<script src="app.js?v=20261106_116"></script>
+<script src="seed-items.js?v=20261106_117"></script>
+<script src="app.js?v=20261106_117"></script>
 </body>
 </html>

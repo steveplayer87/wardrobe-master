@@ -5219,30 +5219,8 @@ function setLaundrySelectMode(on) {
   const selActions = document.getElementById('laundrySelectActions');
   if (selActions) selActions.classList.toggle('is-hidden', !on);
 
-  // Toggle selection chrome in-place so cards stay smooth
-  document.querySelectorAll('#laundryOverviewGrid .item-card[data-id]').forEach(card => {
-    card.classList.toggle('is-selectable', on);
-    card.classList.remove('is-selected');
-    const oldCheck = card.querySelector('.item-card-check');
-    const oldStatus = card.querySelector('.item-status-dot');
-    if (on) {
-      oldStatus?.remove();
-      if (!oldCheck) {
-        const check = document.createElement('span');
-        check.className = 'item-card-check';
-        card.insertBefore(check, card.querySelector('.item-resting-badge') || card.querySelector('.item-info'));
-      }
-    } else {
-      oldCheck?.remove();
-      if (!oldStatus) {
-        const status = document.createElement('span');
-        status.className = 'item-status-dot is-dirty';
-        card.insertBefore(status, card.querySelector('.item-resting-badge') || card.querySelector('.item-info'));
-      }
-    }
-  });
-
   updateLaundrySelectUi();
+  renderLaundryOverview();
 }
 
 function toggleLaundryItemSelection(id, cardEl) {
