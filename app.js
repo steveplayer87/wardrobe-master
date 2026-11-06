@@ -5300,8 +5300,12 @@ function openLaundrySelectedDateChooser() {
        <button type="button" class="chip is-active" data-days="1">昨天</button>
        <button type="button" class="chip" data-days="2">前天</button>
        <button type="button" class="chip" data-days="3">大前天 (${Number(addDays(todayStr(), -3).slice(8))}號)</button>
+       <button type="button" class="chip" data-days="custom" id="btnLaundryCustomDateChip">自訂日期</button>
      </div>
-     <input type="date" id="laundryCustomDateInput" max="${todayStr()}" value="${defaultDate}" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:14px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface-2);color:var(--color-ink);">`,
+     <div id="laundryCustomDateWrap" style="margin-top:4px;">
+       <label style="display:block;font-size:11.5px;color:var(--color-ink-muted);margin-bottom:5px;">清洗日期：</label>
+       <input type="date" id="laundryCustomDateInput" max="${todayStr()}" value="${defaultDate}" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:14px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface-2);color:var(--color-ink);">
+     </div>`,
     [
       { label: '先不要', kind: 'secondary', returnTo: 'modal-laundry' },
       { label: '下一步：確認單品', kind: 'primary', onClick: () => {
@@ -5314,21 +5318,38 @@ function openLaundrySelectedDateChooser() {
   setTimeout(() => {
     const chips = document.querySelectorAll('#laundryQuickDates .chip');
     const input = document.getElementById('laundryCustomDateInput');
+    const customChip = document.getElementById('btnLaundryCustomDateChip');
     chips.forEach(chip => {
       chip.addEventListener('click', () => {
         chips.forEach(c => c.classList.remove('is-active'));
         chip.classList.add('is-active');
-        const days = Number(chip.dataset.days);
-        const d = addDays(todayStr(), -days);
-        if (input) input.value = d;
+        if (chip.dataset.days === 'custom') {
+          if (input) {
+            input.focus();
+            if (typeof input.showPicker === 'function') {
+              try { input.showPicker(); } catch (_) {}
+            }
+          }
+        } else {
+          const days = Number(chip.dataset.days);
+          const d = addDays(todayStr(), -days);
+          if (input) input.value = d;
+        }
       });
     });
     if (input) {
       input.addEventListener('change', () => {
+        let matched = false;
         chips.forEach(c => {
+          if (c.dataset.days === 'custom') return;
           const days = Number(c.dataset.days);
-          c.classList.toggle('is-active', addDays(todayStr(), -days) === input.value);
+          const isMatch = addDays(todayStr(), -days) === input.value;
+          c.classList.toggle('is-active', isMatch);
+          if (isMatch) matched = true;
         });
+        if (customChip) {
+          customChip.classList.toggle('is-active', !matched);
+        }
       });
     }
   }, 60);
@@ -5397,8 +5418,12 @@ function openLaundryDateChooser() {
        <button type="button" class="chip" data-days="1">昨天</button>
        <button type="button" class="chip" data-days="2">前天</button>
        <button type="button" class="chip is-active" data-days="3">大前天 (${Number(defaultDate.slice(8))}號)</button>
+       <button type="button" class="chip" data-days="custom" id="btnConfirmCustomDateChip">自訂日期</button>
      </div>
-     <input type="date" id="customWashDateInput" max="${todayStr()}" value="${defaultDate}" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:14px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface-2);color:var(--color-ink);">`,
+     <div style="margin-top:4px;">
+       <label style="display:block;font-size:11.5px;color:var(--color-ink-muted);margin-bottom:5px;">清洗日期：</label>
+       <input type="date" id="customWashDateInput" max="${todayStr()}" value="${defaultDate}" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:14px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface-2);color:var(--color-ink);">
+     </div>`,
     [
       { label: '先不要', kind: 'secondary', returnTo: 'modal-laundry' },
       { label: '確認以此日期洗好', kind: 'primary', onClick: () => {
@@ -5411,21 +5436,38 @@ function openLaundryDateChooser() {
   setTimeout(() => {
     const chips = document.querySelectorAll('#confirmQuickDates .chip');
     const input = document.getElementById('customWashDateInput');
+    const customChip = document.getElementById('btnConfirmCustomDateChip');
     chips.forEach(chip => {
       chip.addEventListener('click', () => {
         chips.forEach(c => c.classList.remove('is-active'));
         chip.classList.add('is-active');
-        const days = Number(chip.dataset.days);
-        const d = addDays(todayStr(), -days);
-        if (input) input.value = d;
+        if (chip.dataset.days === 'custom') {
+          if (input) {
+            input.focus();
+            if (typeof input.showPicker === 'function') {
+              try { input.showPicker(); } catch (_) {}
+            }
+          }
+        } else {
+          const days = Number(chip.dataset.days);
+          const d = addDays(todayStr(), -days);
+          if (input) input.value = d;
+        }
       });
     });
     if (input) {
       input.addEventListener('change', () => {
+        let matched = false;
         chips.forEach(c => {
+          if (c.dataset.days === 'custom') return;
           const days = Number(c.dataset.days);
-          c.classList.toggle('is-active', addDays(todayStr(), -days) === input.value);
+          const isMatch = addDays(todayStr(), -days) === input.value;
+          c.classList.toggle('is-active', isMatch);
+          if (isMatch) matched = true;
         });
+        if (customChip) {
+          customChip.classList.toggle('is-active', !matched);
+        }
       });
     }
   }, 60);
