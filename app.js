@@ -5292,26 +5292,67 @@ function openLaundrySelectedDateChooser() {
     return;
   }
   const defaultDate = addDays(todayStr(), -1);
+
+  const previewHtml = selectedItems.map(item => `
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;background:var(--color-surface-2);margin-bottom:6px;">
+      <span style="width:36px;height:36px;flex:0 0 36px;border-radius:8px;overflow:hidden;background:var(--color-surface);display:flex;align-items:center;justify-content:center;">
+        ${item.image ? `<img src="${item.image}" style="width:100%;height:100%;object-fit:cover;">` : categoryIcon(item.category)}
+      </span>
+      <div style="min-width:0;flex:1;text-align:left;">
+        <div style="font-size:13px;font-weight:700;color:var(--color-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.name)}</div>
+        <div style="font-size:11px;color:var(--color-ink-muted);">${categoryLabel(item.category)}${item.brand ? '・' + escapeHtml(item.brand) : ''}</div>
+      </div>
+    </div>
+  `).join('');
+
   openConfirm(
-    '選擇清洗日期',
-    `<p style="margin-bottom:10px;font-size:13px;color:var(--color-ink-soft);line-height:1.4;">已選取 ${selectedItems.length} 件單品，請選擇這批衣物實際清洗的日期：</p>
-     <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="laundryQuickDates">
+    '指定日期洗衣',
+    `<p style="margin-bottom:8px;font-size:13px;color:var(--color-ink-soft);line-height:1.4;">
+       已選取 <b>${selectedItems.length} 件</b> 單品，請選擇實際清洗的日期：
+     </p>
+     <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;" id="laundryQuickDates">
        <button type="button" class="chip" data-days="0">今天</button>
        <button type="button" class="chip is-active" data-days="1">昨天</button>
        <button type="button" class="chip" data-days="2">前天</button>
        <button type="button" class="chip" data-days="3">大前天 (${Number(addDays(todayStr(), -3).slice(8))}號)</button>
        <button type="button" class="chip" data-days="custom" id="btnLaundryCustomDateChip">自訂日期</button>
      </div>
-     <div id="laundryCustomDateWrap" style="margin-top:4px;">
-       <label style="display:block;font-size:11.5px;color:var(--color-ink-muted);margin-bottom:5px;">清洗日期：</label>
-       <input type="date" id="laundryCustomDateInput" max="${todayStr()}" value="${defaultDate}" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:14px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface-2);color:var(--color-ink);">
-     </div>`,
+     <div id="laundryCustomDateWrap" style="margin-bottom:12px;">
+       <input type="date" id="laundryCustomDateInput" max="${todayStr()}" value="${defaultDate}" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:14px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface-2);color:var(--color-ink);">
+     </div>
+     <div style="font-size:12px;font-weight:700;color:var(--color-ink);margin-bottom:6px;">確認清洗單品清單：</div>
+     <div style="max-height:160px;overflow-y:auto;margin-bottom:8px;border:1px solid var(--color-line);border-radius:12px;padding:8px;">
+       ${previewHtml}
+     </div>
+     <p style="font-size:11px;color:var(--color-ink-soft);margin:0;">
+       未選取的其他衣物將繼續保留在洗衣籃中。
+     </p>`,
     [
-      { label: '先不要', kind: 'secondary', returnTo: 'modal-laundry' },
-      { label: '下一步：確認單品', kind: 'primary', onClick: () => {
+      { label: '取消', kind: 'secondary', returnTo: 'modal-laundry' },
+      { label: '確認洗好', kind: 'primary', onClick: () => {
         const input = document.getElementById('laundryCustomDateInput');
         const chosenDate = input?.value || defaultDate;
-        confirmWashSelectedItems(selectedItems, chosenDate);
+        selectedItems.forEach(item => recordItemWash(item, chosenDate));
+        recordLaundryEvent(chosenDate, {
+          boostedItemIds: selectedItems.filter(i => i.extraWash).map(i => i.id)
+        });
+        if (!state.laundry.lastWashDate || chosenDate >= state.laundry.lastWashDate) {
+          state.laundry.lastWashDate = chosenDate;
+        }
+        state.laundry.snoozedUntil = null;
+        syncLatestLaundryDate();
+        saveState();
+        renderAll();
+        syncLaundryDiaryTag(chosenDate, true).then(ok => {
+          if (ok) toast(`Notion 已同步 ${formatDayWithWeekday(chosenDate)} 洗衣標籤`);
+        });
+        setLaundrySelectMode(false);
+        toast(`已將 ${selectedItems.length} 件單品記錄於 ${formatDayWithWeekday(chosenDate)} 洗好`);
+        if (state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i)).length === 0) {
+          closeModal();
+        } else {
+          openLaundryModal();
+        }
       }}
     ]
   );
@@ -5353,59 +5394,6 @@ function openLaundrySelectedDateChooser() {
       });
     }
   }, 60);
-}
-
-function confirmWashSelectedItems(selectedItems, dateStr) {
-  const previewHtml = selectedItems.map(item => `
-    <div style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;background:var(--color-surface-2);margin-bottom:6px;">
-      <span style="width:36px;height:36px;flex:0 0 36px;border-radius:8px;overflow:hidden;background:var(--color-surface);display:flex;align-items:center;justify-content:center;">
-        ${item.image ? `<img src="${item.image}" style="width:100%;height:100%;object-fit:cover;">` : categoryIcon(item.category)}
-      </span>
-      <div style="min-width:0;flex:1;text-align:left;">
-        <div style="font-size:13px;font-weight:700;color:var(--color-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(item.name)}</div>
-        <div style="font-size:11px;color:var(--color-ink-muted);">${categoryLabel(item.category)}${item.brand ? '・' + escapeHtml(item.brand) : ''}</div>
-      </div>
-    </div>
-  `).join('');
-
-  openConfirm(
-    '確認清洗紀錄',
-    `<p style="margin-bottom:12px;font-size:13px;color:var(--color-ink);line-height:1.45;">
-      確定將以下 <b>${selectedItems.length} 件</b> 單品記錄於 <b>${formatDayWithWeekday(dateStr)}</b> 洗好了嗎？
-    </p>
-    <div style="max-height:220px;overflow-y:auto;margin-bottom:8px;border:1px solid var(--color-line);border-radius:12px;padding:8px;">
-      ${previewHtml}
-    </div>
-    <p style="font-size:11px;color:var(--color-ink-soft);margin:0;">
-      洗衣籃內未選取的其他衣物將繼續保留在洗衣籃中。
-    </p>`,
-    [
-      { label: '取消', kind: 'secondary', returnTo: 'modal-laundry' },
-      { label: '確認洗好', kind: 'primary', onClick: () => {
-        selectedItems.forEach(item => recordItemWash(item, dateStr));
-        recordLaundryEvent(dateStr, {
-          boostedItemIds: selectedItems.filter(i => i.extraWash).map(i => i.id)
-        });
-        if (!state.laundry.lastWashDate || dateStr >= state.laundry.lastWashDate) {
-          state.laundry.lastWashDate = dateStr;
-        }
-        state.laundry.snoozedUntil = null;
-        syncLatestLaundryDate();
-        saveState();
-        renderAll();
-        syncLaundryDiaryTag(dateStr, true).then(ok => {
-          if (ok) toast(`Notion 已同步 ${formatDayWithWeekday(dateStr)} 洗衣標籤`);
-        });
-        setLaundrySelectMode(false);
-        toast(`已將 ${selectedItems.length} 件單品記錄於 ${formatDayWithWeekday(dateStr)} 洗好`);
-        if (state.items.filter(i => i.status === 'dirty' && !isPreCutoffDirtyToday(i)).length === 0) {
-          closeModal();
-        } else {
-          openLaundryModal();
-        }
-      }}
-    ]
-  );
 }
 
 function openLaundryDateChooser() {
