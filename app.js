@@ -221,8 +221,8 @@ function classifyColorFamily(hex) {
     return '其他';
   }
 }
-const FIXED_CATEGORIES = ['top', 'bottom', 'outer', 'shoes', 'hat', 'accessory', 'pajamaTop', 'pajamaBottom'];
-const CATEGORY_LABEL = { top: '上衣', bottom: '褲子', outer: '外套', shoes: '鞋子', hat: '帽子', accessory: '配件', inner: '內衣', thermal: '保暖衣', pajamaTop: '睡衣', pajamaBottom: '睡褲' };
+const FIXED_CATEGORIES = ['top', 'bottom', 'outer', 'shoes', 'hat', 'accessory', 'pajamaTop', 'pajamaBottom', 'sportPants'];
+const CATEGORY_LABEL = { top: '上衣', bottom: '褲子', outer: '外套', shoes: '鞋子', hat: '帽子', accessory: '配件', inner: '內衣', thermal: '保暖衣', pajamaTop: '睡衣', pajamaBottom: '睡褲', sportPants: '運動褲' };
 const ASPECT_RATIOS = { '1:1': 1, '3:4': 0.75, '2:3': 2/3 };
 const ASPECT_LABELS = { '1:1': '方形', '3:4': '直式', '2:3': '窄長' };
 function getCategoryAspectKey(category) {
@@ -586,6 +586,8 @@ function defaultState() {
     activeTowel: 'towelA',
     activePajama: null, // { id: itemId, startDate: dateStr }
     pajamaHistory: [], // [{ id: itemId, startDate: str, endDate: str }]
+    activeSportPants: null, // { id: itemId, startDate: dateStr }
+    sportPantsHistory: [], // [{ id: itemId, startDate: str, endDate: str }]
     laundry: { lastWashDate: todayStr(), cycleDays: 2, snoozedUntil: null, history: [] },
     syncMeta: { consumables: { laundry: 0, sheets: 0, toothbrush: 0, razor: 0 } },
     wishlist: [],
@@ -791,6 +793,10 @@ function normalizeLoadedState() {
     state.activePajama = null;
   }
   state.pajamaHistory = Array.isArray(state.pajamaHistory) ? state.pajamaHistory : [];
+  if (!state.activeSportPants || typeof state.activeSportPants !== 'object') {
+    state.activeSportPants = null;
+  }
+  state.sportPantsHistory = Array.isArray(state.sportPantsHistory) ? state.sportPantsHistory : [];
 }
 normalizeLoadedState();
 
@@ -2309,7 +2315,7 @@ function renderHome() {
   const pendingConsumables = getPendingLaundryConsumables();
   const towel = state.consumables.find(c => c.id === state.activeTowel) || state.consumables.find(c => isTowelId(c.id));
   const towelDays = towel ? daysUsed(towel) : 0;
-  renderChipList('tempRackList', 'tempRackEmpty', rack, { pinActiveTowel: true, pinActivePajama: true });
+  renderChipList('tempRackList', 'tempRackEmpty', rack, { pinActiveTowel: true, pinActivePajama: true, pinActiveSportPants: true });
   renderChipList('basketList', 'basketEmpty', basket, { pendingConsumables, isLaundry: true });
   const daysSinceWash = Math.max(0, daysBetween(state.laundry.lastWashDate, todayStr()));
   const totalBasketCount = basket.length + pendingConsumables.length;
@@ -2358,7 +2364,23 @@ function renderChipList(listId, emptyId, items, opts) {
         ? `<img class="rack-chip-thumb" src="${pajamaItem.image}" alt="">`
         : `<span class="rack-chip-thumb">${ICONS.pajamaTop || categoryIcon(pajamaItem.category)}</span>`;
       chip.innerHTML = `${thumb}<span class="rack-chip-text">${escapeHtml(pajamaItem.name)}・睡衣已穿 ${pDays} 天</span>`;
-      chip.addEventListener('click', e => { e.stopPropagation(); openExtrasPicker(); });
+      chip.addEventListener('click', e => { e.stopPropagation(); openPajamaDetail('pajama'); });
+      list.appendChild(chip);
+    }
+  }
+
+  if (opts && opts.pinActiveSportPants && state.activeSportPants) {
+    const spItem = findItem(state.activeSportPants.id);
+    if (spItem) {
+      const spDays = daysBetween(state.activeSportPants.startDate, todayStr()) + 1;
+      const chip = document.createElement('button');
+      chip.className = 'rack-chip is-pinned';
+      chip.type = 'button';
+      const thumb = spItem.image
+        ? `<img class="rack-chip-thumb" src="${spItem.image}" alt="">`
+        : `<span class="rack-chip-thumb">${categoryIcon('bottom')}</span>`;
+      chip.innerHTML = `${thumb}<span class="rack-chip-text">${escapeHtml(spItem.name)}・運動褲已穿 ${spDays} 天</span>`;
+      chip.addEventListener('click', e => { e.stopPropagation(); openPajamaDetail('sportPants'); });
       list.appendChild(chip);
     }
   }
@@ -2417,62 +2439,104 @@ function openRackOverview() {
   const pinnedWrap = document.getElementById('rackOverviewPinnedTowel');
   if (pinnedWrap) {
     pinnedWrap.innerHTML = '';
-    if (towel) {
+    const hasTowel = Boolean(towel);
+    const hasPajama = Boolean(state.activePajama && findItem(state.activePajama.id));
+    const hasSportPants = Boolean(state.activeSportPants && findItem(state.activeSportPants.id));
+
+    if (hasTowel || hasPajama || hasSportPants) {
       pinnedWrap.hidden = false;
-      const chip = document.createElement('div');
-      chip.className = 'rack-pinned-towel-card';
-      chip.style.cssText = 'margin:12px 16px 4px;padding:12px 14px;border-radius:14px;background:var(--card-bg, #fff);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;gap:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.04);';
-      const towelImg = consumableImage(towel);
-      const thumbHtml = towelImg ? `<img src="${towelImg}" alt="" style="width:38px;height:38px;object-fit:cover;border-radius:10px;">` : `<span style="width:38px;height:38px;border-radius:10px;background:var(--subtle-bg,#f1f5f9);display:flex;align-items:center;justify-content:center;">${ICONS[towel.icon] || ''}</span>`;
-      chip.innerHTML = `${thumbHtml}<div style="flex:1"><div style="font-weight:600;font-size:14px;color:var(--text-main,#0f172a);">${escapeHtml(towel.name)}</div><div style="font-size:12px;color:var(--text-muted,#64748b);">浴巾已使用 ${daysUsed(towel)} 天・置頂使用中</div></div>`;
-      chip.addEventListener('click', () => openConsumableDetail(towel.id));
-      pinnedWrap.appendChild(chip);
-      const divider = document.createElement('hr');
-      divider.style.cssText = 'margin:14px 16px 18px;border:none;border-top:1px solid var(--color-line,#e2e8f0);';
-      pinnedWrap.appendChild(divider);
-    }
-    if (state.activePajama) {
-      const pajama = findItem(state.activePajama.id);
-      if (pajama) {
-        pinnedWrap.hidden = false;
+      const pinnedContainer = document.createElement('div');
+      pinnedContainer.className = 'rack-pinned-group';
+      pinnedContainer.style.cssText = 'margin:12px 16px 4px;display:flex;flex-direction:column;gap:8px;';
+
+      if (hasTowel) {
+        const chip = document.createElement('div');
+        chip.className = 'rack-pinned-towel-card';
+        chip.style.cssText = 'padding:12px 14px;border-radius:14px;background:var(--card-bg, #fff);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;gap:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.04);';
+        const towelImg = consumableImage(towel);
+        const thumbHtml = towelImg ? `<img src="${towelImg}" alt="" style="width:38px;height:38px;object-fit:cover;border-radius:10px;">` : `<span style="width:38px;height:38px;border-radius:10px;background:var(--subtle-bg,#f1f5f9);display:flex;align-items:center;justify-content:center;">${ICONS[towel.icon] || ''}</span>`;
+        chip.innerHTML = `${thumbHtml}<div style="flex:1"><div style="font-weight:600;font-size:14px;color:var(--text-main,#0f172a);">${escapeHtml(towel.name)}</div><div style="font-size:12px;color:var(--text-muted,#64748b);">浴巾已使用 ${daysUsed(towel)} 天・置頂使用中</div></div>`;
+        chip.addEventListener('click', () => {
+          modalReturnTo = 'modal-rack-overview';
+          openConsumableDetail(towel.id);
+        });
+        pinnedContainer.appendChild(chip);
+      }
+
+      if (hasPajama) {
+        const pajama = findItem(state.activePajama.id);
         const pDays = daysBetween(state.activePajama.startDate, todayStr()) + 1;
         const cycle = state.profile.washThresholds?.pajama || 14;
         const pajamaChip = document.createElement('div');
         pajamaChip.className = 'rack-pinned-pajama-card';
-        pajamaChip.style.cssText = 'margin:12px 16px 4px;padding:12px 14px;border-radius:14px;background:var(--card-bg, #fff);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);';
+        pajamaChip.style.cssText = 'padding:12px 14px;border-radius:14px;background:var(--card-bg, #fff);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.04);';
         const pThumb = pajama.image
           ? `<img src="${pajama.image}" alt="" style="width:38px;height:38px;object-fit:cover;border-radius:10px;">`
           : `<span style="width:38px;height:38px;border-radius:10px;background:var(--subtle-bg,#f1f5f9);display:flex;align-items:center;justify-content:center;">${ICONS.pajamaTop || categoryIcon(pajama.category)}</span>`;
         pajamaChip.innerHTML = `
-          <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;cursor:pointer;" id="btnPajamaRackDetail">
+          <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
             ${pThumb}
             <div style="flex:1;min-width:0;">
               <div style="font-weight:600;font-size:14px;color:var(--text-main,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(pajama.name)}</div>
-              <div style="font-size:12px;color:var(--text-muted,#64748b);">睡衣已連續穿 ${pDays} 天（週期 ${cycle} 天）</div>
+              <div style="font-size:12px;color:var(--text-muted,#64748b);">睡衣已連續穿 ${pDays} 天・置頂使用中</div>
             </div>
           </div>
           <button type="button" class="btn btn-secondary" id="btnRackSendPajama" style="padding:6px 12px;font-size:12px;white-space:nowrap;flex-shrink:0;">丟進洗衣籃</button>
         `;
-        pajamaChip.querySelector('#btnPajamaRackDetail').addEventListener('click', () => {
+        pajamaChip.addEventListener('click', (e) => {
+          if (e.target.closest('#btnRackSendPajama')) return;
           modalReturnTo = 'modal-rack-overview';
-          openItemDetail(pajama.id);
+          openPajamaDetail('pajama');
         });
         pajamaChip.querySelector('#btnRackSendPajama').addEventListener('click', (e) => {
           e.stopPropagation();
           sendPajamaToLaundry();
         });
-        pinnedWrap.appendChild(pajamaChip);
-        const divider = document.createElement('hr');
-        divider.style.cssText = 'margin:14px 16px 18px;border:none;border-top:1px solid var(--color-line,#e2e8f0);';
-        pinnedWrap.appendChild(divider);
+        pinnedContainer.appendChild(pajamaChip);
       }
-    }
-    if (!towel && !state.activePajama) {
+
+      if (hasSportPants) {
+        const sportPants = findItem(state.activeSportPants.id);
+        const spDays = daysBetween(state.activeSportPants.startDate, todayStr()) + 1;
+        const spChip = document.createElement('div');
+        spChip.className = 'rack-pinned-pajama-card';
+        spChip.style.cssText = 'padding:12px 14px;border-radius:14px;background:var(--card-bg, #fff);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.04);';
+        const spThumb = sportPants.image
+          ? `<img src="${sportPants.image}" alt="" style="width:38px;height:38px;object-fit:cover;border-radius:10px;">`
+          : `<span style="width:38px;height:38px;border-radius:10px;background:var(--subtle-bg,#f1f5f9);display:flex;align-items:center;justify-content:center;">${categoryIcon('bottom')}</span>`;
+        spChip.innerHTML = `
+          <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
+            ${spThumb}
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:14px;color:var(--text-main,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(sportPants.name)}</div>
+              <div style="font-size:12px;color:var(--text-muted,#64748b);">運動褲已連續穿 ${spDays} 天・置頂使用中</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary" id="btnRackSendSportPants" style="padding:6px 12px;font-size:12px;white-space:nowrap;flex-shrink:0;">丟進洗衣籃</button>
+        `;
+        spChip.addEventListener('click', (e) => {
+          if (e.target.closest('#btnRackSendSportPants')) return;
+          modalReturnTo = 'modal-rack-overview';
+          openPajamaDetail('sportPants');
+        });
+        spChip.querySelector('#btnRackSendSportPants').addEventListener('click', (e) => {
+          e.stopPropagation();
+          sendSportPantsToLaundry();
+        });
+        pinnedContainer.appendChild(spChip);
+      }
+
+      pinnedWrap.appendChild(pinnedContainer);
+      const divider = document.createElement('hr');
+      divider.style.cssText = 'margin:14px 16px 18px;border:none;border-top:1px solid var(--color-line,#e2e8f0);';
+      pinnedWrap.appendChild(divider);
+    } else {
       pinnedWrap.hidden = true;
     }
   }
 
-  const items = state.items.filter(i => (i.status === 'resting' || isPreCutoffDirtyToday(i)) && (!state.activePajama || i.id !== state.activePajama.id));
+  const pinnedIds = new Set([state.activePajama?.id, state.activeSportPants?.id].filter(Boolean));
+  const items = state.items.filter(i => (i.status === 'resting' || isPreCutoffDirtyToday(i)) && !pinnedIds.has(i.id));
   empty.hidden = items.length !== 0;
   items.forEach(item => grid.appendChild(buildItemCard(item, { rackMode: true, returnTo: 'modal-rack-overview' })));
   openModal('modal-rack-overview');
@@ -3075,6 +3139,8 @@ function openDayDetail(dateStr, entry) {
       <div><p class="ddr-cat">${categoryLabel(item.category)}</p><p class="ddr-name">${escapeHtml(item.name)}</p></div></button>`;
   });
 
+  const specialDayRows = [];
+  // 1. 睡衣
   let dayPajamaItem = null;
   let dayPajamaLabel = '睡衣';
   if (state.activePajama && dateStr >= state.activePajama.startDate && dateStr <= todayStr()) {
@@ -3092,32 +3158,61 @@ function openDayDetail(dateStr, entry) {
     dayPajamaLabel = '睡衣';
   }
   if (!dayPajamaItem && Array.isArray(state.items)) {
-    const matched = state.items.find(i => (i.pajamaRanges || []).some(r => r.startDate <= dateStr && dateStr <= r.endDate));
+    const matched = state.items.find(i => (i.pajamaRanges || []).some(r => r.startDate <= dateStr && dateStr <= r.endDate && (!r.tag || r.tag.includes('睡衣'))));
     if (matched) {
       dayPajamaItem = matched;
       dayPajamaLabel = '睡衣・週期服役紀錄';
     }
   }
+  if (dayPajamaItem) {
+    specialDayRows.push({ item: dayPajamaItem, label: dayPajamaLabel, icon: ICONS.pajamaTop || categoryIcon(dayPajamaItem.category) });
+  }
+
+  // 2. 運動褲
+  let daySportItem = null;
+  let daySportLabel = '運動褲';
+  if (state.activeSportPants && dateStr >= state.activeSportPants.startDate && dateStr <= todayStr()) {
+    daySportItem = findItem(state.activeSportPants.id);
+    daySportLabel = '運動褲・連續服役中';
+  } else if (Array.isArray(state.sportPantsHistory)) {
+    const hist = state.sportPantsHistory.find(h => h.startDate <= dateStr && dateStr <= h.endDate);
+    if (hist) {
+      daySportItem = findItem(hist.id);
+      daySportLabel = '運動褲・服役紀錄';
+    }
+  }
+  if (!daySportItem && Array.isArray(state.items)) {
+    const matched = state.items.find(i => (i.pajamaRanges || []).some(r => r.startDate <= dateStr && dateStr <= r.endDate && r.tag && r.tag.includes('運動褲')));
+    if (matched) {
+      daySportItem = matched;
+      daySportLabel = '運動褲・服役紀錄';
+    }
+  }
+  if (daySportItem) {
+    specialDayRows.push({ item: daySportItem, label: daySportLabel, icon: categoryIcon('bottom') });
+  }
 
   let pajamaSectionHtml = '';
-  if (dayPajamaItem) {
-    const pajamaThumb = dayPajamaItem.image
-      ? `<img class="ddr-thumb" src="${dayPajamaItem.image}" alt="" style="background:transparent!important;">`
-      : `<span class="ddr-thumb">${ICONS.pajamaTop || categoryIcon(dayPajamaItem.category)}</span>`;
+  if (specialDayRows.length) {
     pajamaSectionHtml = `
       <div class="day-detail-pajama-section" style="margin-top:20px;padding-top:14px;border-top:1px dashed var(--border,#cbd5e1);">
         <div style="font-size:12px;font-weight:700;color:var(--text-muted,#64748b);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-          <span>居家睡衣</span>
+          <span>居家睡衣／休閒運動</span>
         </div>
-        <button type="button" class="day-detail-row" data-item-id="${dayPajamaItem.id}">
-          ${pajamaThumb}
-          <div><p class="ddr-cat">${escapeHtml(dayPajamaLabel)}</p><p class="ddr-name">${escapeHtml(dayPajamaItem.name)}</p></div>
-        </button>
+        ${specialDayRows.map(({ item, label, icon }) => {
+          const thumb = item.image
+            ? `<img class="ddr-thumb" src="${item.image}" alt="" style="background:transparent!important;">`
+            : `<span class="ddr-thumb">${icon}</span>`;
+          return `<button type="button" class="day-detail-row" data-item-id="${item.id}">
+            ${thumb}
+            <div><p class="ddr-cat">${escapeHtml(label)}</p><p class="ddr-name">${escapeHtml(item.name)}</p></div>
+          </button>`;
+        }).join('')}
       </div>`;
   }
 
   let outfitContentHtml = '';
-  if (hasOutfit || dayPajamaItem) {
+  if (hasOutfit || specialDayRows.length) {
     outfitContentHtml = figurePreviewHtml + rows.join('') + pajamaSectionHtml + `
       <div class="settings-actions" style="margin-top:14px">
         <button class="btn-secondary" id="btnDayEdit">編輯這天穿搭</button>
@@ -3590,6 +3685,133 @@ function openConsumableDetail(id) {
     openConsumableDetail(id);
     renderConsumables();
   });
+  openModal('modal-consumable');
+}
+
+function openPajamaDetail(type = 'pajama') {
+  const isPajama = type === 'pajama';
+  const activeObj = isPajama ? state.activePajama : state.activeSportPants;
+  if (!activeObj) return;
+  const item = findItem(activeObj.id);
+  if (!item) return;
+
+  const body = document.getElementById('consumableDetailBody');
+  if (!body) return;
+
+  const used = Math.max(1, daysBetween(activeObj.startDate, todayStr()) + 1);
+  const cycle = isPajama ? (state.profile.washThresholds?.pajama || 14) : null;
+  const typeLabel = isPajama ? '睡衣' : '運動褲';
+
+  let statsHtml = `
+    <div class="stepper-row">
+      <span class="stepper-label">已穿天數</span>
+      <div class="stepper-control">
+        <button type="button" class="stepper-btn" id="pUsedMinus">−</button>
+        <span class="stepper-value" id="pUsedValue">${used}</span>
+        <button type="button" class="stepper-btn" id="pUsedPlus">＋</button>
+      </div>
+    </div>`;
+
+  if (isPajama) {
+    statsHtml += `
+      <div class="stepper-row">
+        <span class="stepper-label">建議週期</span>
+        <div class="stepper-control">
+          <button type="button" class="stepper-btn" id="pCycleMinus">−</button>
+          <span class="stepper-value" id="pCycleValue">${cycle}</span>
+          <button type="button" class="stepper-btn" id="pCyclePlus">＋</button>
+        </div>
+      </div>`;
+  }
+
+  const imgUrl = item.image || '';
+  const photoHtml = imgUrl
+    ? `<div class="consumable-detail-photo-wrap"><img src="${imgUrl}" alt="" class="consumable-detail-photo"></div>`
+    : `<div class="consumable-detail-photo-wrap" style="display:flex;align-items:center;justify-content:center;background:var(--color-surface-2);border-radius:18px;aspect-ratio:4/3;color:var(--color-ink-muted);">${categoryIcon(item.category)}</div>`;
+
+  body.innerHTML = `
+    <div class="modal-head">
+      <h2>${escapeHtml(item.name)}</h2>
+      <button class="modal-close" data-close>${ICONS.close}</button>
+    </div>
+    ${photoHtml}
+    ${statsHtml}
+    <button class="btn-primary" id="btnPajamaSendLaundry">提前丟到洗衣籃</button>
+    <div style="display:flex;gap:10px;margin-top:10px;">
+      <button type="button" class="btn-secondary" id="btnPajamaChangeItem" style="flex:1;">更換其他${typeLabel}</button>
+      <button type="button" class="btn-secondary" id="btnPajamaViewWardrobeDetail" style="flex:1;">查看單品詳情</button>
+    </div>
+    <p class="detail-meta">開始穿著日期：${fmtDate(activeObj.startDate)}（服役中）</p>
+  `;
+
+  body.querySelector('[data-close]').addEventListener('click', closeModal);
+
+  body.querySelector('#btnPajamaSendLaundry').addEventListener('click', () => {
+    closeModal();
+    if (isPajama) {
+      sendPajamaToLaundry();
+    } else {
+      sendSportPantsToLaundry();
+    }
+  });
+
+  body.querySelector('#btnPajamaChangeItem').addEventListener('click', () => {
+    closeModal();
+    openExtrasPicker();
+    setTimeout(() => {
+      const targetCat = isPajama ? 'pajamaTop' : 'sportPants';
+      const chips = document.querySelectorAll('#tryonCategoryChips .chip');
+      chips.forEach(c => {
+        if (c.dataset.cat === targetCat) {
+          c.click();
+        }
+      });
+      if (isPajama) window._pajamaChangingMode = true;
+      else window._sportPantsChangingMode = true;
+      renderTryonGridFor(targetCat, targetCat);
+    }, 180);
+  });
+
+  body.querySelector('#btnPajamaViewWardrobeDetail').addEventListener('click', () => {
+    modalReturnTo = 'modal-consumable';
+    openItemDetail(item.id);
+  });
+
+  const usedMinus = body.querySelector('#pUsedMinus');
+  const usedPlus = body.querySelector('#pUsedPlus');
+  if (usedMinus) usedMinus.addEventListener('click', () => {
+    activeObj.startDate = addDays(activeObj.startDate, 1);
+    if (activeObj.startDate > todayStr()) activeObj.startDate = todayStr();
+    saveState({ action: `調整${typeLabel}已穿天數` });
+    openPajamaDetail(type);
+    renderAll();
+  });
+  if (usedPlus) usedPlus.addEventListener('click', () => {
+    activeObj.startDate = addDays(activeObj.startDate, -1);
+    saveState({ action: `調整${typeLabel}已穿天數` });
+    openPajamaDetail(type);
+    renderAll();
+  });
+
+  if (isPajama) {
+    const cycleMinus = body.querySelector('#pCycleMinus');
+    const cyclePlus = body.querySelector('#pCyclePlus');
+    if (cycleMinus) cycleMinus.addEventListener('click', () => {
+      state.profile.washThresholds = state.profile.washThresholds || {};
+      state.profile.washThresholds.pajama = Math.max(1, (state.profile.washThresholds.pajama || 14) - 1);
+      saveState({ action: '調整睡衣清洗週期' });
+      openPajamaDetail(type);
+      renderAll();
+    });
+    if (cyclePlus) cyclePlus.addEventListener('click', () => {
+      state.profile.washThresholds = state.profile.washThresholds || {};
+      state.profile.washThresholds.pajama = (state.profile.washThresholds.pajama || 14) + 1;
+      saveState({ action: '調整睡衣清洗週期' });
+      openPajamaDetail(type);
+      renderAll();
+    });
+  }
+
   openModal('modal-consumable');
 }
 
@@ -4115,6 +4337,25 @@ function getItemWearHistoryEntries(item) {
     }
   }
 
+  if (state.activeSportPants && state.activeSportPants.id === item.id) {
+    const s = state.activeSportPants.startDate;
+    const e = todayStr();
+    const days = daysBetween(s, e) + 1;
+    entries.push({
+      type: 'activeSportPants',
+      startDate: s,
+      endDate: e,
+      days,
+      label: '服役中運動褲'
+    });
+    let cur = new Date(s + 'T00:00:00');
+    const endD = new Date(e + 'T00:00:00');
+    while (cur <= endD) {
+      coveredDates.add(cur.toISOString().slice(0, 10));
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
   const ranges = [];
   if (Array.isArray(item.pajamaRanges)) {
     ranges.push(...item.pajamaRanges);
@@ -4122,7 +4363,14 @@ function getItemWearHistoryEntries(item) {
   if (Array.isArray(state.pajamaHistory)) {
     state.pajamaHistory.forEach(h => {
       if (h.id === item.id && !ranges.some(r => r.startDate === h.startDate && r.endDate === h.endDate)) {
-        ranges.push(h);
+        ranges.push({ ...h, tag: '睡衣' });
+      }
+    });
+  }
+  if (Array.isArray(state.sportPantsHistory)) {
+    state.sportPantsHistory.forEach(h => {
+      if (h.id === item.id && !ranges.some(r => r.startDate === h.startDate && r.endDate === h.endDate)) {
+        ranges.push({ ...h, tag: '運動褲' });
       }
     });
   }
@@ -4257,11 +4505,11 @@ function openItemDetail(itemId) {
       return `
         <p class="wear-history-heading">穿著歷史（共 ${wearEntries.length} 次紀錄）</p>
         <div class="wear-history-list">${wearEntries.slice(0, 30).map(e => {
-          if (e.type === 'activePajama') {
+          if (e.type === 'activePajama' || e.type === 'activeSportPants') {
             return `
               <div class="wear-history-row wash-history-row" style="background:var(--color-surface-2, #f8fafc);">
                 <span>${fmtDate(e.startDate)} ～ 至今（共 ${e.days} 天）</span>
-                <span class="care-history-tag" style="background:var(--color-sage-tint,#ecfdf5);color:var(--color-sage,#059669);border-color:var(--color-sage,#10b981);">服役中睡衣</span>
+                <span class="care-history-tag" style="background:var(--color-sage-tint,#ecfdf5);color:var(--color-sage,#059669);border-color:var(--color-sage,#10b981);">${escapeHtml(e.label)}</span>
               </div>`;
           }
           if (e.type === 'pajamaRange') {
@@ -6143,6 +6391,82 @@ function sendPajamaToLaundry() {
   closeModal();
   toast('已將睡衣丟入洗衣籃');
 }
+
+function activateSportPantsItem(itemId) {
+  if (!itemId) {
+    if (state.activeSportPants) {
+      const oldItem = findItem(state.activeSportPants.id);
+      const s = state.activeSportPants.startDate;
+      const e = todayStr();
+      state.sportPantsHistory.unshift({
+        id: state.activeSportPants.id,
+        startDate: s,
+        endDate: e
+      });
+      if (oldItem) {
+        oldItem.pajamaRanges = oldItem.pajamaRanges || [];
+        oldItem.pajamaRanges.unshift({ startDate: s, endDate: e, tag: '運動褲' });
+      }
+      state.activeSportPants = null;
+    }
+  } else {
+    if (state.activeSportPants && state.activeSportPants.id !== itemId) {
+      const oldItem = findItem(state.activeSportPants.id);
+      const s = state.activeSportPants.startDate;
+      const e = todayStr();
+      state.sportPantsHistory.unshift({
+        id: state.activeSportPants.id,
+        startDate: s,
+        endDate: e
+      });
+      if (oldItem) {
+        oldItem.pajamaRanges = oldItem.pajamaRanges || [];
+        oldItem.pajamaRanges.unshift({ startDate: s, endDate: e, tag: '運動褲' });
+      }
+    }
+    state.activeSportPants = {
+      id: itemId,
+      startDate: todayStr()
+    };
+    const item = findItem(itemId);
+    if (item && item.status === 'dirty') {
+      item.status = 'resting';
+      item.basketAt = null;
+    }
+  }
+  saveState({ action: '變更服役中運動褲' });
+  renderAll();
+  toast('已更新服役中運動褲');
+}
+
+function sendSportPantsToLaundry() {
+  if (!state.activeSportPants) return;
+  const item = findItem(state.activeSportPants.id);
+  const startDate = state.activeSportPants.startDate;
+  const endDate = todayStr();
+  const days = daysBetween(startDate, endDate) + 1;
+  state.sportPantsHistory.unshift({
+    id: state.activeSportPants.id,
+    startDate,
+    endDate
+  });
+  if (item) {
+    item.pajamaRanges = item.pajamaRanges || [];
+    item.pajamaRanges.unshift({ startDate, endDate, tag: '運動褲' });
+    item.totalWearCount = (item.totalWearCount || 0) + days;
+    item.wearCount = (item.wearCount || 0) + days;
+    item.lastWornDate = endDate;
+    if (item.status !== 'dirty') item.basketAt = todayStr();
+    item.status = 'dirty';
+    item.forceBasketToday = todayStr();
+    item.restingSince = null;
+  }
+  state.activeSportPants = null;
+  saveState({ action: '將運動褲丟入洗衣籃' });
+  renderAll();
+  closeModal();
+  toast('已將運動褲丟入洗衣籃');
+}
 let tryonCurrentSlot = null, tryonCurrentCategory = null;
 let tryonSearchQuery = '';
 let tryonSort = 'recent';
@@ -6267,6 +6591,81 @@ function renderTryonGridFor(slot, category) {
     grid.appendChild(cancelBanner);
   }
 
+  if (category === 'sportPants' && !isBackfill && state.activeSportPants && !window._sportPantsChangingMode) {
+    const spItem = findItem(state.activeSportPants.id);
+    if (spItem) {
+      const spDays = daysBetween(state.activeSportPants.startDate, todayStr()) + 1;
+      empty.hidden = true;
+      document.getElementById('tryonFilterBadge').hidden = true;
+      
+      const spView = document.createElement('div');
+      spView.className = 'active-pajama-view';
+      spView.style.cssText = 'grid-column:1 / -1;padding:16px 8px;width:100%;max-width:380px;margin:0 auto;';
+      const thumbHtml = spItem.image
+        ? `<img src="${spItem.image}" alt="" style="width:100%;height:100%;object-fit:cover;">`
+        : `<span style="font-size:24px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;height:100%;">${categoryIcon('bottom')}</span>`;
+
+      spView.innerHTML = `
+        <div style="background:var(--color-surface-2,#f8fafc);border:1.5px solid var(--color-border,#e2e8f0);border-radius:18px;padding:18px 16px;text-align:center;">
+          <div style="display:inline-block;padding:4px 12px;border-radius:20px;background:var(--color-sage-tint,#ecfdf5);color:var(--color-sage,#059669);font-size:12px;font-weight:700;margin-bottom:12px;">
+            服役中運動褲
+          </div>
+          <div style="width:100px;height:100px;margin:0 auto 12px;border-radius:14px;overflow:hidden;background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);display:flex;align-items:center;justify-content:center;cursor:pointer;" id="btnSportPantsViewPhoto">
+            ${thumbHtml}
+          </div>
+          <div style="font-size:16px;font-weight:700;color:var(--color-ink,#0f172a);margin-bottom:6px;">
+            ${escapeHtml(spItem.name)}
+          </div>
+          <div style="font-size:13px;color:var(--color-ink-muted,#64748b);margin-bottom:18px;line-height:1.5;">
+            已連續穿著 <strong>${spDays}</strong> 天<br>
+            <span style="font-size:12px;">（自 ${fmtDate(state.activeSportPants.startDate)} 起服役）</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button type="button" class="btn btn-primary" id="btnActiveSportPantsWash" style="width:100%;padding:12px 16px;font-size:14px;font-weight:600;">
+              丟到洗衣籃
+            </button>
+            <div style="display:flex;gap:10px;">
+              <button type="button" class="btn btn-secondary" id="btnActiveSportPantsChange" style="flex:1;padding:10px 12px;font-size:13px;">
+                更換其他運動褲
+              </button>
+              <button type="button" class="btn btn-secondary btn-subtle" id="btnActiveSportPantsStop" style="flex:1;padding:10px 12px;font-size:13px;">
+                結束服役
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      spView.querySelector('#btnSportPantsViewPhoto').addEventListener('click', () => {
+        modalReturnTo = 'modal-tryon';
+        openItemDetail(spItem.id);
+      });
+      spView.querySelector('#btnActiveSportPantsWash').addEventListener('click', () => {
+        sendSportPantsToLaundry();
+      });
+      spView.querySelector('#btnActiveSportPantsChange').addEventListener('click', () => {
+        window._sportPantsChangingMode = true;
+        renderTryonGridFor('sportPants', 'sportPants');
+      });
+      spView.querySelector('#btnActiveSportPantsStop').addEventListener('click', () => {
+        activateSportPantsItem(null);
+        renderTryonGridFor('sportPants', 'sportPants');
+      });
+      grid.appendChild(spView);
+      return;
+    }
+  }
+
+  if (category === 'sportPants' && !isBackfill && window._sportPantsChangingMode && state.activeSportPants) {
+    const cancelBanner = document.createElement('div');
+    cancelBanner.style.cssText = 'grid-column:1 / -1;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--color-surface-2,#f1f5f9);border-radius:10px;font-size:13px;';
+    cancelBanner.innerHTML = `<span>選擇要替換的新運動褲：</span><button type="button" class="btn btn-secondary" style="font-size:12px;padding:4px 10px;">取消更換</button>`;
+    cancelBanner.querySelector('button').addEventListener('click', () => {
+      window._sportPantsChangingMode = false;
+      renderTryonGridFor('sportPants', 'sportPants');
+    });
+    grid.appendChild(cancelBanner);
+  }
+
   let options = state.items.filter(i => {
     if (category === 'inner' || category === 'thermal') {
       const match = i.category === 'top' || i.category === 'inner' || i.category === 'thermal' ||
@@ -6275,6 +6674,9 @@ function renderTryonGridFor(slot, category) {
       if (!match) return false;
     } else if (category === 'pajamaTop') {
       const match = i.category === 'pajamaTop' || i.category === 'top' || (i.tags || []).some(t => t.includes('睡衣')) || i.name.includes('睡衣');
+      if (!match) return false;
+    } else if (category === 'sportPants') {
+      const match = i.category === 'bottom' || (i.tags || []).some(t => t.includes('運動') || t.includes('瑜珈') || t.includes('健身') || t.includes('棉褲')) || i.name.includes('運動') || i.name.includes('棉褲');
       if (!match) return false;
     } else if (category === 'pajamaBottom') {
       const match = i.category === 'pajamaBottom' || i.category === 'bottom' || (i.tags || []).some(t => t.includes('睡褲')) || i.name.includes('睡褲');
@@ -6336,6 +6738,10 @@ function renderTryonGridFor(slot, category) {
           window._pajamaChangingMode = false;
           activatePajamaItem(item.id);
           renderTryonGridFor('pajamaTop', 'pajamaTop');
+        } else if (slot === 'sportPants' && !isBackfill) {
+          window._sportPantsChangingMode = false;
+          activateSportPantsItem(item.id);
+          renderTryonGridFor('sportPants', 'sportPants');
         } else {
           selectSlotItem(slot, item.id);
         }
@@ -6382,22 +6788,25 @@ function addExtrasClearAction() {
 }
 function openExtrasPicker() {
   window._pajamaChangingMode = false;
+  window._sportPantsChangingMode = false;
   document.getElementById('tryonTitle').textContent = '選擇其他單品';
   resetTryonToolbar();
   const chipsWrap = document.getElementById('tryonCategoryChips');
   chipsWrap.classList.remove('is-hidden');
   chipsWrap.innerHTML = '';
-  ['outer', 'accessory', 'hat', 'pajamaTop', 'pajamaBottom'].forEach((cat, i) => {
+  ['outer', 'accessory', 'hat', 'pajamaTop', 'sportPants', 'pajamaBottom'].forEach((cat, i) => {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'chip' + (i === 0 ? ' is-active' : '');
+    chip.dataset.cat = cat;
     chip.textContent = categoryLabel(cat);
     chip.addEventListener('click', () => {
       window._pajamaChangingMode = false;
+      window._sportPantsChangingMode = false;
       chipsWrap.querySelectorAll('.chip').forEach(c => c.classList.remove('is-active'));
       chip.classList.add('is-active');
       renderTryonGridFor(cat, cat);
-      if (cat !== 'pajamaTop') {
+      if (!['pajamaTop', 'sportPants'].includes(cat)) {
         addExtrasClearAction();
       } else {
         const clearWrap = document.getElementById('tryonClearWrap');
