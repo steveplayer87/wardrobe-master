@@ -575,7 +575,7 @@ function defaultState() {
       avatar: '',
       weather: { city: '', latitude: null, longitude: null, timezone: 'auto', current: null, updatedAt: 0, tempDropThreshold: 4, alertEnabled: true, forecast: null, forecastStatus: '' },
       outfitLayout: normalizeOutfitLayout(OUTFIT_LAYOUT_DEFAULTS),
-      washThresholds: { bottom: 3, outer: 5, shoes: 8, hat: 8, accessory: 8, pajamaTop: 3, pajamaBottom: 3 },
+      washThresholds: { bottom: 3, outer: 5, shoes: 8, hat: 8, accessory: 8, pajama: 14 },
       categoryAspect: { top: '1:1', bottom: '3:4', outer: '1:1', shoes: '1:1', hat: '1:1', accessory: '1:1' },
     },
     items: JSON.parse(JSON.stringify(typeof SEED_ITEMS !== 'undefined' ? SEED_ITEMS : [])),
@@ -584,6 +584,8 @@ function defaultState() {
     ootdHistory: [],
     consumables: CONSUMABLE_DEFS.map(c => ({ id: c.id, name: c.name, cycleDays: c.cycleDays, icon: c.icon, startDate: todayStr(), history: [] })),
     activeTowel: 'towelA',
+    activePajama: null, // { id: itemId, startDate: dateStr }
+    pajamaHistory: [], // [{ id: itemId, startDate: str, endDate: str }]
     laundry: { lastWashDate: todayStr(), cycleDays: 2, snoozedUntil: null, history: [] },
     syncMeta: { consumables: { laundry: 0, sheets: 0, toothbrush: 0, razor: 0 } },
     wishlist: [],
@@ -785,6 +787,10 @@ function normalizeLoadedState() {
   if (!state.currentSandboxId || !state.sandboxes.some(s => s.id === state.currentSandboxId)) {
     state.currentSandboxId = state.sandboxes[0]?.id || 'sb_default';
   }
+  if (!state.activePajama || typeof state.activePajama !== 'object') {
+    state.activePajama = null;
+  }
+  state.pajamaHistory = Array.isArray(state.pajamaHistory) ? state.pajamaHistory : [];
 }
 normalizeLoadedState();
 
@@ -1509,7 +1515,8 @@ function getNotifications() {
   }
   const pendingConsumables = getPendingLaundryConsumables();
   const laundrySnoozed = !!state.laundry?.snoozedUntil && state.laundry.snoozedUntil > todayStr();
-  if (!laundrySnoozed && (dirtyItems.length || isLaundryDueToday() || pendingConsumables.length)) {
+  const washedToday = state.laundry?.lastWashDate === todayStr() || laundryHistoryDates().has(todayStr());
+  if (!laundrySnoozed && !washedToday && (dirtyItems.length || isLaundryDueToday() || pendingConsumables.length)) {
     list.push({ type: 'laundry', id: 'laundry', text: '今天該洗衣服了', icon: 'basket' });
   }
   return list;
@@ -2302,7 +2309,7 @@ function renderHome() {
   const pendingConsumables = getPendingLaundryConsumables();
   const towel = state.consumables.find(c => c.id === state.activeTowel) || state.consumables.find(c => isTowelId(c.id));
   const towelDays = towel ? daysUsed(towel) : 0;
-  renderChipList('tempRackList', 'tempRackEmpty', rack, { pinActiveTowel: true });
+  renderChipList('tempRackList', 'tempRackEmpty', rack, { pinActiveTowel: true, pinActivePajama: true });
   renderChipList('basketList', 'basketEmpty', basket, { pendingConsumables, isLaundry: true });
   const daysSinceWash = Math.max(0, daysBetween(state.laundry.lastWashDate, todayStr()));
   const totalBasketCount = basket.length + pendingConsumables.length;
@@ -2336,6 +2343,22 @@ function renderChipList(listId, emptyId, items, opts) {
       const thumbHtml = towelImg ? `<img src="${towelImg}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : (ICONS[towel.icon] || '');
       chip.innerHTML = `<span class="rack-chip-thumb">${thumbHtml}</span><span class="rack-chip-text">${escapeHtml(towel.name)}・已用 ${daysUsed(towel)} 天</span>`;
       chip.addEventListener('click', e => { e.stopPropagation(); openConsumableDetail(towel.id); });
+      list.appendChild(chip);
+    }
+  }
+
+  if (opts && opts.pinActivePajama && state.activePajama) {
+    const pajamaItem = findItem(state.activePajama.id);
+    if (pajamaItem) {
+      const pDays = daysBetween(state.activePajama.startDate, todayStr()) + 1;
+      const chip = document.createElement('button');
+      chip.className = 'rack-chip is-pinned';
+      chip.type = 'button';
+      const thumb = pajamaItem.image
+        ? `<img class="rack-chip-thumb" src="${pajamaItem.image}" alt="">`
+        : `<span class="rack-chip-thumb">${ICONS.pajamaTop || categoryIcon(pajamaItem.category)}</span>`;
+      chip.innerHTML = `${thumb}<span class="rack-chip-text">${escapeHtml(pajamaItem.name)}・睡衣已穿 ${pDays} 天</span>`;
+      chip.addEventListener('click', e => { e.stopPropagation(); openExtrasPicker(); });
       list.appendChild(chip);
     }
   }
@@ -2384,9 +2407,7 @@ function renderChipList(listId, emptyId, items, opts) {
 function openRackOverview() {
   const grid = document.getElementById('rackOverviewGrid');
   const empty = document.getElementById('rackOverviewEmpty');
-  const items = state.items.filter(i => i.status === 'resting' || isPreCutoffDirtyToday(i));
   grid.innerHTML = '';
-  empty.hidden = items.length !== 0;
 
   const towel = state.consumables.find(c => c.id === state.activeTowel) || state.consumables.find(c => isTowelId(c.id));
   const towelDays = towel ? daysUsed(towel) : 0;
@@ -2409,11 +2430,50 @@ function openRackOverview() {
       const divider = document.createElement('hr');
       divider.style.cssText = 'margin:14px 16px 18px;border:none;border-top:1px solid var(--color-line,#e2e8f0);';
       pinnedWrap.appendChild(divider);
-    } else {
+    }
+    if (state.activePajama) {
+      const pajama = findItem(state.activePajama.id);
+      if (pajama) {
+        pinnedWrap.hidden = false;
+        const pDays = daysBetween(state.activePajama.startDate, todayStr()) + 1;
+        const cycle = state.profile.washThresholds?.pajama || 14;
+        const pajamaChip = document.createElement('div');
+        pajamaChip.className = 'rack-pinned-pajama-card';
+        pajamaChip.style.cssText = 'margin:12px 16px 4px;padding:12px 14px;border-radius:14px;background:var(--card-bg, #fff);border:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);';
+        const pThumb = pajama.image
+          ? `<img src="${pajama.image}" alt="" style="width:38px;height:38px;object-fit:cover;border-radius:10px;">`
+          : `<span style="width:38px;height:38px;border-radius:10px;background:var(--subtle-bg,#f1f5f9);display:flex;align-items:center;justify-content:center;">${ICONS.pajamaTop || categoryIcon(pajama.category)}</span>`;
+        pajamaChip.innerHTML = `
+          <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;cursor:pointer;" id="btnPajamaRackDetail">
+            ${pThumb}
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:14px;color:var(--text-main,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(pajama.name)}</div>
+              <div style="font-size:12px;color:var(--text-muted,#64748b);">睡衣已連續穿 ${pDays} 天（週期 ${cycle} 天）</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary" id="btnRackSendPajama" style="padding:6px 12px;font-size:12px;white-space:nowrap;flex-shrink:0;">丟進洗衣籃</button>
+        `;
+        pajamaChip.querySelector('#btnPajamaRackDetail').addEventListener('click', () => {
+          modalReturnTo = 'modal-rack-overview';
+          openItemDetail(pajama.id);
+        });
+        pajamaChip.querySelector('#btnRackSendPajama').addEventListener('click', (e) => {
+          e.stopPropagation();
+          sendPajamaToLaundry();
+        });
+        pinnedWrap.appendChild(pajamaChip);
+        const divider = document.createElement('hr');
+        divider.style.cssText = 'margin:14px 16px 18px;border:none;border-top:1px solid var(--color-line,#e2e8f0);';
+        pinnedWrap.appendChild(divider);
+      }
+    }
+    if (!towel && !state.activePajama) {
       pinnedWrap.hidden = true;
     }
   }
 
+  const items = state.items.filter(i => (i.status === 'resting' || isPreCutoffDirtyToday(i)) && (!state.activePajama || i.id !== state.activePajama.id));
+  empty.hidden = items.length !== 0;
   items.forEach(item => grid.appendChild(buildItemCard(item, { rackMode: true, returnTo: 'modal-rack-overview' })));
   openModal('modal-rack-overview');
 }
@@ -3007,7 +3067,7 @@ function openDayDetail(dateStr, entry) {
       </div>`;
   }
 
-  const rows = ALL_SLOTS.filter(s => entry[s]).map(s => {
+  const rows = ALL_SLOTS.filter(s => entry[s] && !['pajamaTop', 'pajamaBottom'].includes(s)).map(s => {
     const item = findItem(entry[s]);
     if (!item) return `<div class="day-detail-row"><p class="ddr-name">（已刪除的衣物）</p></div>`;
     const thumb = item.image ? `<img class="ddr-thumb" src="${item.image}" alt="" style="background:transparent!important;">` : `<span class="ddr-thumb">${categoryIcon(item.category)}</span>`;
@@ -3015,12 +3075,53 @@ function openDayDetail(dateStr, entry) {
       <div><p class="ddr-cat">${categoryLabel(item.category)}</p><p class="ddr-name">${escapeHtml(item.name)}</p></div></button>`;
   });
 
+  let dayPajamaItem = null;
+  let dayPajamaLabel = '睡衣';
+  if (state.activePajama && dateStr >= state.activePajama.startDate && dateStr <= todayStr()) {
+    dayPajamaItem = findItem(state.activePajama.id);
+    dayPajamaLabel = '睡衣・連續服役中';
+  } else if (Array.isArray(state.pajamaHistory)) {
+    const hist = state.pajamaHistory.find(h => h.startDate <= dateStr && dateStr <= h.endDate);
+    if (hist) {
+      dayPajamaItem = findItem(hist.id);
+      dayPajamaLabel = '睡衣・週期服役紀錄';
+    }
+  }
+  if (!dayPajamaItem && (entry.pajamaTop || entry.pajamaBottom)) {
+    dayPajamaItem = findItem(entry.pajamaTop || entry.pajamaBottom);
+    dayPajamaLabel = '睡衣';
+  }
+  if (!dayPajamaItem && Array.isArray(state.items)) {
+    const matched = state.items.find(i => (i.pajamaRanges || []).some(r => r.startDate <= dateStr && dateStr <= r.endDate));
+    if (matched) {
+      dayPajamaItem = matched;
+      dayPajamaLabel = '睡衣・週期服役紀錄';
+    }
+  }
+
+  let pajamaSectionHtml = '';
+  if (dayPajamaItem) {
+    const pajamaThumb = dayPajamaItem.image
+      ? `<img class="ddr-thumb" src="${dayPajamaItem.image}" alt="" style="background:transparent!important;">`
+      : `<span class="ddr-thumb">${ICONS.pajamaTop || categoryIcon(dayPajamaItem.category)}</span>`;
+    pajamaSectionHtml = `
+      <div class="day-detail-pajama-section" style="margin-top:20px;padding-top:14px;border-top:1px dashed var(--border,#cbd5e1);">
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted,#64748b);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <span>居家睡衣</span>
+        </div>
+        <button type="button" class="day-detail-row" data-item-id="${dayPajamaItem.id}">
+          ${pajamaThumb}
+          <div><p class="ddr-cat">${escapeHtml(dayPajamaLabel)}</p><p class="ddr-name">${escapeHtml(dayPajamaItem.name)}</p></div>
+        </button>
+      </div>`;
+  }
+
   let outfitContentHtml = '';
-  if (hasOutfit) {
-    outfitContentHtml = figurePreviewHtml + rows.join('') + `
+  if (hasOutfit || dayPajamaItem) {
+    outfitContentHtml = figurePreviewHtml + rows.join('') + pajamaSectionHtml + `
       <div class="settings-actions" style="margin-top:14px">
         <button class="btn-secondary" id="btnDayEdit">編輯這天穿搭</button>
-        ${isToday ? '' : '<button class="btn-secondary btn-danger" id="btnDayDelete">刪除這天穿搭</button>'}
+        ${isToday ? '' : (hasOutfit ? '<button class="btn-secondary btn-danger" id="btnDayDelete">刪除這天穿搭</button>' : '')}
       </div>`;
   } else {
     outfitContentHtml = `
@@ -3991,6 +4092,78 @@ function saveWishlistForm() {
 /* ============================================================
    ITEM DETAIL / ADD-EDIT MODAL
    ============================================================ */
+function getItemWearHistoryEntries(item) {
+  const entries = [];
+  const coveredDates = new Set();
+
+  if (state.activePajama && state.activePajama.id === item.id) {
+    const s = state.activePajama.startDate;
+    const e = todayStr();
+    const days = daysBetween(s, e) + 1;
+    entries.push({
+      type: 'activePajama',
+      startDate: s,
+      endDate: e,
+      days,
+      label: '服役中睡衣'
+    });
+    let cur = new Date(s + 'T00:00:00');
+    const endD = new Date(e + 'T00:00:00');
+    while (cur <= endD) {
+      coveredDates.add(cur.toISOString().slice(0, 10));
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+
+  const ranges = [];
+  if (Array.isArray(item.pajamaRanges)) {
+    ranges.push(...item.pajamaRanges);
+  }
+  if (Array.isArray(state.pajamaHistory)) {
+    state.pajamaHistory.forEach(h => {
+      if (h.id === item.id && !ranges.some(r => r.startDate === h.startDate && r.endDate === h.endDate)) {
+        ranges.push(h);
+      }
+    });
+  }
+
+  ranges.forEach(r => {
+    const days = daysBetween(r.startDate, r.endDate) + 1;
+    entries.push({
+      type: 'pajamaRange',
+      startDate: r.startDate,
+      endDate: r.endDate,
+      days,
+      tag: r.tag || '睡衣'
+    });
+    let cur = new Date(r.startDate + 'T00:00:00');
+    const endD = new Date(r.endDate + 'T00:00:00');
+    while (cur <= endD) {
+      coveredDates.add(cur.toISOString().slice(0, 10));
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+
+  if (Array.isArray(item.wearHistory)) {
+    item.wearHistory.forEach(d => {
+      if (!coveredDates.has(d)) {
+        entries.push({
+          type: 'single',
+          date: d
+        });
+      }
+    });
+  }
+
+  entries.sort((a, b) => {
+    const dateA = a.startDate || a.date;
+    const dateB = b.startDate || b.date;
+    return dateB.localeCompare(dateA);
+  });
+
+  return entries;
+}
+
 function openItemDetail(itemId) {
   const item = findItem(itemId);
   if (!item) return;
@@ -4078,10 +4251,30 @@ function openItemDetail(itemId) {
       <p class="wear-history-heading">除污漬紀錄（共 ${stainList.length} 次）</p>
       <div class="wear-history-list">${stainList.slice(0, 20).map(s => `<div class="wear-history-row wash-history-row"><span>${fmtDate(s.date)}</span><span class="care-history-tag care-history-tag-stain">${escapeHtml(s.note || '局部去漬')}</span></div>`).join('')}</div>
     ` : ''}
-    ${item.wearHistory && item.wearHistory.length ? `
-      <p class="wear-history-heading">穿著歷史（共 ${item.wearHistory.length} 次）</p>
-      <div class="wear-history-list">${item.wearHistory.slice(0, 30).map(d => `<div class="wear-history-row">${fmtDate(d)}</div>`).join('')}</div>
-    ` : ''}
+    ${(() => {
+      const wearEntries = getItemWearHistoryEntries(item);
+      if (!wearEntries.length) return '';
+      return `
+        <p class="wear-history-heading">穿著歷史（共 ${wearEntries.length} 次紀錄）</p>
+        <div class="wear-history-list">${wearEntries.slice(0, 30).map(e => {
+          if (e.type === 'activePajama') {
+            return `
+              <div class="wear-history-row wash-history-row" style="background:var(--color-surface-2, #f8fafc);">
+                <span>${fmtDate(e.startDate)} ～ 至今（共 ${e.days} 天）</span>
+                <span class="care-history-tag" style="background:var(--color-sage-tint,#ecfdf5);color:var(--color-sage,#059669);border-color:var(--color-sage,#10b981);">服役中睡衣</span>
+              </div>`;
+          }
+          if (e.type === 'pajamaRange') {
+            return `
+              <div class="wear-history-row wash-history-row">
+                <span>${fmtDate(e.startDate)} ～ ${fmtDate(e.endDate)}（共 ${e.days} 天）</span>
+                <span class="care-history-tag">${escapeHtml(e.tag)}</span>
+              </div>`;
+          }
+          return `<div class="wear-history-row"><span>${fmtDate(e.date)}</span></div>`;
+        }).join('')}</div>
+      `;
+    })()}
     ${item.washHistory && item.washHistory.length ? `
       <p class="wear-history-heading">洗衣歷史（共 ${item.washHistory.length} 次）</p>
       <div class="wear-history-list">${item.washHistory.slice(0, 30).map(entry => { const record = washHistoryEntry(entry); return `<div class="wear-history-row wash-history-row"><span>${fmtDate(record.date)}</span>${record.extraWash ? '<span class="history-boost-badge">加強清洗</span>' : ''}</div>`; }).join('')}</div>
@@ -4444,8 +4637,7 @@ function readSettingsDraft() {
     shoes: readVal('valThresholdShoes', state.profile.washThresholds?.shoes ?? 8),
     hat: readVal('valThresholdHat', state.profile.washThresholds?.hat ?? 8),
     accessory: readVal('valThresholdAccessory', state.profile.washThresholds?.accessory ?? 8),
-    pajamaTop: readVal('valThresholdPajamaTop', state.profile.washThresholds?.pajamaTop ?? 3),
-    pajamaBottom: readVal('valThresholdPajamaBottom', state.profile.washThresholds?.pajamaBottom ?? 3),
+    pajama: readVal('valThresholdPajama', state.profile.washThresholds?.pajama ?? 14),
   };
   const towelDays = readVal('valThresholdTowel', 7);
   state.consumables.forEach(c => { if (isTowelId(c.id)) c.cycleDays = towelDays; });
@@ -5551,9 +5743,32 @@ function openLaundryModal() {
   const postponeDay = new Date(postponeDate + 'T00:00:00').getDay();
   const postponeButton = document.getElementById('btnLaundryPostpone');
   if (postponeButton) postponeButton.textContent = `延後一天洗（禮拜${['日','一','二','三','四','五','六'][postponeDay]}）`;
+  const isDue = isLaundryDueToday();
+  const washedToday = last === todayStr();
+  
+  let nextStatHtml = '';
+  if (washedToday) {
+    nextStatHtml = `
+      <div class="detail-stat detail-stat-success" style="background:var(--color-sage-tint, #ecfdf5);border:1.5px solid var(--color-sage, #10b981);">
+        <b style="color:var(--color-sage, #059669);display:inline-flex;align-items:center;justify-content:center;gap:4px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M20 6 9 17l-5-5"/></svg>
+          已洗好
+        </b>
+        <span style="color:var(--color-sage, #059669);font-weight:600;">今日已洗好</span>
+      </div>`;
+  } else if (isDue) {
+    nextStatHtml = `
+      <div class="detail-stat detail-stat-due" style="background:var(--color-coral-tint, #fef2f2);border:1.5px solid var(--color-coral, #ef4444);box-shadow:0 0 0 1px rgba(239,68,68,0.2);">
+        <b style="color:var(--color-coral, #dc2626);">${fmtDate(next)}</b>
+        <span style="color:var(--color-coral, #dc2626);font-weight:700;">今晚該洗了</span>
+      </div>`;
+  } else {
+    nextStatHtml = `<div class="detail-stat"><b>${fmtDate(next)}</b><span>下次預計洗衣</span></div>`;
+  }
+
   document.getElementById('laundryStats').innerHTML = `
     <div class="detail-stat"><b>${daysSince}</b><span>距上次洗衣天數</span></div>
-    <div class="detail-stat"><b>${fmtDate(next)}</b><span>下次預計洗衣</span></div>
+    ${nextStatHtml}
     <div class="detail-stat"><b>${state.laundry.cycleDays}</b><span>洗衣週期(天)</span></div>
   `;
   openModal('modal-laundry');
@@ -5852,6 +6067,82 @@ function selectSlotItem(slot, itemId) {
     closeModal();
   }
 }
+
+function activatePajamaItem(itemId) {
+  if (!itemId) {
+    if (state.activePajama) {
+      const oldItem = findItem(state.activePajama.id);
+      const s = state.activePajama.startDate;
+      const e = todayStr();
+      state.pajamaHistory.unshift({
+        id: state.activePajama.id,
+        startDate: s,
+        endDate: e
+      });
+      if (oldItem) {
+        oldItem.pajamaRanges = oldItem.pajamaRanges || [];
+        oldItem.pajamaRanges.unshift({ startDate: s, endDate: e, tag: '睡衣' });
+      }
+      state.activePajama = null;
+    }
+  } else {
+    if (state.activePajama && state.activePajama.id !== itemId) {
+      const oldItem = findItem(state.activePajama.id);
+      const s = state.activePajama.startDate;
+      const e = todayStr();
+      state.pajamaHistory.unshift({
+        id: state.activePajama.id,
+        startDate: s,
+        endDate: e
+      });
+      if (oldItem) {
+        oldItem.pajamaRanges = oldItem.pajamaRanges || [];
+        oldItem.pajamaRanges.unshift({ startDate: s, endDate: e, tag: '睡衣' });
+      }
+    }
+    state.activePajama = {
+      id: itemId,
+      startDate: todayStr()
+    };
+    const item = findItem(itemId);
+    if (item && item.status === 'dirty') {
+      item.status = 'resting';
+      item.basketAt = null;
+    }
+  }
+  saveState({ action: '變更服役中睡衣' });
+  renderAll();
+  toast('已更新服役中睡衣');
+}
+
+function sendPajamaToLaundry() {
+  if (!state.activePajama) return;
+  const item = findItem(state.activePajama.id);
+  const startDate = state.activePajama.startDate;
+  const endDate = todayStr();
+  const days = daysBetween(startDate, endDate) + 1;
+  state.pajamaHistory.unshift({
+    id: state.activePajama.id,
+    startDate,
+    endDate
+  });
+  if (item) {
+    item.pajamaRanges = item.pajamaRanges || [];
+    item.pajamaRanges.unshift({ startDate, endDate, tag: '睡衣' });
+    item.totalWearCount = (item.totalWearCount || 0) + days;
+    item.wearCount = (item.wearCount || 0) + days;
+    item.lastWornDate = endDate;
+    if (item.status !== 'dirty') item.basketAt = todayStr();
+    item.status = 'dirty';
+    item.forceBasketToday = todayStr();
+    item.restingSince = null;
+  }
+  state.activePajama = null;
+  saveState({ action: '將睡衣丟入洗衣籃' });
+  renderAll();
+  closeModal();
+  toast('已將睡衣丟入洗衣籃');
+}
 let tryonCurrentSlot = null, tryonCurrentCategory = null;
 let tryonSearchQuery = '';
 let tryonSort = 'recent';
@@ -5899,9 +6190,85 @@ function renderTryonGridFor(slot, category) {
   const empty = document.getElementById('tryonPickerEmpty');
   grid.innerHTML = '';
   const isBackfill = !!backfillDraft;
+
+  if (category === 'pajamaTop' && !isBackfill && state.activePajama && !window._pajamaChangingMode) {
+    const pajamaItem = findItem(state.activePajama.id);
+    if (pajamaItem) {
+      const pDays = daysBetween(state.activePajama.startDate, todayStr()) + 1;
+      const cycle = state.profile.washThresholds?.pajama || 14;
+      empty.hidden = true;
+      document.getElementById('tryonFilterBadge').hidden = true;
+      
+      const pView = document.createElement('div');
+      pView.className = 'active-pajama-view';
+      pView.style.cssText = 'grid-column:1 / -1;padding:16px 8px;width:100%;max-width:380px;margin:0 auto;';
+      const thumbHtml = pajamaItem.image
+        ? `<img src="${pajamaItem.image}" alt="" style="width:100%;height:100%;object-fit:cover;">`
+        : `<span style="font-size:24px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;height:100%;">${ICONS.pajamaTop || categoryIcon(pajamaItem.category)}</span>`;
+
+      pView.innerHTML = `
+        <div style="background:var(--color-surface-2,#f8fafc);border:1.5px solid var(--color-border,#e2e8f0);border-radius:18px;padding:18px 16px;text-align:center;">
+          <div style="display:inline-block;padding:4px 12px;border-radius:20px;background:var(--color-sage-tint,#ecfdf5);color:var(--color-sage,#059669);font-size:12px;font-weight:700;margin-bottom:12px;">
+            服役中睡衣
+          </div>
+          <div style="width:100px;height:100px;margin:0 auto 12px;border-radius:14px;overflow:hidden;background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);display:flex;align-items:center;justify-content:center;cursor:pointer;" id="btnPajamaViewPhoto">
+            ${thumbHtml}
+          </div>
+          <div style="font-size:16px;font-weight:700;color:var(--color-ink,#0f172a);margin-bottom:6px;">
+            ${escapeHtml(pajamaItem.name)}
+          </div>
+          <div style="font-size:13px;color:var(--color-ink-muted,#64748b);margin-bottom:18px;line-height:1.5;">
+            已連續穿著 <strong>${pDays}</strong> 天<br>
+            <span style="font-size:12px;">（自 ${fmtDate(state.activePajama.startDate)} 起，預設週期 ${cycle} 天）</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button type="button" class="btn btn-primary" id="btnActivePajamaWash" style="width:100%;padding:12px 16px;font-size:14px;font-weight:600;">
+              丟到洗衣籃
+            </button>
+            <div style="display:flex;gap:10px;">
+              <button type="button" class="btn btn-secondary" id="btnActivePajamaChange" style="flex:1;padding:10px 12px;font-size:13px;">
+                更換其他睡衣
+              </button>
+              <button type="button" class="btn btn-secondary btn-subtle" id="btnActivePajamaStop" style="flex:1;padding:10px 12px;font-size:13px;">
+                結束服役
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      pView.querySelector('#btnPajamaViewPhoto').addEventListener('click', () => {
+        modalReturnTo = 'modal-tryon';
+        openItemDetail(pajamaItem.id);
+      });
+      pView.querySelector('#btnActivePajamaWash').addEventListener('click', () => {
+        sendPajamaToLaundry();
+      });
+      pView.querySelector('#btnActivePajamaChange').addEventListener('click', () => {
+        window._pajamaChangingMode = true;
+        renderTryonGridFor('pajamaTop', 'pajamaTop');
+      });
+      pView.querySelector('#btnActivePajamaStop').addEventListener('click', () => {
+        activatePajamaItem(null);
+        renderTryonGridFor('pajamaTop', 'pajamaTop');
+      });
+      grid.appendChild(pView);
+      return;
+    }
+  }
+
+  if (category === 'pajamaTop' && !isBackfill && window._pajamaChangingMode && state.activePajama) {
+    const cancelBanner = document.createElement('div');
+    cancelBanner.style.cssText = 'grid-column:1 / -1;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--color-surface-2,#f1f5f9);border-radius:10px;font-size:13px;';
+    cancelBanner.innerHTML = `<span>選擇要替換的新睡衣：</span><button type="button" class="btn btn-secondary" style="font-size:12px;padding:4px 10px;">取消更換</button>`;
+    cancelBanner.querySelector('button').addEventListener('click', () => {
+      window._pajamaChangingMode = false;
+      renderTryonGridFor('pajamaTop', 'pajamaTop');
+    });
+    grid.appendChild(cancelBanner);
+  }
+
   let options = state.items.filter(i => {
     if (category === 'inner' || category === 'thermal') {
-      // 目前不限定二三頁會出現的上衣品相：所有上衣、以及標註內衣/保暖衣者均可選擇
       const match = i.category === 'top' || i.category === 'inner' || i.category === 'thermal' ||
         (i.tags || []).some(t => t.includes('內衣') || t.includes('保暖衣') || t.includes('發熱') || t.includes('涼感')) ||
         i.name.includes('內衣') || i.name.includes('保暖衣') || i.name.includes('發熱');
@@ -5962,7 +6329,18 @@ function renderTryonGridFor(slot, category) {
     grid.appendChild(noneCard);
   }
   options.forEach(item => {
-    const card = buildItemCard(item, { tryonMode: true, onClick: () => selectSlotItem(slot, item.id) });
+    const card = buildItemCard(item, {
+      tryonMode: true,
+      onClick: () => {
+        if (slot === 'pajamaTop' && !isBackfill) {
+          window._pajamaChangingMode = false;
+          activatePajamaItem(item.id);
+          renderTryonGridFor('pajamaTop', 'pajamaTop');
+        } else {
+          selectSlotItem(slot, item.id);
+        }
+      }
+    });
     grid.appendChild(card);
   });
 }
@@ -6003,6 +6381,7 @@ function addExtrasClearAction() {
   clearWrap.appendChild(clearButton);
 }
 function openExtrasPicker() {
+  window._pajamaChangingMode = false;
   document.getElementById('tryonTitle').textContent = '選擇其他單品';
   resetTryonToolbar();
   const chipsWrap = document.getElementById('tryonCategoryChips');
@@ -6014,10 +6393,16 @@ function openExtrasPicker() {
     chip.className = 'chip' + (i === 0 ? ' is-active' : '');
     chip.textContent = categoryLabel(cat);
     chip.addEventListener('click', () => {
+      window._pajamaChangingMode = false;
       chipsWrap.querySelectorAll('.chip').forEach(c => c.classList.remove('is-active'));
       chip.classList.add('is-active');
       renderTryonGridFor(cat, cat);
-      addExtrasClearAction();
+      if (cat !== 'pajamaTop') {
+        addExtrasClearAction();
+      } else {
+        const clearWrap = document.getElementById('tryonClearWrap');
+        if (clearWrap) clearWrap.innerHTML = '';
+      }
     });
     chipsWrap.appendChild(chip);
   });
@@ -9559,8 +9944,7 @@ function syncThresholdCardsUI() {
   setCardVal('valThresholdShoes', t.shoes ?? 8);
   setCardVal('valThresholdHat', t.hat ?? 8);
   setCardVal('valThresholdAccessory', t.accessory ?? 8);
-  setCardVal('valThresholdPajamaTop', t.pajamaTop ?? 3);
-  setCardVal('valThresholdPajamaBottom', t.pajamaBottom ?? 3);
+  setCardVal('valThresholdPajama', t.pajama ?? 14);
   const towel = state.consumables?.find(c => isTowelId(c.id));
   setCardVal('valThresholdTowel', towel ? towel.cycleDays : 7);
 }

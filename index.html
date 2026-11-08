@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261106_119">
+<link rel="stylesheet" href="styles.css?v=20261108_120">
 </head>
 <body>
 
@@ -779,27 +779,15 @@
             </div>
           </div>
 
-          <div class="threshold-card" data-cat="pajamaTop">
+          <div class="threshold-card" data-cat="pajama">
             <div class="tc-left">
               <span class="tc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l8-3 8 3v4a2 2 0 0 1-2 2h-1v7H7v-7H6a2 2 0 0 1-2-2V7z"/><path d="M12 4v16"/><path d="M9 10h6"/></svg></span>
-              <span class="tc-label">睡衣</span>
+              <span class="tc-label">睡衣週期</span>
             </div>
             <div class="tc-stepper">
-              <button type="button" class="tc-step-btn tc-minus" data-cat="pajamaTop" aria-label="減少">−</button>
-              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdPajamaTop">3</strong><span class="tc-unit"> 次</span></span>
-              <button type="button" class="tc-step-btn tc-plus" data-cat="pajamaTop" aria-label="增加">+</button>
-            </div>
-          </div>
-
-          <div class="threshold-card" data-cat="pajamaBottom">
-            <div class="tc-left">
-              <span class="tc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l1 7-2 11h-3l-2-8-2 8H7L5 10l1-7z"/><path d="M6 7h12"/></svg></span>
-              <span class="tc-label">睡褲</span>
-            </div>
-            <div class="tc-stepper">
-              <button type="button" class="tc-step-btn tc-minus" data-cat="pajamaBottom" aria-label="減少">−</button>
-              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdPajamaBottom">3</strong><span class="tc-unit"> 次</span></span>
-              <button type="button" class="tc-step-btn tc-plus" data-cat="pajamaBottom" aria-label="增加">+</button>
+              <button type="button" class="tc-step-btn tc-minus" data-cat="pajama" aria-label="減少">−</button>
+              <span class="tc-val-unit"><strong class="tc-val" id="valThresholdPajama">14</strong><span class="tc-unit"> 天</span></span>
+              <button type="button" class="tc-step-btn tc-plus" data-cat="pajama" aria-label="增加">+</button>
             </div>
           </div>
         </div>
@@ -1605,7 +1593,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v119', K='wm_seen_version', seen=null;
+  var V='v120', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1615,7 +1603,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261106_119"></script>
-<script src="app.js?v=20261106_119"></script>
+<script src="seed-items.js?v=20261108_120"></script>
+<script src="app.js?v=20261108_120"></script>
 </body>
 </html>
