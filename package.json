@@ -1,7 +1,0 @@
-{
-  "name": "wardrobe-app",
-  "private": true,
-  "description": "衣櫥助手 — static PWA (no build step). package.json exists only to run tests.",
-  "scripts": { "test": "node tests/itembrowser.test.js" },
-  "devDependencies": { "jsdom": "^26.0.0" }
-}

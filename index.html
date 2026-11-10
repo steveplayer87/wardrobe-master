@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261109_122">
+<link rel="stylesheet" href="styles.css?v=20261108_121">
 </head>
 <body>
 
@@ -161,8 +161,17 @@
               <input type="date" id="rankEndDate" aria-label="結束日期">
             </div>
           </div>
+          <div class="category-tabs rank-cat-tabs" id="rankCategoryTabs">
+            <button type="button" class="cat-tab is-active" data-cat="all">全部</button>
+            <button type="button" class="cat-tab" data-cat="top">上衣</button>
+            <button type="button" class="cat-tab" data-cat="bottom">褲子</button>
+            <button type="button" class="cat-tab" data-cat="outer">外套</button>
+            <button type="button" class="cat-tab" data-cat="shoes">鞋子</button>
+            <button type="button" class="cat-tab" data-cat="hat">帽子</button>
+            <button type="button" class="cat-tab" data-cat="accessory">配件</button>
+          </div>
         </div>
-        <div id="rankBrowserMount"></div>
+        <div class="item-grid" id="rankList"></div>
         <p class="stats-heading">穿搭統計</p>
         <div class="rank-stats" id="rankStats"></div>
       </div>
@@ -1584,7 +1593,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v122', K='wm_seen_version', seen=null;
+  var V='v121', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1594,7 +1603,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261109_122"></script>
-<script src="app.js?v=20261109_122"></script>
+<script src="seed-items.js?v=20261108_121"></script>
+<script src="app.js?v=20261108_121"></script>
 </body>
 </html>
