@@ -1,3 +1,5 @@
 .DS_Store
 *.log
 .wrangler/
+node_modules/
+wardrobe-app.zip
