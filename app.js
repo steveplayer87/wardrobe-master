@@ -2542,6 +2542,361 @@ function openRackOverview() {
   openModal('modal-rack-overview');
 }
 
+/* ============================================================
+   COMPONENT LIBRARY: ItemBrowser Architecture
+   Layer 1: Query Layer (pure functions: SORTERS, queryItems)
+   Layer 2: Card Layer (pure function: buildItemCard with opts)
+   Layer 3: Component Layer (createItemBrowser, filter controller)
+   ============================================================ */
+const SORTERS = {
+  recent:    { label: '最近新增', cmp: (a, b) => (b.createdAt || 0) - (a.createdAt || 0) },
+  wearCount: { label: '穿著次數', cmp: (a, b) => (b.wearCount || 0) - (a.wearCount || 0) },
+  totalWear: { label: '累計穿著', cmp: (a, b) => (b.totalWearCount || 0) - (a.totalWearCount || 0) },
+  lastWorn:  { label: '最近穿著', cmp: (a, b) => (b.lastWornDate || '').localeCompare(a.lastWornDate || '') },
+  name:      { label: '名稱',     cmp: (a, b) => a.name.localeCompare(b.name, 'zh-Hant') },
+  modified:  { label: '最近修改', cmp: (a, b) => (Number(b.modifiedAt || b.createdAt || 0) - Number(a.modifiedAt || a.createdAt || 0)) },
+};
+const DEFAULT_SORT_KEYS = ['recent', 'wearCount', 'lastWorn', 'name'];
+
+function isFiltered(filters) {
+  if (!filters) return false;
+  return (filters.status && filters.status !== 'all') || (filters.tags && filters.tags.length > 0);
+}
+
+function itemMatchesSearch(item, q) {
+  if (!q) return true;
+  const hay = [
+    item.name,
+    item.brand || '',
+    item.color || '',
+    item.colorFamily || '',
+    item.price != null ? String(item.price) : '',
+    fmtDate(item.purchaseDate || ''),
+    fmtDate(item.lastWornDate || ''),
+    (item.tags || []).join(' '),
+    categoryLabel(item.category),
+  ].join(' ').toLowerCase();
+  return hay.includes(q.toLowerCase());
+}
+
+function queryItems(items, q) {
+  q = q || {};
+  const out = (items || []).filter(i => {
+    if (q.cat != null && q.matchCategory && !q.matchCategory(i, q.cat)) return false;
+    if (q.filters && !itemMatchesFilters(i, q.filters)) return false;
+    return itemMatchesSearch(i, q.query);
+  });
+  const sorter = SORTERS[q.sort] || SORTERS.recent;
+  return out.slice().sort(sorter.cmp);
+}
+
+window.SORTERS = SORTERS;
+window.queryItems = queryItems;
+
+function createItemBrowser(cfg) {
+  const features = Object.assign({ count: true, search: true, filter: true, select: false }, cfg.features);
+  const sortKeys = cfg.sortKeys || DEFAULT_SORT_KEYS;
+  const mk = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
+  const role = (n, r) => { n.setAttribute('data-role', r); return n; };
+  const iconBtn = (name, label, r) => {
+    const b = role(mk('button', 'icon-only-btn'), r);
+    b.type = 'button'; b.setAttribute('aria-label', label);
+    const s = mk('span'); s.setAttribute('data-icon', name); s.innerHTML = ICONS[name] || '';
+    b.appendChild(s);
+    return b;
+  };
+
+  const B = { cfg, visible: [], state: null };
+  const freshState = over => Object.assign({
+    cat: cfg.defaultCat != null ? cfg.defaultCat : null,
+    sort: cfg.defaultSort || sortKeys[0],
+    query: '',
+    filters: { status: 'all', tags: [] },
+    searchOpen: false,
+    selectMode: false,
+    selected: new Set(),
+  }, over || {});
+  B.state = freshState();
+
+  const root = cfg.mount;
+  if (!root) return B;
+  root.innerHTML = '';
+  root.classList.add('item-browser');
+  root.setAttribute('data-ib', cfg.id);
+
+  const catRow = role(mk('div', 'chip-row'), 'categories');
+  const sortRow = mk('div', 'sort-row');
+  const sortSel = role(mk('select', 'sort-select'), 'sort');
+  sortKeys.forEach(k => {
+    const s = SORTERS[k];
+    if (s) {
+      const o = mk('option'); o.value = k; o.textContent = s.label; sortSel.appendChild(o);
+    }
+  });
+  const right = mk('div', 'sort-row-right');
+  let filterBtn = null, badgeEl = null, searchBtn = null, selectBtn = null;
+  if (features.filter) {
+    filterBtn = iconBtn('filter', '篩選', 'filter');
+    badgeEl = mk('span', 'filter-badge'); badgeEl.hidden = true;
+    filterBtn.appendChild(badgeEl);
+    right.appendChild(filterBtn);
+  }
+  if (features.search) { searchBtn = iconBtn('search', '搜尋', 'search'); right.appendChild(searchBtn); }
+  if (features.select) {
+    selectBtn = role(mk('button', 'select-mode-btn'), 'select-toggle');
+    selectBtn.type = 'button'; selectBtn.textContent = '選取';
+    right.appendChild(selectBtn);
+  }
+  sortRow.appendChild(sortSel);
+  sortRow.appendChild(right);
+
+  const searchRow = role(mk('div', 'search-row is-hidden'), 'search-row');
+  const searchInput = role(mk('input'), 'search-input');
+  searchInput.type = 'text'; searchInput.placeholder = '搜尋名稱、價格、日期…';
+  const searchClear = role(mk('button', 'search-clear-btn'), 'search-clear');
+  searchClear.type = 'button'; searchClear.textContent = '取消';
+  searchRow.appendChild(searchInput); searchRow.appendChild(searchClear);
+
+  const extraSlot = mk('div');
+  const countEl = role(mk('p', 'item-count'), 'count');
+  const grid = role(mk('div', 'item-grid'), 'grid');
+  const emptyEl = role(mk('p', 'empty-hint'), 'empty'); emptyEl.hidden = true;
+  const footerSlot = mk('div');
+
+  const bar = role(mk('div', 'select-bar is-hidden'), 'select-bar');
+  const barCount = role(mk('p'), 'select-count');
+  const barActions = mk('div', 'select-bar-actions');
+  const barBtn = (label, cls) => { const b = mk('button', 'btn-secondary' + (cls ? ' ' + cls : '')); b.type = 'button'; b.textContent = label; return b; };
+  if (features.select) {
+    const btnAll = role(barBtn('全選'), 'select-all');
+    btnAll.addEventListener('click', () => {
+      const st = B.state;
+      const allOn = B.visible.length > 0 && B.visible.every(i => st.selected.has(i.id));
+      if (allOn) st.selected.clear(); else B.visible.forEach(i => st.selected.add(i.id));
+      B.render();
+    });
+    barActions.appendChild(btnAll);
+    (cfg.selectActions || []).forEach(a => {
+      const b = role(barBtn(a.label, a.kind === 'danger' ? 'btn-danger' : ''), 'select-action');
+      b.addEventListener('click', () => {
+        if (!B.state.selected.size) { toast('請先選取單品'); return; }
+        a.run(Array.from(B.state.selected), B);
+      });
+      barActions.appendChild(b);
+    });
+    const btnCancel = role(barBtn('取消'), 'select-cancel');
+    btnCancel.addEventListener('click', () => B.setSelectMode(false));
+    barActions.appendChild(btnCancel);
+  }
+  bar.appendChild(barCount); bar.appendChild(barActions);
+
+  [catRow, sortRow, searchRow, extraSlot, countEl, grid, emptyEl, footerSlot, bar].forEach(n => root.appendChild(n));
+
+  sortSel.addEventListener('change', () => { B.state.sort = sortSel.value; B.render(); });
+  if (filterBtn) filterBtn.addEventListener('click', () => openFilterFor(B));
+  if (searchBtn) searchBtn.addEventListener('click', () => {
+    B.state.searchOpen = !B.state.searchOpen;
+    B.render();
+    if (B.state.searchOpen) searchInput.focus();
+  });
+  searchInput.addEventListener('input', () => { B.state.query = searchInput.value.trim(); B.render(); });
+  searchClear.addEventListener('click', () => {
+    B.state.query = ''; B.state.searchOpen = false; searchInput.value = '';
+    B.render();
+  });
+  if (selectBtn) selectBtn.addEventListener('click', () => B.setSelectMode(!B.state.selectMode));
+
+  B.setSelectMode = on => {
+    B.state.selectMode = on;
+    B.state.selected.clear();
+    if (cfg.onSelectModeChange) cfg.onSelectModeChange(on);
+    B.render();
+  };
+  B.reset = over => {
+    B.state = freshState(over);
+    searchInput.value = '';
+    if (cfg.onSelectModeChange) cfg.onSelectModeChange(false);
+    B.render();
+  };
+
+  const cardOpts = (item, idx) => {
+    const st = B.state;
+    return {
+      selectMode: st.selectMode,
+      selected: st.selected.has(item.id),
+      badge: cfg.badge ? cfg.badge(item, idx, B) : null,
+      subtitle: cfg.subtitle ? cfg.subtitle(item) : null,
+      onLongPress: (cfg.onLongPress && !st.selectMode) ? cfg.onLongPress : null,
+      onTap: it => {
+        if (B.state.selectMode) {
+          if (B.state.selected.has(it.id)) B.state.selected.delete(it.id); else B.state.selected.add(it.id);
+          B.render();
+        } else cfg.onItemTap(it);
+      },
+    };
+  };
+
+  B.render = () => {
+    const st = B.state;
+    const cats = cfg.categories ? cfg.categories() : null;
+    if (cats && cats.length && !cats.some(c => c.id === st.cat)) st.cat = cats[0].id;
+
+    if (!cats) catRow.classList.add('is-hidden');
+    else {
+      catRow.classList.remove('is-hidden');
+      const keep = catRow.scrollLeft;
+      catRow.innerHTML = '';
+      cats.forEach(c => {
+        const chip = mk('button', 'chip' + (st.cat === c.id ? ' is-active' : ''));
+        chip.type = 'button'; chip.textContent = c.label; chip.setAttribute('data-cat', c.id);
+        chip.addEventListener('click', () => { B.state.cat = c.id; B.render(); });
+        catRow.appendChild(chip);
+      });
+      if (cfg.addCategory) {
+        const add = mk('button', 'chip chip-add');
+        add.type = 'button'; add.textContent = '+ 新增分類';
+        add.addEventListener('click', cfg.addCategory);
+        catRow.appendChild(add);
+      }
+      catRow.scrollLeft = keep;
+    }
+
+    B.visible = queryItems(cfg.getItems(), {
+      cat: cats ? st.cat : null, matchCategory: cfg.matchCategory,
+      query: st.query, filters: st.filters, sort: st.sort,
+    });
+    if (st.selectMode) {
+      const vis = new Set(B.visible.map(i => i.id));
+      Array.from(st.selected).forEach(id => { if (!vis.has(id)) st.selected.delete(id); });
+    }
+
+    sortSel.value = st.sort;
+    if (badgeEl) badgeEl.hidden = !isFiltered(st.filters);
+    if (selectBtn) selectBtn.classList.toggle('is-active', st.selectMode);
+    searchRow.classList.toggle('is-hidden', !st.searchOpen);
+    countEl.hidden = !features.count;
+    countEl.textContent = `${B.visible.length} 件`;
+
+    extraSlot.innerHTML = '';
+    if (cfg.renderExtra) { const n = cfg.renderExtra(B); if (n) extraSlot.appendChild(n); }
+    footerSlot.innerHTML = '';
+    if (cfg.footer) { const n = cfg.footer(B); if (n) footerSlot.appendChild(n); }
+
+    grid.innerHTML = '';
+    B.visible.forEach((item, idx) => grid.appendChild(buildItemCard(item, cardOpts(item, idx))));
+    if (!B.visible.length) {
+      let text = cfg.emptyText ? cfg.emptyText(B) : null;
+      if (text == null) text = (st.query || isFiltered(st.filters)) ? '沒有符合的單品' : '目前沒有單品';
+      emptyEl.textContent = text;
+      emptyEl.hidden = false;
+    } else emptyEl.hidden = true;
+
+    bar.classList.toggle('is-hidden', !(features.select && st.selectMode));
+    barCount.textContent = `已選 ${st.selected.size} 件`;
+  };
+
+  B.els = { root, catRow, sortSel, searchInput, grid, bar };
+  B.render();
+  return B;
+}
+
+let filterTarget = null;
+function openFilterFor(B) {
+  filterTarget = B;
+  filterContext = 'browser';
+  renderFilterModalForBrowser(B);
+  pushModal('modal-filter');
+}
+
+function renderFilterModalForBrowser(B) {
+  if (!B) return;
+  const f = B.state.filters;
+  document.getElementById('filterModalTitle').textContent = '篩選';
+  document.getElementById('filterStatusSection').classList.remove('is-hidden');
+  document.getElementById('filterCategorySection').classList.add('is-hidden');
+  document.getElementById('filterColorSection')?.classList.add('is-hidden');
+  document.getElementById('filterBrandSection')?.classList.add('is-hidden');
+  document.getElementById('savedFilterSection')?.classList.add('is-hidden');
+  const invertBar = document.querySelector('.filter-invert-bar');
+  if (invertBar) invertBar.classList.add('is-hidden');
+
+  document.querySelectorAll('#filterStatusChips .chip').forEach(c => c.classList.toggle('is-active', c.getAttribute('data-status') === f.status));
+  const tagRow = document.getElementById('filterTagChips');
+  if (tagRow) {
+    tagRow.innerHTML = '';
+    const inScope = new Set(f.tags || []);
+    (B.cfg.getItems() || []).forEach(i => (i.tags || []).forEach(t => inScope.add(t)));
+    Array.from(inScope).sort((a, b) => a.localeCompare(b, 'zh-Hant')).forEach(t => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip' + ((f.tags || []).includes(t) ? ' is-active' : '');
+      chip.textContent = t;
+      chip.addEventListener('click', () => {
+        const cur = B.state.filters;
+        cur.tags = cur.tags.includes(t) ? cur.tags.filter(x => x !== t) : cur.tags.concat(t);
+        chip.classList.toggle('is-active');
+        B.render();
+      });
+      tagRow.appendChild(chip);
+    });
+  }
+}
+
+let rankBrowser = null;
+function initBrowsers() {
+  const rankMount = document.getElementById('rankBrowserMount');
+  if (rankMount && !rankBrowser) {
+    rankBrowser = createItemBrowser({
+      id: 'rank',
+      mount: rankMount,
+      features: { count: false, search: true, filter: true, select: false },
+      sortKeys: ['totalWear', 'wearCount', 'lastWorn', 'name'],
+      defaultSort: 'totalWear',
+      categories: () => [{ id: 'all', label: '全部' }].concat(allCategoryIds().map(id => ({ id, label: categoryLabel(id) }))),
+      matchCategory: (i, cat) => cat === 'all' ? true : i.category === cat,
+      getItems: () => {
+        const entries = allOotdEntries();
+        const today = todayStr();
+        const monthPrefix = `${uiCalMonth.y}-${String(uiCalMonth.m + 1).padStart(2, '0')}`;
+        let periodEntries = entries;
+        if (uiRankPeriod === 'month') {
+          periodEntries = entries.filter(e => e.date?.startsWith(monthPrefix));
+        } else if (uiRankPeriod === '30d') {
+          periodEntries = entries.filter(e => e.date && daysBetween(e.date, today) <= 30);
+        } else if (uiRankPeriod === 'custom') {
+          const sDate = document.getElementById('rankStartDate')?.value;
+          const eDate = document.getElementById('rankEndDate')?.value;
+          periodEntries = entries.filter(e => {
+            if (!e.date) return false;
+            if (sDate && e.date < sDate) return false;
+            if (eDate && e.date > eDate) return false;
+            return true;
+          });
+        }
+        const periodWearCounts = {};
+        periodEntries.forEach(e => {
+          ALL_SLOTS.forEach(slot => {
+            const itemId = e[slot];
+            if (itemId) periodWearCounts[itemId] = (periodWearCounts[itemId] || 0) + 1;
+          });
+        });
+        return state.items
+          .filter(i => i.status !== 'retired')
+          .map(i => {
+            const count = uiRankPeriod === 'all' ? (i.totalWearCount || 0) : (periodWearCounts[i.id] || 0);
+            return Object.assign({}, i, { periodWearCount: count });
+          })
+          .filter(i => (uiRankPeriod === 'all' ? (i.totalWearCount || 0) > 0 : (i.periodWearCount || 0) > 0));
+      },
+      onItemTap: item => openItemDetail(item.id),
+      badge: (item, idx, B) => (B.state.sort === 'totalWear' || B.state.sort === 'wearCount') ? `#${idx + 1}` : null,
+      subtitle: item => uiRankPeriod === 'all' ? `穿過 ${item.totalWearCount || 0} 次` : `穿過 ${item.periodWearCount || 0} 次`,
+      emptyText: B => (B.state.query || isFiltered(B.state.filters)) ? null : '這段期間還沒有穿搭紀錄，去主頁試穿看看吧',
+    });
+  }
+  window.itemBrowsers = Object.assign({}, window.itemBrowsers, { rank: rankBrowser });
+}
+
 /* ---- Wardrobe tab ---- */
 let uiWardrobeCat = 'all';
 let uiWardrobeSort = 'recent';
@@ -2563,21 +2918,6 @@ function isFilterActive() {
     uiWardrobeFilters.colors.length > 0 ||
     uiWardrobeFilters.brands.length > 0 ||
     uiWardrobeFilters.invert;
-}
-function itemMatchesSearch(item, q) {
-  if (!q) return true;
-  const hay = [
-    item.name,
-    item.brand || '',
-    item.color || '',
-    item.colorFamily || '',
-    item.price != null ? String(item.price) : '',
-    fmtDate(item.purchaseDate || ''),
-    fmtDate(item.lastWornDate || ''),
-    (item.tags || []).join(' '),
-    categoryLabel(item.category),
-  ].join(' ').toLowerCase();
-  return hay.includes(q.toLowerCase());
 }
 
 function renderCategoryChips() {
@@ -2613,24 +2953,26 @@ function normalizeItemColorFamily(item) {
   return raw;
 }
 
-function itemMatchesFilters(item) {
-  const hasStatus = uiWardrobeFilters.status !== 'all';
-  const hasTags = uiWardrobeFilters.tags.length > 0;
-  const hasColors = uiWardrobeFilters.colors.length > 0;
-  const hasBrands = uiWardrobeFilters.brands.length > 0;
+function itemMatchesFilters(item, filters) {
+  const f = filters || uiWardrobeFilters;
+  if (!f) return true;
+  const hasStatus = f.status && f.status !== 'all';
+  const hasTags = f.tags && f.tags.length > 0;
+  const hasColors = f.colors && f.colors.length > 0;
+  const hasBrands = f.brands && f.brands.length > 0;
 
   if (!hasStatus && !hasTags && !hasColors && !hasBrands) return true;
 
-  const statusMatch = !hasStatus || item.status === uiWardrobeFilters.status;
-  const tagMatch = !hasTags || uiWardrobeFilters.tags.every(t => (item.tags || []).includes(t));
+  const statusMatch = !hasStatus || item.status === f.status;
+  const tagMatch = !hasTags || f.tags.every(t => (item.tags || []).includes(t));
   const itemFamily = normalizeItemColorFamily(item);
-  const colorMatch = !hasColors || uiWardrobeFilters.colors.includes(itemFamily);
+  const colorMatch = !hasColors || f.colors.includes(itemFamily);
   const brandMatch = !hasBrands || (
-    item.brand && uiWardrobeFilters.brands.includes(item.brand)
+    item.brand && f.brands.includes(item.brand)
   );
 
   const matched = statusMatch && tagMatch && colorMatch && brandMatch;
-  if (uiWardrobeFilters.invert) {
+  if (f.invert) {
     return !matched;
   }
   return matched;
@@ -2711,9 +3053,10 @@ function buildItemCard(item, opts) {
   card.dataset.id = item.id;
   card.dataset.category = item.category || '';
   const statusClass = item.status === 'dirty' ? 'is-dirty' : item.status === 'resting' ? 'is-resting' : '';
-  const selected = uiSelectMode && uiSelectedIds.has(item.id);
-  if (uiSelectMode) card.classList.add('is-selectable');
-  if (selected) card.classList.add('is-selected');
+  const isSelectMode = opts.selectMode != null ? opts.selectMode : uiSelectMode;
+  const isSelected = opts.selected != null ? opts.selected : (uiSelectMode && uiSelectedIds.has(item.id));
+  if (isSelectMode) card.classList.add('is-selectable');
+  if (isSelected) card.classList.add('is-selected');
   const activityMeta = item.status === 'resting' && item.restingSince
     ? `（${fmtDate(item.restingSince)} 開始）`
     : item.status === 'dirty' && item.basketAt
@@ -2737,10 +3080,11 @@ function buildItemCard(item, opts) {
       ${washBoostMarkup(item, opts)}
     `;
   } else {
+    const wearSubtitle = opts.subtitle != null ? opts.subtitle : `穿了 ${item.wearCount||0} 次${activityMeta}`;
     infoHtml = `
       ${brandMarkup}
       ${itemCardNameMarkup(item.name)}
-      <p class="item-wear">穿了 ${item.wearCount||0} 次${activityMeta}</p>
+      <p class="item-wear">${escapeHtml(wearSubtitle)}</p>
       ${washBoostMarkup(item, opts)}
     `;
   }
@@ -2755,13 +3099,22 @@ function buildItemCard(item, opts) {
     return item.wearCount || 1;
   })();
 
-  const restingBadge = item.status === 'resting'
+  let cornerMarkup = '';
+  if (isSelectMode || (opts && opts.isLaundrySelectMode)) {
+    cornerMarkup = `<span class="item-card-check"></span>`;
+  } else if (opts.badge) {
+    cornerMarkup = `<span class="rank-badge">${escapeHtml(opts.badge)}</span>`;
+  } else if (item.status !== 'retired') {
+    cornerMarkup = `<span class="item-status-dot ${statusClass}"></span>`;
+  }
+
+  const restingBadge = !opts.badge && item.status === 'resting'
     ? `<span class="item-resting-badge">已穿 ${restingWornCount} 次</span>`
-    : (item.status === 'dirty' && opts && opts.tryonMode ? `<span class="item-dirty-badge">待洗</span>` : '');
+    : (!opts.badge && item.status === 'dirty' && opts && opts.tryonMode ? `<span class="item-dirty-badge">待洗</span>` : '');
 
   card.innerHTML = `
     <div class="item-photo">${itemPhotoMarkup(item)}</div>
-    ${(uiSelectMode || (opts && opts.isLaundrySelectMode)) ? `<span class="item-card-check"></span>` : (item.status !== 'retired' ? `<span class="item-status-dot ${statusClass}"></span>` : '')}
+    ${cornerMarkup}
     ${restingBadge}
     <div class="item-info">
       ${infoHtml}
@@ -2774,7 +3127,8 @@ function buildItemCard(item, opts) {
     longPressTimer = setTimeout(() => {
       longPressFired = true;
       if (navigator.vibrate) navigator.vibrate(10);
-      if (!uiSelectMode) openAddModal(item.id);
+      if (opts.onLongPress) opts.onLongPress(item);
+      else if (!uiSelectMode) openAddModal(item.id);
     }, 550);
   }, { passive: true });
   const cancelLongPress = () => clearTimeout(longPressTimer);
@@ -2800,6 +3154,7 @@ function buildItemCard(item, opts) {
   }
   card.addEventListener('click', () => {
     if (longPressFired) { longPressFired = false; return; }
+    if (opts.onTap) { opts.onTap(item); return; }
     if (opts.onClick) { opts.onClick(item); return; }
     if (opts.isLaundrySelectMode) toggleLaundryItemSelection(item.id, card);
     else if (uiSelectMode) toggleItemSelection(item.id, card);
@@ -3003,7 +3358,7 @@ function renderCalStats() {
 }
 
 function renderRank() {
-  const list = document.getElementById('rankList');
+  if (!rankBrowser) initBrowsers();
   const statsWrap = document.getElementById('rankStats');
   const entries = allOotdEntries();
   const today = todayStr();
@@ -3038,64 +3393,30 @@ function renderRank() {
     });
   });
 
-  // Filter items by category
-  let itemsToRank = state.items.filter(i => i.status !== 'retired');
-  if (uiRankCategory !== 'all') {
-    itemsToRank = itemsToRank.filter(i => i.category === uiRankCategory);
-  }
-
-  // Attach wear count and filter > 0
-  const ranked = itemsToRank.map(item => ({
-    item,
-    count: uiRankPeriod === 'all' ? (item.totalWearCount || 0) : (periodWearCounts[item.id] || 0)
-  }))
-  .filter(x => x.count > 0)
-  .sort((a, b) => b.count - a.count);
-
-  // Sync active states for pills & tabs
+  // Sync active states for pills
   document.querySelectorAll('#rankPeriodPills .rank-period-btn').forEach(btn => {
     btn.classList.toggle('is-active', btn.dataset.period === uiRankPeriod);
-  });
-  document.querySelectorAll('#rankCategoryTabs .cat-tab').forEach(btn => {
-    btn.classList.toggle('is-active', btn.dataset.cat === uiRankCategory);
   });
 
   // Stats calculation
   const totalWearInPeriod = Object.values(periodWearCounts).reduce((a, b) => a + b, 0);
-  const activeItemsCount = itemsToRank.length;
-  const wornItemsInPeriod = ranked.length;
+  const activeItemsCount = state.items.filter(i => i.status !== 'retired').length;
+  const wornCount = Object.keys(periodWearCounts).length;
   const daysLogged = new Set(periodEntries.map(e => e.date)).size;
 
   const periodName = uiRankPeriod === 'month' ? '本月' : (uiRankPeriod === '30d' ? '近 30 天' : '歷史累積');
-  const catName = uiRankCategory === 'all' ? '全單品' : categoryLabel(uiRankCategory);
 
   const stats = [
     { label: `${periodName}穿著次數`, value: `${uiRankPeriod === 'all' ? state.items.reduce((s, i) => s + (i.totalWearCount || 0), 0) : totalWearInPeriod} 次` },
     { label: `${periodName}穿搭天數`, value: `${daysLogged} 天` },
-    { label: `${catName}上榜款數`, value: `${wornItemsInPeriod} 件` },
-    { label: `${catName}穿搭率`, value: `${activeItemsCount ? Math.round(wornItemsInPeriod / activeItemsCount * 100) : 0}%` },
+    { label: `上榜款數`, value: `${uiRankPeriod === 'all' ? state.items.filter(i => (i.totalWearCount || 0) > 0).length : wornCount} 件` },
+    { label: `單品動能率`, value: `${activeItemsCount ? Math.round((uiRankPeriod === 'all' ? state.items.filter(i => (i.totalWearCount || 0) > 0).length : wornCount) / activeItemsCount * 100) : 0}%` },
   ];
   if (statsWrap) statsWrap.innerHTML = stats.map(s => `<div class="rank-stat-card"><p>${s.label}</p><b>${s.value}</b></div>`).join('');
 
-  list.innerHTML = '';
-  if (!ranked.length) {
-    list.innerHTML = `<p class="empty-hint" style="grid-column: 1 / -1; text-align: center; padding: 24px 0;">在「${periodName}」期間，${catName}還沒有穿搭紀錄</p>`;
-    return;
+  if (rankBrowser) {
+    rankBrowser.render();
   }
-  ranked.slice(0, 30).forEach(({ item, count }, idx) => {
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'item-card';
-    card.innerHTML = `
-      <div class="item-photo">${itemPhotoMarkup(item)}</div>
-      <span class="rank-badge">#${idx + 1}</span>
-      <div class="item-info">
-        ${itemCardNameMarkup(item.name)}
-        <p class="item-wear">穿過 ${count} 次</p>
-      </div>`;
-    card.addEventListener('click', () => openItemDetail(item.id));
-    list.appendChild(card);
-  });
 }
 
 function openDayDetail(dateStr, entry) {
@@ -5441,11 +5762,14 @@ function openAddModal(editId = null) {
    MODAL PLUMBING (incl. swipe-to-dismiss)
    ============================================================ */
 let modalStack = [];
+function pushModal(id, onReturn) {
+  openModal(id, { onReturn });
+}
 function openModal(id, opts = {}) {
   const current = document.querySelector('.modal-sheet.is-active:not(.is-behind)') || document.querySelector('.modal-sheet.is-active');
   if (current && current.id !== id && !opts.fromStack) {
     persistTransientForms();
-    modalStack.push({ id: current.id, returnTo: modalReturnTo, editingItemId });
+    modalStack.push({ id: current.id, returnTo: modalReturnTo, editingItemId, onReturn: opts.onReturn });
     current.classList.add('is-behind');
   }
   document.querySelectorAll('.modal-sheet').forEach(s => {
@@ -5577,6 +5901,9 @@ function closeModal() {
           renderItemDetail(prev.editingItemId);
         } else if (prev.id === 'modal-tryon' && tryonCurrentSlot) {
           renderTryonGridFor(tryonCurrentSlot, tryonCurrentCategory);
+        }
+        if (prev.onReturn) {
+          try { prev.onReturn(); } catch (e) { console.error(e); }
         }
       }
       return;
@@ -8257,6 +8584,12 @@ function wireEvents() {
   document.getElementById('btnFilter').addEventListener('click', () => { modalReturnTo = null; openFilterModal('wardrobe'); });
   document.getElementById('filterStatusChips').addEventListener('click', e => {
     const chip = e.target.closest('.chip'); if (!chip) return;
+    if (filterContext === 'browser' && filterTarget) {
+      filterTarget.state.filters.status = chip.getAttribute('data-status');
+      renderFilterModalForBrowser(filterTarget);
+      filterTarget.render();
+      return;
+    }
     if (filterContext !== 'wardrobe') return;
     uiWardrobeFilters.status = chip.getAttribute('data-status');
     document.querySelectorAll('#filterStatusChips .chip').forEach(c => c.classList.remove('is-active'));
@@ -8273,6 +8606,12 @@ function wireEvents() {
   });
 
   document.getElementById('btnFilterClear').addEventListener('click', () => {
+    if (filterContext === 'browser' && filterTarget) {
+      filterTarget.state.filters = { status: 'all', tags: [] };
+      renderFilterModalForBrowser(filterTarget);
+      filterTarget.render();
+      return;
+    }
     if (filterContext === 'wishlist') uiWishlistFilters = { category: 'all', tags: [] };
     else uiWardrobeFilters = { status: 'all', tags: [], colors: [], brands: [], invert: false };
     openFilterModal(filterContext);
