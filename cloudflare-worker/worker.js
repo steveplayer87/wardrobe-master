@@ -149,21 +149,28 @@ export default {
           }
           const valid = stations.filter(st => normalizeTemp(st?.WeatherElement?.AirTemperature) !== null);
           if (!valid.length) return null;
-          if (hasCoords) {
+          const pickClosest = pool => {
+            if (!pool.length) return null;
+            if (!hasCoords) return pool[0];
             let best = null;
             let bestDist = Infinity;
-            for (const st of valid) {
+            for (const st of pool) {
               const c = pickStationCoords(st);
               if (!c) continue;
               const d = (c.lat - latParam) ** 2 + (c.lon - lonParam) ** 2;
               if (d < bestDist) { bestDist = d; best = st; }
             }
-            if (best) return best;
-          }
+            return best || pool[0];
+          };
           if (rawTown) {
-            const byTown = valid.find(st => (st.GeoInfo?.TownName || "").replace(/^台/, "臺") === rawTown);
-            if (byTown) return byTown;
+            const inTown = valid.filter(st => (st.GeoInfo?.TownName || "").replace(/^台/, "臺") === rawTown);
+            const nonHighwayInTown = inTown.filter(st => !/^國[一二三四五六七八九十]/.test(st.StationName || ""));
+            if (nonHighwayInTown.length) return pickClosest(nonHighwayInTown);
+            if (inTown.length) return pickClosest(inTown);
           }
+          const nonHighwayValid = valid.filter(st => !/^國[一二三四五六七八九十]/.test(st.StationName || ""));
+          if (hasCoords && nonHighwayValid.length) return pickClosest(nonHighwayValid);
+          if (hasCoords) return pickClosest(valid);
           const byCounty = valid.find(st => (st.GeoInfo?.CountyName || "").replace(/^台/, "臺") === rawCounty);
           return byCounty || valid[0];
         };
@@ -237,11 +244,20 @@ export default {
           } catch (_) {}
         }
 
-        // 3. 取得鄉鎮未來 3 天逐 3 小時預報 (F-D0047-089) 補齊今日整天 24 小時趨勢
+        // 3. 取得鄉鎮未來 3 天逐 3 小時預報 (各縣市 F-D0047-xxx) 補齊今日整天 24 小時趨勢
+        const CWA_3D_DATASET_BY_COUNTY = {
+          "宜蘭縣": "F-D0047-001", "桃園市": "F-D0047-005", "新竹縣": "F-D0047-009", "苗栗縣": "F-D0047-013",
+          "彰化縣": "F-D0047-017", "南投縣": "F-D0047-021", "雲林縣": "F-D0047-025", "嘉義縣": "F-D0047-029",
+          "屏東縣": "F-D0047-033", "臺東縣": "F-D0047-037", "花蓮縣": "F-D0047-041", "澎湖縣": "F-D0047-045",
+          "基隆市": "F-D0047-049", "新竹市": "F-D0047-053", "嘉義市": "F-D0047-057", "臺北市": "F-D0047-061",
+          "高雄市": "F-D0047-065", "新北市": "F-D0047-069", "臺中市": "F-D0047-073", "臺南市": "F-D0047-077",
+          "連江縣": "F-D0047-081", "金門縣": "F-D0047-085"
+        };
         const forecastNodes = [];
         try {
+          const fcDatasetId = CWA_3D_DATASET_BY_COUNTY[currentSnap.county] || CWA_3D_DATASET_BY_COUNTY[rawCounty] || "F-D0047-089";
           const targetTown = rawTown || currentSnap.town || "";
-          const fcUrl = new URL("https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-089");
+          const fcUrl = new URL(`https://opendata.cwa.gov.tw/api/v1/rest/datastore/${fcDatasetId}`);
           fcUrl.searchParams.set("Authorization", env.CWA_API_KEY);
           fcUrl.searchParams.set("format", "JSON");
           if (targetTown) fcUrl.searchParams.set("LocationName", targetTown);
@@ -371,103 +387,127 @@ export default {
           return result;
         };
 
+        // 4. 取得今日已過時段 & 昨日實測資料：優先讀取 KV；若尚未累積，透過 CWA historyapi (XML) 補齊
+        const extractStationFromCwaXml = (xmlText, targetStationId, targetTown) => {
+          if (!xmlText || typeof xmlText !== "string") return null;
+          const findBlockContaining = needle => {
+            if (!needle) return "";
+            const idx = xmlText.indexOf(needle);
+            if (idx < 0) return "";
+            const start = xmlText.lastIndexOf("<Station>", idx);
+            const end = xmlText.indexOf("</Station>", idx);
+            if (start < 0 || end < 0 || end <= start) return "";
+            return xmlText.slice(start, end + 10);
+          };
+          let block = findBlockContaining(`<StationId>${targetStationId}</StationId>`);
+          if (!block && targetTown) {
+            block = findBlockContaining(`<TownName>${targetTown}</TownName>`);
+          }
+          if (!block) return null;
+          const tagVal = tag => {
+            const m = block.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
+            return m ? m[1].trim() : "";
+          };
+          const temp = normalizeTemp(tagVal("AirTemperature"));
+          if (temp === null) return null;
+          const obsRaw = tagVal("DateTime");
+          const hour = obsRaw.length >= 13 ? Number(obsRaw.slice(11, 13)) : 0;
+          const isNight = hour >= 18 || hour < 6;
+          const wxRaw = tagVal("Weather");
+          const wxLabel = wxRaw && wxRaw !== "X" && wxRaw !== "-99" ? wxRaw : "晴朗";
+          return {
+            hour,
+            temp,
+            code: mapCwaWeatherToCode(wxLabel, isNight),
+            label: wxLabel,
+            isDay: isNight ? 0 : 1,
+            actual: true
+          };
+        };
+
+        const fetchCwaHistoryIntoMap = async (targetDate, targetHoursList, obsMap, kvKey) => {
+          const missing = targetHoursList.filter(h => h >= 0 && h <= 23 && !obsMap[String(h).padStart(2, "0")]);
+          if (!missing.length) return false;
+          try {
+            const metaUrl = new URL("https://opendata.cwa.gov.tw/historyapi/v1/getMetadata/O-A0001-001");
+            metaUrl.searchParams.set("Authorization", env.CWA_API_KEY);
+            metaUrl.searchParams.set("format", "JSON");
+            metaUrl.searchParams.set("timeFrom", `${targetDate}T00:00:00`);
+            metaUrl.searchParams.set("timeTo", `${targetDate}T23:59:59`);
+            const metaRes = await fetch(metaUrl.toString(), { headers: { "Accept": "application/json" } });
+            if (!metaRes.ok) return false;
+            const metaJson = await metaRes.json();
+            const resources = metaJson?.dataset?.resources?.resource?.data?.time ||
+              metaJson?.resources?.resource?.data?.time ||
+              metaJson?.data?.time ||
+              [];
+            const byHourUrl = new Map();
+            for (const item of (Array.isArray(resources) ? resources : [])) {
+              const tStr = String(item?.DateTime || item?.DataTime || item?.time || "");
+              const fUrl = item?.ProductURL || item?.url || "";
+              const h = tStr.length >= 13 ? Number(tStr.slice(11, 13)) : NaN;
+              if (fUrl && Number.isFinite(h) && !byHourUrl.has(h)) byHourUrl.set(h, fUrl);
+            }
+            let updated = false;
+            for (const h of missing) {
+              const fUrl = byHourUrl.get(h);
+              if (!fUrl) continue;
+              try {
+                const histRes = await fetch(fUrl);
+                if (!histRes.ok) continue;
+                const histText = await histRes.text();
+                let snap = extractStationFromCwaXml(histText, currentSnap.stationId, currentSnap.town);
+                if (!snap && histText.trim().startsWith("{")) {
+                  const histJson = JSON.parse(histText);
+                  const st = findBestStation(histJson?.records?.Station || histJson?.cwaopendata?.dataset?.Station || [], currentSnap.stationId);
+                  const parsed = extractStationSnap(st);
+                  if (parsed) {
+                    snap = { hour: h, temp: parsed.temp, code: parsed.code, label: parsed.weatherText, isDay: h >= 6 && h < 18 ? 1 : 0, actual: true };
+                  }
+                }
+                if (snap) {
+                  obsMap[String(h).padStart(2, "0")] = { ...snap, hour: h };
+                  updated = true;
+                }
+              } catch (_) {}
+            }
+            if (updated) {
+              try {
+                await env.WARDROBE_STORE.put(kvKey, JSON.stringify(obsMap), { expirationTtl: 60 * 60 * 24 * 7 });
+              } catch (_) {}
+            }
+            return updated;
+          } catch (_) {
+            return false;
+          }
+        };
+
+        // 補抓今日稍早整點實測（讓今天凌晨到現在也盡量是實測曲線）
+        const todayEarlyHours = [0, 3, 6, 9, currentHour - 1].filter(h => h >= 0 && h < currentSnap.hour);
+        await fetchCwaHistoryIntoMap(todayDate, todayEarlyHours, todayObsMap, todayKvKey);
+
         const todayKnots = forecastNodes
           .filter(n => n.date === todayDate)
           .map(n => ({ hour: n.hour, temp: n.temp, code: n.code, weatherText: n.weatherText, pop: n.pop }));
-        // 加入今日實測作為即時錨點，讓未累積到的過去小時推估更貼近實際
-        todayKnots.push({
-          hour: currentSnap.hour,
-          temp: currentSnap.temp,
-          code: currentSnap.code,
-          weatherText: currentSnap.weatherText,
-          pop: null
-        });
+        for (const v of Object.values(todayObsMap)) {
+          if (v && Number.isFinite(v.temp)) {
+            todayKnots.push({ hour: Number(v.hour), temp: Number(v.temp), code: v.code, weatherText: v.label || "", pop: null });
+          }
+        }
         const todayHours = buildDayHoursFromKnots(todayDate, todayObsMap, todayKnots);
 
-        // 4. 取得昨日實測資料：優先讀取 KV；若尚未累積，透過 CWA historyapi 補齊關鍵小時與昨日同小時
         let yesterdayObsMap = {};
         let yesterdaySource = "cwa-kv";
         try { yesterdayObsMap = (await env.WARDROBE_STORE.get(yesterdayKvKey, "json")) || {}; } catch (_) {}
         if (!yesterdayObsMap || typeof yesterdayObsMap !== "object") yesterdayObsMap = {};
 
-        const targetHours = Array.from(new Set([currentHour, 0, 3, 6, 9, 12, 15, 18, 21]));
-        const missingTargetHours = targetHours.filter(h => !yesterdayObsMap[String(h).padStart(2, "0")]);
-        if (missingTargetHours.length > 0) {
-          yesterdaySource = "cwa-history";
-          try {
-            const metaUrl = new URL("https://opendata.cwa.gov.tw/historyapi/v1/getMetadata/O-A0001-001");
-            metaUrl.searchParams.set("Authorization", env.CWA_API_KEY);
-            metaUrl.searchParams.set("format", "JSON");
-            metaUrl.searchParams.set("timeFrom", `${yesterdayDate}T00:00:00`);
-            metaUrl.searchParams.set("timeTo", `${yesterdayDate}T23:59:59`);
-            const metaRes = await fetch(metaUrl.toString(), { headers: { "Accept": "application/json" } });
-            if (metaRes.ok) {
-              const metaJson = await metaRes.json();
-              const resources = metaJson?.dataset?.resources?.resource?.data?.time ||
-                metaJson?.resources?.resource?.data?.time ||
-                metaJson?.data?.time ||
-                metaJson?.files ||
-                (Array.isArray(metaJson) ? metaJson : []);
-              const parsedFiles = (Array.isArray(resources) ? resources : []).map(item => {
-                const tStr = String(item?.DataTime || item?.dataTime || item?.time || item?.obsTime || "");
-                const fUrl = item?.ProductURL || item?.productURL || item?.url || item?.Url || "";
-                const h = tStr.length >= 13 ? Number(tStr.slice(11, 13)) : NaN;
-                return fUrl && Number.isFinite(h) ? { hour: h, url: fUrl } : null;
-              }).filter(Boolean);
-
-              // 若 metadata 回傳結構為時間節點包 url 陣列，做一層保險掃描
-              if (!parsedFiles.length && metaJson && typeof metaJson === "object") {
-                const stack = [metaJson];
-                while (stack.length && parsedFiles.length < 30) {
-                  const cur = stack.pop();
-                  if (!cur || typeof cur !== "object") continue;
-                  const u = cur.ProductURL || cur.productURL || cur.url || cur.Url;
-                  const t = cur.DataTime || cur.dataTime || cur.time || cur.Time || cur.DateTime;
-                  if (typeof u === "string" && u.startsWith("http") && typeof t === "string" && t.includes(yesterdayDate)) {
-                    const h = Number(t.slice(11, 13));
-                    if (Number.isFinite(h)) parsedFiles.push({ hour: h, url: u });
-                  }
-                  for (const val of Object.values(cur)) {
-                    if (val && typeof val === "object") stack.push(val);
-                  }
-                }
-              }
-
-              const byHourUrl = new Map();
-              for (const f of parsedFiles) {
-                if (!byHourUrl.has(f.hour)) byHourUrl.set(f.hour, f.url);
-              }
-              let kvUpdated = false;
-              for (const h of missingTargetHours) {
-                const fUrl = byHourUrl.get(h);
-                if (!fUrl) continue;
-                try {
-                  const histRes = await fetch(fUrl, { headers: { "Accept": "application/json" } });
-                  if (!histRes.ok) continue;
-                  const histJson = await histRes.json();
-                  const st = findBestStation(histJson?.records?.Station || histJson?.cwaopendata?.dataset?.Station || [], currentSnap.stationId);
-                  const snap = extractStationSnap(st);
-                  if (snap) {
-                    yesterdayObsMap[String(h).padStart(2, "0")] = {
-                      hour: h,
-                      temp: snap.temp,
-                      code: snap.code,
-                      label: snap.weatherText,
-                      isDay: h >= 6 && h < 18 ? 1 : 0,
-                      actual: true
-                    };
-                    kvUpdated = true;
-                  }
-                } catch (_) {}
-              }
-              if (kvUpdated) {
-                try {
-                  await env.WARDROBE_STORE.put(yesterdayKvKey, JSON.stringify(yesterdayObsMap), { expirationTtl: 60 * 60 * 24 * 7 });
-                } catch (_) {}
-              }
-            }
-          } catch (_) {}
-        }
+        const yesterdayTargetHours = Array.from(new Set([
+          currentHour,
+          Math.min(23, currentHour + 1),
+          0, 3, 6, 9, 12, 15, 18, 21, 23
+        ]));
+        const fetchedYesterday = await fetchCwaHistoryIntoMap(yesterdayDate, yesterdayTargetHours, yesterdayObsMap, yesterdayKvKey);
+        if (fetchedYesterday) yesterdaySource = "cwa-history";
 
         const yesterdayKnots = Object.values(yesterdayObsMap)
           .filter(v => v && Number.isFinite(v.temp))
@@ -483,9 +523,13 @@ export default {
         const yTemps = yesterdayHours.map(h => h.temp).filter(v => v !== null);
         const yesterdayMin = yTemps.length ? Math.round(Math.min(...yTemps) * 10) / 10 : null;
         const yesterdayMax = yTemps.length ? Math.round(Math.max(...yTemps) * 10) / 10 : null;
-        const yesterdaySameHour = yesterdayHours[currentHour] && yesterdayHours[currentHour].temp !== null
-          ? yesterdayHours[currentHour]
-          : null;
+        let yesterdaySameHour = null;
+        if (yesterdayHours[currentHour] && yesterdayHours[currentHour].temp !== null) {
+          yesterdaySameHour = yesterdayHours[currentHour];
+        } else {
+          const nearby = [currentHour + 1, currentHour - 1].find(h => h >= 0 && h <= 23 && yesterdayHours[h] && yesterdayHours[h].temp !== null);
+          if (nearby !== undefined) yesterdaySameHour = { ...yesterdayHours[nearby], approxHour: nearby };
+        }
 
         return new Response(JSON.stringify({
           success: true,
