@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261109_122">
+<link rel="stylesheet" href="styles.css?v=20261112_123">
 </head>
 <body>
 
@@ -54,7 +54,7 @@
           </span>
           <span class="scene-orb" id="sceneOrb"></span>
           <span class="scene-star s1"></span><span class="scene-star s2"></span><span class="scene-star s3"></span>
-          <span class="scene-weather" id="sceneWeather">設定城市後顯示天氣</span>
+          <button type="button" class="scene-weather" id="sceneWeather" aria-label="查看今日與昨日天氣對比">設定城市後顯示天氣</button>
         </div>
         <p class="scene-label">今日穿搭</p>
 
@@ -812,6 +812,61 @@
     <p class="weather-alert-temperatures" id="weatherAlertTemperatures">26° → 20°</p>
     <p class="weather-alert-copy" id="weatherAlertCopy">明天明顯降溫，建議準備薄外套，出門前再確認天氣。</p>
     <div class="weather-alert-actions"><button type="button" class="btn-secondary" data-close>稍後再看</button><button type="button" class="btn-primary" id="btnWeatherAlertWardrobe">前往衣櫥</button></div>
+  </div>
+
+  <!-- Weather Detail Modal (Today vs Yesterday Comparison & Hourly Strip) -->
+  <div class="modal-sheet modal-sheet-tall" id="modal-weather-detail" data-modal>
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <h2>天氣與昨日溫差</h2>
+      <div class="wd-head-actions">
+        <button type="button" class="btn-secondary wd-settings-btn" id="btnWeatherDetailSettings" aria-label="地點與提醒設定">地點設定</button>
+        <button class="modal-close" data-close aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+    </div>
+    <div id="weatherDetailBody" class="wd-body">
+      <div class="wd-location-row">
+        <span class="wd-location-name" id="wdLocationName">桃園市中壢區</span>
+        <span class="wd-meta-text" id="wdMetaText">氣象資料載入中…</span>
+      </div>
+
+      <div class="wd-hero-card">
+        <div class="wd-yesterday-col">
+          <span class="wd-col-caption">昨日此時</span>
+          <div class="wd-yesterday-icon" id="wdYesterdayIcon" aria-hidden="true"></div>
+          <div class="wd-yesterday-temp" id="wdYesterdayTemp">—</div>
+          <div class="wd-yesterday-label" id="wdYesterdayLabel">尚無資料</div>
+        </div>
+        <div class="wd-hero-divider" aria-hidden="true"></div>
+        <div class="wd-today-col">
+          <span class="wd-col-caption" id="wdTodayCaption">今日此時</span>
+          <div class="wd-today-main">
+            <span class="wd-today-temp" id="wdTodayTemp">—</span>
+            <div class="wd-today-cond">
+              <span class="wd-today-icon" id="wdTodayIcon" aria-hidden="true"></span>
+              <span class="wd-today-label" id="wdTodayLabel">—</span>
+            </div>
+          </div>
+          <div class="wd-delta-pill" id="wdDeltaPill">比對昨日此時…</div>
+        </div>
+      </div>
+
+      <div class="wd-range-row" id="wdRangeRow">
+        <span id="wdTodayRange">今日：—</span>
+        <span id="wdYesterdayRange">昨日：—</span>
+      </div>
+
+      <div class="wd-hourly-section">
+        <div class="wd-hourly-header">
+          <span class="wd-hourly-title">逐時天氣變化</span>
+          <div class="segment wd-day-segment" id="wdDaySegment" role="tablist" aria-label="查看今天或昨天">
+            <button type="button" class="segment-btn is-active" data-wd-day="today" role="tab" aria-selected="true">今天</button>
+            <button type="button" class="segment-btn" data-wd-day="yesterday" role="tab" aria-selected="false">昨天</button>
+          </div>
+        </div>
+        <div class="wd-hourly-strip" id="wdHourlyStrip" aria-label="每小時天氣列表"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Weather Settings Modal -->
@@ -1584,7 +1639,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v122', K='wm_seen_version', seen=null;
+  var V='v123', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1594,7 +1649,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261109_122"></script>
-<script src="app.js?v=20261109_122"></script>
+<script src="seed-items.js?v=20261112_123"></script>
+<script src="app.js?v=20261112_123"></script>
 </body>
 </html>

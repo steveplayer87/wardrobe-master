@@ -90,6 +90,432 @@ export default {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=1800" } });
       }
 
+      // 2b. 中央氣象署詳細天氣（今日實測 + 鄉鎮預報 + 昨日對比與逐時回溯）
+      if (path === "/api/weather-detail" && request.method === "GET") {
+        if (!env.CWA_API_KEY) {
+          return new Response(JSON.stringify({ success: false, error: "CWA_API_KEY_NOT_CONFIGURED" }), {
+            status: 503, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
+          });
+        }
+        const rawCounty = (url.searchParams.get("county") || "桃園市").replace(/^台/, "臺").trim();
+        const rawTown = (url.searchParams.get("town") || "").replace(/^台/, "臺").trim();
+        const latParam = Number(url.searchParams.get("lat"));
+        const lonParam = Number(url.searchParams.get("lon"));
+        const hasCoords = Number.isFinite(latParam) && Number.isFinite(lonParam);
+
+        const taipeiFmt = new Intl.DateTimeFormat("sv-SE", {
+          timeZone: "Asia/Taipei",
+          year: "numeric", month: "2-digit", day: "2-digit",
+          hour: "2-digit", minute: "2-digit", hour12: false
+        });
+        const parts = Object.fromEntries(taipeiFmt.formatToParts(new Date()).map(p => [p.type, p.value]));
+        const todayDate = `${parts.year}-${parts.month}-${parts.day}`;
+        const currentHour = Math.min(23, Math.max(0, Number(parts.hour) || 0));
+        const yDateObj = new Date(`${todayDate}T12:00:00+08:00`);
+        yDateObj.setDate(yDateObj.getDate() - 1);
+        const yesterdayDate = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Taipei" }).format(yDateObj);
+
+        const normalizeTemp = val => {
+          const n = Number(val);
+          return Number.isFinite(n) && n > -50 && n < 60 ? Math.round(n * 10) / 10 : null;
+        };
+        const mapCwaWeatherToCode = (text, isNight = false) => {
+          const s = String(text || "");
+          if (!s || s === "X" || s === "-99") return 0;
+          if (s.includes("雷")) return 95;
+          if (s.includes("雪") || s.includes("冰霰")) return 71;
+          if (s.includes("大雨") || s.includes("豪雨")) return 65;
+          if (s.includes("短暫雨") || s.includes("陣雨")) return 80;
+          if (s.includes("細雨") || s.includes("毛雨")) return 51;
+          if (s.includes("雨")) return 61;
+          if (s.includes("霧")) return 45;
+          if (s.includes("陰")) return 3;
+          if (s.includes("多雲")) return 2;
+          if (s.includes("晴")) return s.includes("雲") ? 1 : 0;
+          return isNight ? 1 : 0;
+        };
+        const pickStationCoords = st => {
+          const coords = st?.GeoInfo?.Coordinates || [];
+          const wgs = coords.find(c => String(c.CoordinateName || "").toUpperCase() === "WGS84") || coords[0];
+          const slat = Number(wgs?.StationLatitude);
+          const slon = Number(wgs?.StationLongitude);
+          return Number.isFinite(slat) && Number.isFinite(slon) ? { lat: slat, lon: slon } : null;
+        };
+        const findBestStation = (stations, preferredId = null) => {
+          if (!Array.isArray(stations) || !stations.length) return null;
+          if (preferredId) {
+            const exact = stations.find(st => st.StationId === preferredId && normalizeTemp(st?.WeatherElement?.AirTemperature) !== null);
+            if (exact) return exact;
+          }
+          const valid = stations.filter(st => normalizeTemp(st?.WeatherElement?.AirTemperature) !== null);
+          if (!valid.length) return null;
+          if (hasCoords) {
+            let best = null;
+            let bestDist = Infinity;
+            for (const st of valid) {
+              const c = pickStationCoords(st);
+              if (!c) continue;
+              const d = (c.lat - latParam) ** 2 + (c.lon - lonParam) ** 2;
+              if (d < bestDist) { bestDist = d; best = st; }
+            }
+            if (best) return best;
+          }
+          if (rawTown) {
+            const byTown = valid.find(st => (st.GeoInfo?.TownName || "").replace(/^台/, "臺") === rawTown);
+            if (byTown) return byTown;
+          }
+          const byCounty = valid.find(st => (st.GeoInfo?.CountyName || "").replace(/^台/, "臺") === rawCounty);
+          return byCounty || valid[0];
+        };
+        const extractStationSnap = st => {
+          if (!st) return null;
+          const temp = normalizeTemp(st?.WeatherElement?.AirTemperature);
+          if (temp === null) return null;
+          const obsRaw = String(st?.ObsTime?.DateTime || "");
+          const hour = obsRaw.length >= 13 ? Number(obsRaw.slice(11, 13)) : currentHour;
+          const isNight = hour >= 18 || hour < 6;
+          const wxRaw = String(st?.WeatherElement?.Weather || "");
+          const wxLabel = wxRaw && wxRaw !== "X" && wxRaw !== "-99" ? wxRaw : "";
+          const hum = Number(st?.WeatherElement?.RelativeHumidity);
+          const high = normalizeTemp(st?.WeatherElement?.DailyExtreme?.DailyHigh?.TemperatureInfo?.AirTemperature);
+          const low = normalizeTemp(st?.WeatherElement?.DailyExtreme?.DailyLow?.TemperatureInfo?.AirTemperature);
+          return {
+            stationId: st.StationId || "",
+            stationName: st.StationName || "",
+            county: (st.GeoInfo?.CountyName || rawCounty).replace(/^台/, "臺"),
+            town: (st.GeoInfo?.TownName || rawTown).replace(/^台/, "臺"),
+            obsTime: obsRaw || null,
+            hour,
+            temp,
+            humidity: Number.isFinite(hum) && hum >= 0 && hum <= 100 ? Math.round(hum) : null,
+            weatherText: wxLabel || "晴朗",
+            code: mapCwaWeatherToCode(wxLabel, isNight),
+            isDay: isNight ? 0 : 1,
+            dailyHigh: high,
+            dailyLow: low,
+          };
+        };
+
+        // 1. 取得即時全測站逐時實測 (O-A0001-001)
+        const obsUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001?Authorization=${encodeURIComponent(env.CWA_API_KEY)}&format=JSON`;
+        const obsRes = await fetch(obsUrl, { headers: { "Accept": "application/json" } });
+        if (!obsRes.ok) {
+          return new Response(JSON.stringify({ success: false, error: "CWA_OBS_FAILED", status: obsRes.status }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
+          });
+        }
+        const obsJson = await obsRes.json();
+        const bestStation = findBestStation(obsJson?.records?.Station || []);
+        const currentSnap = extractStationSnap(bestStation);
+        if (!currentSnap) {
+          return new Response(JSON.stringify({ success: false, error: "CWA_STATION_NOT_FOUND" }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" }
+          });
+        }
+
+        const cacheKeyId = (currentSnap.stationId || `${rawCounty}_${rawTown || "default"}`).replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff]/g, "_");
+        const todayKvKey = `weather_obs_${todayDate}_${cacheKeyId}`;
+        const yesterdayKvKey = `weather_obs_${yesterdayDate}_${cacheKeyId}`;
+
+        // 2. 更新 KV 中今日實測逐時紀錄
+        let todayObsMap = {};
+        try { todayObsMap = (await env.WARDROBE_STORE.get(todayKvKey, "json")) || {}; } catch (_) {}
+        if (!todayObsMap || typeof todayObsMap !== "object") todayObsMap = {};
+        const obsHourKey = String(currentSnap.hour).padStart(2, "0");
+        const prevSlot = todayObsMap[obsHourKey];
+        if (!prevSlot || prevSlot.temp !== currentSnap.temp || prevSlot.code !== currentSnap.code) {
+          todayObsMap[obsHourKey] = {
+            hour: currentSnap.hour,
+            temp: currentSnap.temp,
+            code: currentSnap.code,
+            label: currentSnap.weatherText,
+            isDay: currentSnap.isDay,
+            actual: true
+          };
+          try {
+            await env.WARDROBE_STORE.put(todayKvKey, JSON.stringify(todayObsMap), { expirationTtl: 60 * 60 * 24 * 7 });
+          } catch (_) {}
+        }
+
+        // 3. 取得鄉鎮未來 3 天逐 3 小時預報 (F-D0047-089) 補齊今日整天 24 小時趨勢
+        const forecastNodes = [];
+        try {
+          const targetTown = rawTown || currentSnap.town || "";
+          const fcUrl = new URL("https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-D0047-089");
+          fcUrl.searchParams.set("Authorization", env.CWA_API_KEY);
+          fcUrl.searchParams.set("format", "JSON");
+          if (targetTown) fcUrl.searchParams.set("LocationName", targetTown);
+          const fcRes = await fetch(fcUrl.toString(), { headers: { "Accept": "application/json" } });
+          if (fcRes.ok) {
+            const fcJson = await fcRes.json();
+            const groups = fcJson?.records?.Locations || fcJson?.records?.locations || [];
+            let matchedLoc = null;
+            for (const g of groups) {
+              const gName = String(g.LocationsName || g.locationsName || "").replace(/^台/, "臺");
+              const locs = g.Location || g.location || [];
+              const found = locs.find(l => {
+                const lName = String(l.LocationName || l.locationName || "").replace(/^台/, "臺");
+                return targetTown ? lName === targetTown && (!gName || gName === rawCounty || gName.includes(rawCounty.slice(0, 2))) : (!gName || gName === rawCounty);
+              }) || locs[0];
+              if (found) { matchedLoc = found; break; }
+            }
+            if (matchedLoc) {
+              const elements = matchedLoc.WeatherElement || matchedLoc.weatherElement || [];
+              const findEl = names => elements.find(el => names.includes(el.ElementName || el.elementName));
+              const tempEl = findEl(["溫度", "T"]);
+              const wxEl = findEl(["天氣現象", "Wx"]);
+              const popEl = findEl(["3小時降雨機率", "PoP3h", "PoP"]);
+
+              const wxByTime = new Map();
+              for (const t of (wxEl?.Time || wxEl?.time || [])) {
+                const start = String(t.StartTime || t.startTime || t.DataTime || t.dataTime || "");
+                const ev = (t.ElementValue || t.elementValue || [])[0] || {};
+                const label = ev.Weather || ev.value || ev.Value || "";
+                if (start && label) wxByTime.set(start.slice(0, 16), String(label));
+              }
+              const popByTime = new Map();
+              for (const t of (popEl?.Time || popEl?.time || [])) {
+                const start = String(t.StartTime || t.startTime || t.DataTime || t.dataTime || "");
+                const ev = (t.ElementValue || t.elementValue || [])[0] || {};
+                const val = Number(ev.ProbabilityOfPrecipitation ?? ev.value ?? ev.Value);
+                if (start && Number.isFinite(val)) popByTime.set(start.slice(0, 16), Math.round(val));
+              }
+
+              for (const t of (tempEl?.Time || tempEl?.time || [])) {
+                const start = String(t.DataTime || t.dataTime || t.StartTime || t.startTime || "");
+                const ev = (t.ElementValue || t.elementValue || [])[0] || {};
+                const tempVal = normalizeTemp(ev.Temperature ?? ev.value ?? ev.Value);
+                if (!start || tempVal === null) continue;
+                const ms = Date.parse(start);
+                if (!Number.isFinite(ms)) continue;
+                const datePart = start.slice(0, 10);
+                const hourPart = Number(start.slice(11, 13));
+                const wxText = wxByTime.get(start.slice(0, 16)) || "";
+                const popVal = popByTime.get(start.slice(0, 16)) ?? null;
+                forecastNodes.push({
+                  ms,
+                  date: datePart,
+                  hour: hourPart,
+                  temp: tempVal,
+                  weatherText: wxText,
+                  code: wxText ? mapCwaWeatherToCode(wxText, hourPart >= 18 || hourPart < 6) : null,
+                  pop: popVal
+                });
+              }
+              forecastNodes.sort((a, b) => a.ms - b.ms);
+            }
+          }
+        } catch (_) {}
+
+        const buildDayHoursFromKnots = (dateStr, actualMap, knots) => {
+          const validKnots = (knots || []).filter(k => Number.isFinite(k.temp)).sort((a, b) => a.hour - b.hour);
+          const result = [];
+          for (let h = 0; h < 24; h++) {
+            const hh = String(h).padStart(2, "0");
+            const act = actualMap[hh];
+            if (act && act.temp != null) {
+              result.push({
+                hour: h,
+                time: `${hh}:00`,
+                temp: Math.round(act.temp * 10) / 10,
+                code: Number.isFinite(Number(act.code)) ? Number(act.code) : currentSnap.code,
+                label: act.label || currentSnap.weatherText,
+                isDay: h >= 6 && h < 18 ? 1 : 0,
+                actual: !!act.actual,
+                pop: act.pop ?? null
+              });
+              continue;
+            }
+            if (validKnots.length) {
+              let left = null;
+              let right = null;
+              for (const k of validKnots) {
+                if (k.hour <= h) left = k;
+                if (k.hour >= h && !right) right = k;
+              }
+              let interpTemp = null;
+              let refKnot = left || right;
+              if (left && right && left.hour !== right.hour) {
+                const ratio = (h - left.hour) / (right.hour - left.hour);
+                interpTemp = Math.round((left.temp + (right.temp - left.temp) * ratio) * 10) / 10;
+                refKnot = ratio < 0.5 ? left : right;
+              } else {
+                interpTemp = (left || right).temp;
+              }
+              const isNight = h >= 18 || h < 6;
+              const code = refKnot.code != null ? refKnot.code : mapCwaWeatherToCode(refKnot.weatherText, isNight);
+              result.push({
+                hour: h,
+                time: `${hh}:00`,
+                temp: interpTemp,
+                code,
+                label: refKnot.weatherText || "",
+                isDay: isNight ? 0 : 1,
+                actual: false,
+                pop: refKnot.pop ?? null
+              });
+            } else {
+              const isNight = h >= 18 || h < 6;
+              result.push({
+                hour: h,
+                time: `${hh}:00`,
+                temp: null,
+                code: 0,
+                label: "",
+                isDay: isNight ? 0 : 1,
+                actual: false,
+                pop: null
+              });
+            }
+          }
+          return result;
+        };
+
+        const todayKnots = forecastNodes
+          .filter(n => n.date === todayDate)
+          .map(n => ({ hour: n.hour, temp: n.temp, code: n.code, weatherText: n.weatherText, pop: n.pop }));
+        // 加入今日實測作為即時錨點，讓未累積到的過去小時推估更貼近實際
+        todayKnots.push({
+          hour: currentSnap.hour,
+          temp: currentSnap.temp,
+          code: currentSnap.code,
+          weatherText: currentSnap.weatherText,
+          pop: null
+        });
+        const todayHours = buildDayHoursFromKnots(todayDate, todayObsMap, todayKnots);
+
+        // 4. 取得昨日實測資料：優先讀取 KV；若尚未累積，透過 CWA historyapi 補齊關鍵小時與昨日同小時
+        let yesterdayObsMap = {};
+        let yesterdaySource = "cwa-kv";
+        try { yesterdayObsMap = (await env.WARDROBE_STORE.get(yesterdayKvKey, "json")) || {}; } catch (_) {}
+        if (!yesterdayObsMap || typeof yesterdayObsMap !== "object") yesterdayObsMap = {};
+
+        const targetHours = Array.from(new Set([currentHour, 0, 3, 6, 9, 12, 15, 18, 21]));
+        const missingTargetHours = targetHours.filter(h => !yesterdayObsMap[String(h).padStart(2, "0")]);
+        if (missingTargetHours.length > 0) {
+          yesterdaySource = "cwa-history";
+          try {
+            const metaUrl = new URL("https://opendata.cwa.gov.tw/historyapi/v1/getMetadata/O-A0001-001");
+            metaUrl.searchParams.set("Authorization", env.CWA_API_KEY);
+            metaUrl.searchParams.set("format", "JSON");
+            metaUrl.searchParams.set("timeFrom", `${yesterdayDate}T00:00:00`);
+            metaUrl.searchParams.set("timeTo", `${yesterdayDate}T23:59:59`);
+            const metaRes = await fetch(metaUrl.toString(), { headers: { "Accept": "application/json" } });
+            if (metaRes.ok) {
+              const metaJson = await metaRes.json();
+              const resources = metaJson?.dataset?.resources?.resource?.data?.time ||
+                metaJson?.resources?.resource?.data?.time ||
+                metaJson?.data?.time ||
+                metaJson?.files ||
+                (Array.isArray(metaJson) ? metaJson : []);
+              const parsedFiles = (Array.isArray(resources) ? resources : []).map(item => {
+                const tStr = String(item?.DataTime || item?.dataTime || item?.time || item?.obsTime || "");
+                const fUrl = item?.ProductURL || item?.productURL || item?.url || item?.Url || "";
+                const h = tStr.length >= 13 ? Number(tStr.slice(11, 13)) : NaN;
+                return fUrl && Number.isFinite(h) ? { hour: h, url: fUrl } : null;
+              }).filter(Boolean);
+
+              // 若 metadata 回傳結構為時間節點包 url 陣列，做一層保險掃描
+              if (!parsedFiles.length && metaJson && typeof metaJson === "object") {
+                const stack = [metaJson];
+                while (stack.length && parsedFiles.length < 30) {
+                  const cur = stack.pop();
+                  if (!cur || typeof cur !== "object") continue;
+                  const u = cur.ProductURL || cur.productURL || cur.url || cur.Url;
+                  const t = cur.DataTime || cur.dataTime || cur.time || cur.Time || cur.DateTime;
+                  if (typeof u === "string" && u.startsWith("http") && typeof t === "string" && t.includes(yesterdayDate)) {
+                    const h = Number(t.slice(11, 13));
+                    if (Number.isFinite(h)) parsedFiles.push({ hour: h, url: u });
+                  }
+                  for (const val of Object.values(cur)) {
+                    if (val && typeof val === "object") stack.push(val);
+                  }
+                }
+              }
+
+              const byHourUrl = new Map();
+              for (const f of parsedFiles) {
+                if (!byHourUrl.has(f.hour)) byHourUrl.set(f.hour, f.url);
+              }
+              let kvUpdated = false;
+              for (const h of missingTargetHours) {
+                const fUrl = byHourUrl.get(h);
+                if (!fUrl) continue;
+                try {
+                  const histRes = await fetch(fUrl, { headers: { "Accept": "application/json" } });
+                  if (!histRes.ok) continue;
+                  const histJson = await histRes.json();
+                  const st = findBestStation(histJson?.records?.Station || histJson?.cwaopendata?.dataset?.Station || [], currentSnap.stationId);
+                  const snap = extractStationSnap(st);
+                  if (snap) {
+                    yesterdayObsMap[String(h).padStart(2, "0")] = {
+                      hour: h,
+                      temp: snap.temp,
+                      code: snap.code,
+                      label: snap.weatherText,
+                      isDay: h >= 6 && h < 18 ? 1 : 0,
+                      actual: true
+                    };
+                    kvUpdated = true;
+                  }
+                } catch (_) {}
+              }
+              if (kvUpdated) {
+                try {
+                  await env.WARDROBE_STORE.put(yesterdayKvKey, JSON.stringify(yesterdayObsMap), { expirationTtl: 60 * 60 * 24 * 7 });
+                } catch (_) {}
+              }
+            }
+          } catch (_) {}
+        }
+
+        const yesterdayKnots = Object.values(yesterdayObsMap)
+          .filter(v => v && Number.isFinite(v.temp))
+          .map(v => ({ hour: Number(v.hour), temp: Number(v.temp), code: v.code, weatherText: v.label || "", pop: null }));
+        const yesterdayHours = buildDayHoursFromKnots(yesterdayDate, yesterdayObsMap, yesterdayKnots);
+
+        const todayTemps = todayHours.map(h => h.temp).filter(v => v !== null);
+        if (currentSnap.dailyHigh !== null) todayTemps.push(currentSnap.dailyHigh);
+        if (currentSnap.dailyLow !== null) todayTemps.push(currentSnap.dailyLow);
+        const todayMin = todayTemps.length ? Math.round(Math.min(...todayTemps) * 10) / 10 : currentSnap.temp;
+        const todayMax = todayTemps.length ? Math.round(Math.max(...todayTemps) * 10) / 10 : currentSnap.temp;
+
+        const yTemps = yesterdayHours.map(h => h.temp).filter(v => v !== null);
+        const yesterdayMin = yTemps.length ? Math.round(Math.min(...yTemps) * 10) / 10 : null;
+        const yesterdayMax = yTemps.length ? Math.round(Math.max(...yTemps) * 10) / 10 : null;
+        const yesterdaySameHour = yesterdayHours[currentHour] && yesterdayHours[currentHour].temp !== null
+          ? yesterdayHours[currentHour]
+          : null;
+
+        return new Response(JSON.stringify({
+          success: true,
+          source: "CWA",
+          yesterdaySource,
+          county: currentSnap.county || rawCounty,
+          town: currentSnap.town || rawTown,
+          stationName: currentSnap.stationName,
+          obsTime: currentSnap.obsTime,
+          todayDate,
+          yesterdayDate,
+          currentHour,
+          current: {
+            temperature_2m: currentSnap.temp,
+            weather_code: currentSnap.code,
+            is_day: currentSnap.isDay,
+            relative_humidity_2m: currentSnap.humidity,
+            weather_label: currentSnap.weatherText,
+          },
+          todayMin,
+          todayMax,
+          yesterdayMin,
+          yesterdayMax,
+          yesterdaySameHour,
+          todayHours,
+          yesterdayHours,
+          fetchedAt: Date.now()
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=600" } });
+      }
+
       // 3. 從 Notion 日記完整回填洗衣日期（唯讀查詢，不改動 Notion 日記）
       if (path === "/api/laundry-history-import" && request.method === "GET") {
         if (!env.NOTION_TOKEN) {

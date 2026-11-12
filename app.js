@@ -580,8 +580,9 @@ function defaultState() {
     },
     items: JSON.parse(JSON.stringify(typeof SEED_ITEMS !== 'undefined' ? SEED_ITEMS : [])),
     customCategories: [],
-    today: { date: todayStr(), top: null, bottom: null, shoes: null, outer: null, hat: null, accessory: null, inner: null, thermal: null, pajamaTop: null, pajamaBottom: null },
+    today: { date: todayStr(), top: null, bottom: null, shoes: null, outer: null, hat: null, accessory: null, inner: null, thermal: null, pajamaTop: null, pajamaBottom: null, weather: null },
     ootdHistory: [],
+    weatherHistory: {},
     consumables: CONSUMABLE_DEFS.map(c => ({ id: c.id, name: c.name, cycleDays: c.cycleDays, icon: c.icon, startDate: todayStr(), history: [] })),
     activeTowel: 'towelA',
     activePajama: null, // { id: itemId, startDate: dateStr }
@@ -690,6 +691,7 @@ function hydrateState(rawObj) {
     customCategories: Array.isArray(parsed.customCategories) ? parsed.customCategories : [],
     today: Object.assign({}, base.today, parsed.today || {}),
     ootdHistory: Array.isArray(parsed.ootdHistory) ? parsed.ootdHistory : [],
+    weatherHistory: (parsed.weatherHistory && typeof parsed.weatherHistory === 'object' && !Array.isArray(parsed.weatherHistory)) ? parsed.weatherHistory : {},
     consumables: Array.isArray(parsed.consumables) && parsed.consumables.length ? parsed.consumables : base.consumables,
     activeTowel: parsed.activeTowel === 'towelB' ? 'towelB' : 'towelA',
     laundry: Object.assign({}, base.laundry, parsed.laundry || {}),
@@ -797,6 +799,12 @@ function normalizeLoadedState() {
     state.activeSportPants = null;
   }
   state.sportPantsHistory = Array.isArray(state.sportPantsHistory) ? state.sportPantsHistory : [];
+  if (!state.weatherHistory || typeof state.weatherHistory !== 'object' || Array.isArray(state.weatherHistory)) {
+    state.weatherHistory = {};
+  }
+  if (state.today && state.today.weather === undefined) {
+    state.today.weather = null;
+  }
 }
 normalizeLoadedState();
 
@@ -1113,9 +1121,13 @@ function redoState() {
 function ensureNewDay() {
   if (state.today.date === todayStr()) return;
   const hadAny = ALL_SLOTS.some(s => state.today[s]);
+  if (state.today.weather && state.today.date) {
+    state.weatherHistory = state.weatherHistory || {};
+    state.weatherHistory[state.today.date] = state.today.weather;
+  }
   if (hadAny) state.ootdHistory.push({ ...state.today });
   state.items.forEach(it => { it.wornToday = false; });
-  const fresh = { date: todayStr() };
+  const fresh = { date: todayStr(), weather: null };
   ALL_SLOTS.forEach(s => { fresh[s] = null; });
   state.today = fresh;
   saveState();
@@ -1893,8 +1905,35 @@ const WEATHER_LABELS = {
 function weatherText(code, isNight) {
   return WEATHER_LABELS[Number(code)] || ['天氣', ''];
 }
+function weatherSvgIcon(code, isNight = false) {
+  const c = Number(code);
+  const stroke = 'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"';
+  if ([95, 96, 99].includes(c)) {
+    return `<svg viewBox="0 0 24 24" ${stroke}><path d="M17.5 17a4.5 4.5 0 0 0 .5-9A6 6 0 0 0 6.2 7a4 4 0 0 0 .3 8"/><path d="M13 12l-2 4h3l-2 5"/></svg>`;
+  }
+  if ([71, 73, 75, 77, 85, 86].includes(c)) {
+    return `<svg viewBox="0 0 24 24" ${stroke}><path d="M17.5 16a4.5 4.5 0 0 0 .5-9A6 6 0 0 0 6.2 6a4 4 0 0 0 .3 8"/><path d="M8 19h.01M12 19h.01M16 19h.01M10 22h.01M14 22h.01"/></svg>`;
+  }
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(c)) {
+    return `<svg viewBox="0 0 24 24" ${stroke}><path d="M17.5 15a4.5 4.5 0 0 0 .5-9A6 6 0 0 0 6.2 5a4 4 0 0 0 .3 8"/><path d="M8 18v3M12 17v4M16 18v3"/></svg>`;
+  }
+  if ([45, 48].includes(c)) {
+    return `<svg viewBox="0 0 24 24" ${stroke}><path d="M4 10h16M3 14h18M5 18h14"/><path d="M7 10a5 5 0 0 1 10 0"/></svg>`;
+  }
+  if ([2, 3].includes(c)) {
+    return `<svg viewBox="0 0 24 24" ${stroke}><path d="M17.5 19H7a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 18 8.5a3.5 3.5 0 0 1-.5 10.5Z"/></svg>`;
+  }
+  if (c === 1) {
+    return isNight
+      ? `<svg viewBox="0 0 24 24" ${stroke}><path d="M13 4a6 6 0 0 0 7 7 6.5 6.5 0 0 1-1.6 4.2"/><path d="M16.5 19H7a4 4 0 0 1-.4-8A5.5 5.5 0 0 1 17 9.5a3.5 3.5 0 0 1-.5 9.5Z"/></svg>`
+      : `<svg viewBox="0 0 24 24" ${stroke}><path d="M12 3v1.5M5.6 5.6l1.1 1.1M18.4 5.6l-1.1 1.1"/><path d="M9 11a3.5 3.5 0 0 1 6.6-1.5"/><path d="M17 19H7.5a4 4 0 0 1-.4-8 5.2 5.2 0 0 1 10.1-1A3.3 3.3 0 0 1 17 19Z"/></svg>`;
+  }
+  return isNight
+    ? `<svg viewBox="0 0 24 24" ${stroke}><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>`
+    : `<svg viewBox="0 0 24 24" ${stroke}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`;
+}
 function formatDisplayTemp(celsius) {
-  if (!Number.isFinite(Number(celsius))) return '';
+  if (celsius === null || celsius === undefined || celsius === '' || !Number.isFinite(Number(celsius))) return '';
   const offset = Number(state.profile.weather?.tempOffset || 0);
   const adjustedC = Number(celsius) + offset;
   if (state.profile.weather?.tempUnit === 'F') {
@@ -1902,6 +1941,25 @@ function formatDisplayTemp(celsius) {
     return `${f}°F`;
   }
   return `${Math.round(adjustedC)}°`;
+}
+function formatTempDelta(todayCelsius, yesterdayCelsius) {
+  if (!Number.isFinite(Number(todayCelsius)) || !Number.isFinite(Number(yesterdayCelsius))) {
+    return { text: '尚無昨日同時段資料', tone: 'neutral', diff: null };
+  }
+  const tDisp = Math.round((Number(todayCelsius) + Number(state.profile.weather?.tempOffset || 0)) * (state.profile.weather?.tempUnit === 'F' ? 9 / 5 : 1));
+  const yDisp = Math.round((Number(yesterdayCelsius) + Number(state.profile.weather?.tempOffset || 0)) * (state.profile.weather?.tempUnit === 'F' ? 9 / 5 : 1));
+  const diff = tDisp - yDisp;
+  const unitSuffix = state.profile.weather?.tempUnit === 'F' ? '°F' : '°';
+  if (diff > 0) return { text: `較昨日此時 +${diff}${unitSuffix}（更暖）`, tone: 'warmer', diff };
+  if (diff < 0) return { text: `較昨日此時 ${diff}${unitSuffix}（較涼）`, tone: 'cooler', diff };
+  return { text: `與昨日此時持平（0${unitSuffix}）`, tone: 'neutral', diff: 0 };
+}
+function formatTempRange(minC, maxC) {
+  const minStr = formatDisplayTemp(minC);
+  const maxStr = formatDisplayTemp(maxC);
+  if (!minStr && !maxStr) return '—';
+  if (minStr && maxStr) return `${minStr} – ${maxStr}`;
+  return minStr || maxStr;
 }
 function weatherAreaLabel(weather) {
   const raw = weather?.area || String(weather?.city || '').split(' · ')[0] || '';
@@ -1919,10 +1977,13 @@ function renderWeather() {
     return;
   }
   const isNight = w.current.is_day != null ? Number(w.current.is_day) === 0 : (new Date().getHours() >= 18 || new Date().getHours() < 6);
-  const [label, symbol] = weatherText(w.current.weather_code, isNight);
+  const [fallbackLabel] = weatherText(w.current.weather_code, isNight);
+  const label = w.current.weather_label || fallbackLabel;
   const temp = formatDisplayTemp(w.current.temperature_2m);
-  const text = `${area}・${symbol} ${label}${temp ? ` ${temp}` : ''}`;
-  if (el) el.textContent = text;
+  const text = `${area}・${label}${temp ? ` ${temp}` : ''}`;
+  if (el) {
+    el.innerHTML = `<span class="scene-weather-icon" aria-hidden="true">${weatherSvgIcon(w.current.weather_code, isNight)}</span><span>${escapeHtml(text)}</span>`;
+  }
   if (sumEl) sumEl.textContent = text;
   updateWeatherPreview();
 }
@@ -1994,6 +2055,7 @@ async function selectWeatherLocation(location) {
     longitude: location.longitude,
     timezone: location.timezone || 'auto',
     current: null,
+    detailCache: null,
     updatedAt: 0,
   });
   saveState({ action: `設定天氣城市為「${area || city}」` });
@@ -2122,6 +2184,43 @@ function getCwaCounty(weather = state.profile.weather || {}) {
   ];
   return map.find(([, aliases]) => aliases.some(alias => raw.includes(alias)))?.[0] || '桃園市';
 }
+function getCwaTown(weather = state.profile.weather || {}) {
+  const area = String(weather.area || weather.city || '').replace(/^台/, '臺').trim();
+  const match = area.match(/([^\s市縣]{1,4}[區鄉鎮市])$/);
+  if (match) return match[1];
+  const city = String(weather.city || '').replace(/^台/, '臺').trim();
+  if (/[區鄉鎮]$/.test(city)) return city;
+  if (area.includes('中壢') || city.includes('中壢') || city.toLowerCase().includes('zhongli')) return '中壢區';
+  return '';
+}
+function recordDailyWeatherHistory(dateStr, summary) {
+  if (!dateStr || !summary) return;
+  const minVal = Number(summary.min);
+  const maxVal = Number(summary.max);
+  if (!Number.isFinite(minVal) && !Number.isFinite(maxVal)) return;
+  const entry = {
+    min: Number.isFinite(minVal) ? Math.round(minVal * 10) / 10 : Math.round(maxVal * 10) / 10,
+    max: Number.isFinite(maxVal) ? Math.round(maxVal * 10) / 10 : Math.round(minVal * 10) / 10,
+    code: Number.isFinite(Number(summary.code)) ? Number(summary.code) : 0,
+    label: summary.label || '',
+    area: summary.area || ''
+  };
+  state.weatherHistory = state.weatherHistory && typeof state.weatherHistory === 'object' ? state.weatherHistory : {};
+  const existing = state.weatherHistory[dateStr];
+  if (existing && Number.isFinite(Number(existing.min)) && Number.isFinite(Number(existing.max))) {
+    entry.min = Math.min(Number(existing.min), entry.min);
+    entry.max = Math.max(Number(existing.max), entry.max);
+  }
+  state.weatherHistory[dateStr] = entry;
+  // 僅保留最近 730 天紀錄，維持儲存空間精簡
+  const keys = Object.keys(state.weatherHistory).sort();
+  if (keys.length > 730) {
+    keys.slice(0, keys.length - 730).forEach(k => delete state.weatherHistory[k]);
+  }
+  if (dateStr === todayStr() && state.today) {
+    state.today.weather = entry;
+  }
+}
 async function refreshWeatherForecast(force = false) {
   const w = state.profile.weather || {};
   if (!w.city || !w.current) return;
@@ -2147,6 +2246,8 @@ async function refreshWeatherForecast(force = false) {
   }
 }
 
+let uiWeatherDetailDay = 'today';
+
 async function refreshWeather(force = false) {
   if (state.weatherSimulation && !force) {
     renderWeather();
@@ -2157,22 +2258,271 @@ async function refreshWeather(force = false) {
   }
   const w = state.profile.weather || {};
   if (w.latitude == null || w.longitude == null) { syncWeatherSettings(); renderWeather(); return; }
-  if (!force && w.current && Date.now() - Number(w.updatedAt || 0) < 30 * 60 * 1000) { renderWeather(); refreshWeatherForecast(false); return; }
+  const hasDetail = w.detailCache && Array.isArray(w.detailCache.todayHours) && w.detailCache.todayHours.length === 24;
+  if (!force && w.current && hasDetail && Date.now() - Number(w.updatedAt || 0) < 30 * 60 * 1000) {
+    renderWeather();
+    refreshWeatherForecast(false);
+    return;
+  }
   const status = document.getElementById('weatherStatus');
   if (status) status.textContent = `${w.city}・正在更新天氣…`;
+
+  const applyWeatherPayload = async (currentObj, detailObj, timezoneVal) => {
+    const area = weatherAreaLabel(w);
+    state.profile.weather = {
+      ...w,
+      timezone: timezoneVal || w.timezone || 'Asia/Taipei',
+      current: currentObj,
+      detailCache: detailObj,
+      updatedAt: Date.now()
+    };
+    const today = todayStr();
+    const todayMin = Number.isFinite(Number(detailObj?.todayMin)) ? Number(detailObj.todayMin) : Number(currentObj?.temperature_2m);
+    const todayMax = Number.isFinite(Number(detailObj?.todayMax)) ? Number(detailObj.todayMax) : Number(currentObj?.temperature_2m);
+    if (Number.isFinite(todayMin) && Number.isFinite(todayMax)) {
+      recordDailyWeatherHistory(today, {
+        min: todayMin,
+        max: todayMax,
+        code: currentObj?.weather_code,
+        label: currentObj?.weather_label || weatherText(currentObj?.weather_code, currentObj?.is_day === 0)[0],
+        area
+      });
+    }
+    if (detailObj?.yesterdayDate && Number.isFinite(Number(detailObj.yesterdayMin)) && Number.isFinite(Number(detailObj.yesterdayMax))) {
+      const yHours = detailObj.yesterdayHours || [];
+      const noonSlot = yHours[12] || yHours.find(h => h && h.temp != null);
+      recordDailyWeatherHistory(detailObj.yesterdayDate, {
+        min: detailObj.yesterdayMin,
+        max: detailObj.yesterdayMax,
+        code: noonSlot?.code ?? currentObj?.weather_code,
+        label: noonSlot?.label || '',
+        area
+      });
+    }
+    saveState({ skipHistory: true });
+    renderHeader();
+    syncWeatherSettings();
+    if (document.getElementById('modal-weather-detail')?.classList.contains('is-active')) {
+      renderWeatherDetailModal();
+    }
+    await refreshWeatherForecast(force);
+  };
+
   try {
-    const params = new URLSearchParams({ latitude: String(w.latitude), longitude: String(w.longitude), current: 'temperature_2m,weather_code,is_day,relative_humidity_2m', timezone: 'auto' });
+    // 1. 優先透過 Cloudflare Worker 呼叫中央氣象署 CWA API（O-A0001-001 實測 + F-D0047-089 鄉鎮預報 + 昨日對比）
+    const county = getCwaCounty(w);
+    const town = getCwaTown(w);
+    const cwaParams = new URLSearchParams({
+      county,
+      town,
+      lat: String(w.latitude),
+      lon: String(w.longitude)
+    });
+    const cwaRes = await fetch(`${CLOUDFLARE_WORKER_URL}/api/weather-detail?${cwaParams}`, { cache: 'no-store' });
+    if (cwaRes.ok) {
+      const cwaData = await cwaRes.json();
+      if (cwaData && cwaData.success && cwaData.current) {
+        await applyWeatherPayload(cwaData.current, cwaData, 'Asia/Taipei');
+        return;
+      }
+    }
+  } catch (_) {}
+
+  // 2. 備援：若 Worker 尚未部署 /api/weather-detail 或為海外地點，改以 Open-Meteo（含昨日 past_days=1）補齊
+  try {
+    const params = new URLSearchParams({
+      latitude: String(w.latitude),
+      longitude: String(w.longitude),
+      current: 'temperature_2m,weather_code,is_day,relative_humidity_2m',
+      hourly: 'temperature_2m,weather_code,is_day',
+      daily: 'temperature_2m_max,temperature_2m_min,weather_code',
+      past_days: '1',
+      forecast_days: '2',
+      timezone: 'auto'
+    });
     const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
     if (!response.ok) throw new Error('forecast failed');
     const data = await response.json();
-    state.profile.weather = { ...w, timezone: data.timezone || w.timezone || 'auto', current: data.current || null, updatedAt: Date.now() };
-    saveState();
-    renderHeader();
-    syncWeatherSettings();
-    await refreshWeatherForecast(force);
+    const todayDate = todayStr();
+    const yDateObj = new Date(`${todayDate}T12:00:00`);
+    yDateObj.setDate(yDateObj.getDate() - 1);
+    const yesterdayDate = `${yDateObj.getFullYear()}-${String(yDateObj.getMonth() + 1).padStart(2, '0')}-${String(yDateObj.getDate()).padStart(2, '0')}`;
+    const currentHour = new Date().getHours();
+
+    const times = data.hourly?.time || [];
+    const temps = data.hourly?.temperature_2m || [];
+    const codes = data.hourly?.weather_code || [];
+    const isDays = data.hourly?.is_day || [];
+    const extractDayHours = targetDate => {
+      const list = [];
+      for (let h = 0; h < 24; h++) {
+        const prefix = `${targetDate}T${String(h).padStart(2, '0')}:`;
+        const idx = times.findIndex(t => String(t).startsWith(prefix));
+        const tempVal = idx >= 0 && Number.isFinite(Number(temps[idx])) ? Math.round(Number(temps[idx]) * 10) / 10 : null;
+        const codeVal = idx >= 0 && Number.isFinite(Number(codes[idx])) ? Number(codes[idx]) : 0;
+        const dayFlag = idx >= 0 && isDays[idx] != null ? Number(isDays[idx]) : (h >= 6 && h < 18 ? 1 : 0);
+        list.push({
+          hour: h,
+          time: `${String(h).padStart(2, '0')}:00`,
+          temp: tempVal,
+          code: codeVal,
+          label: weatherText(codeVal, dayFlag === 0)[0],
+          isDay: dayFlag,
+          actual: targetDate === yesterdayDate || h <= currentHour,
+          pop: null
+        });
+      }
+      return list;
+    };
+    const todayHours = extractDayHours(todayDate);
+    const yesterdayHours = extractDayHours(yesterdayDate);
+    const dailyTimes = data.daily?.time || [];
+    const tIdx = dailyTimes.indexOf(todayDate);
+    const yIdx = dailyTimes.indexOf(yesterdayDate);
+    const todayMin = tIdx >= 0 ? data.daily.temperature_2m_min?.[tIdx] : null;
+    const todayMax = tIdx >= 0 ? data.daily.temperature_2m_max?.[tIdx] : null;
+    const yesterdayMin = yIdx >= 0 ? data.daily.temperature_2m_min?.[yIdx] : null;
+    const yesterdayMax = yIdx >= 0 ? data.daily.temperature_2m_max?.[yIdx] : null;
+
+    await applyWeatherPayload(
+      data.current || null,
+      {
+        source: 'Open-Meteo（備援）',
+        todayDate,
+        yesterdayDate,
+        currentHour,
+        todayMin,
+        todayMax,
+        yesterdayMin,
+        yesterdayMax,
+        yesterdaySameHour: yesterdayHours[currentHour]?.temp != null ? yesterdayHours[currentHour] : null,
+        todayHours,
+        yesterdayHours,
+        fetchedAt: Date.now()
+      },
+      data.timezone || 'auto'
+    );
   } catch (e) {
     if (status) status.textContent = `${w.city}・天氣暫時無法更新，稍後可再試。`;
     renderWeather();
+  }
+}
+
+function renderWeatherDetailModal() {
+  const w = state.profile.weather || {};
+  const area = weatherAreaLabel(w);
+  const detail = w.detailCache || {};
+  const current = w.current;
+  const nowHour = new Date().getHours();
+  const curIsNight = current?.is_day != null ? Number(current.is_day) === 0 : (nowHour >= 18 || nowHour < 6);
+  const curTemp = current?.temperature_2m;
+  const curCode = current?.weather_code ?? 0;
+  const curLabel = current?.weather_label || weatherText(curCode, curIsNight)[0];
+
+  const locEl = document.getElementById('wdLocationName');
+  const metaEl = document.getElementById('wdMetaText');
+  if (locEl) locEl.textContent = area;
+  if (metaEl) {
+    const srcText = detail.source === 'CWA'
+      ? `中央氣象署${detail.stationName ? `（${detail.stationName}站）` : ''}`
+      : (detail.source || '氣象資料');
+    const timeText = w.updatedAt ? new Date(w.updatedAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '';
+    metaEl.textContent = timeText ? `${srcText}・${timeText} 更新` : srcText;
+  }
+
+  const targetHour = Number.isFinite(Number(detail.currentHour)) ? Number(detail.currentHour) : nowHour;
+  const yHours = Array.isArray(detail.yesterdayHours) ? detail.yesterdayHours : [];
+  const ySame = detail.yesterdaySameHour || yHours[targetHour] || null;
+
+  const yIconEl = document.getElementById('wdYesterdayIcon');
+  const yTempEl = document.getElementById('wdYesterdayTemp');
+  const yLabelEl = document.getElementById('wdYesterdayLabel');
+  if (ySame && ySame.temp != null) {
+    if (yIconEl) yIconEl.innerHTML = weatherSvgIcon(ySame.code, ySame.isDay === 0);
+    if (yTempEl) yTempEl.textContent = formatDisplayTemp(ySame.temp) || '—';
+    if (yLabelEl) yLabelEl.textContent = ySame.label || weatherText(ySame.code, ySame.isDay === 0)[0];
+  } else {
+    if (yIconEl) yIconEl.innerHTML = weatherSvgIcon(2, false);
+    if (yTempEl) yTempEl.textContent = '—';
+    if (yLabelEl) yLabelEl.textContent = '待累積昨日資料';
+  }
+
+  const tTempEl = document.getElementById('wdTodayTemp');
+  const tIconEl = document.getElementById('wdTodayIcon');
+  const tLabelEl = document.getElementById('wdTodayLabel');
+  const deltaEl = document.getElementById('wdDeltaPill');
+  if (tTempEl) tTempEl.textContent = formatDisplayTemp(curTemp) || '—';
+  if (tIconEl) tIconEl.innerHTML = weatherSvgIcon(curCode, curIsNight);
+  if (tLabelEl) tLabelEl.textContent = curLabel || '—';
+  if (deltaEl) {
+    const delta = formatTempDelta(curTemp, ySame?.temp);
+    deltaEl.textContent = delta.text;
+    deltaEl.classList.remove('is-warmer', 'is-cooler');
+    if (delta.tone === 'warmer') deltaEl.classList.add('is-warmer');
+    else if (delta.tone === 'cooler') deltaEl.classList.add('is-cooler');
+  }
+
+  const tRangeEl = document.getElementById('wdTodayRange');
+  const yRangeEl = document.getElementById('wdYesterdayRange');
+  if (tRangeEl) tRangeEl.textContent = `今日區間：${formatTempRange(detail.todayMin, detail.todayMax)}`;
+  if (yRangeEl) yRangeEl.textContent = `昨日區間：${formatTempRange(detail.yesterdayMin, detail.yesterdayMax)}`;
+
+  document.querySelectorAll('#wdDaySegment .segment-btn').forEach(btn => {
+    const active = btn.getAttribute('data-wd-day') === uiWeatherDetailDay;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+
+  const strip = document.getElementById('wdHourlyStrip');
+  if (!strip) return;
+  const list = uiWeatherDetailDay === 'yesterday'
+    ? (Array.isArray(detail.yesterdayHours) ? detail.yesterdayHours : [])
+    : (Array.isArray(detail.todayHours) ? detail.todayHours : []);
+
+  if (!list.length) {
+    strip.innerHTML = '<p class="settings-helper" style="margin:12px auto;">尚無逐時氣象資料，請稍後再更新。</p>';
+    return;
+  }
+
+  strip.innerHTML = list.map(slot => {
+    const h = Number(slot.hour);
+    const isHighlight = h === nowHour;
+    const timeLabel = uiWeatherDetailDay === 'today' && isHighlight
+      ? '現在'
+      : `${String(h).padStart(2, '0')}:00`;
+    const popHtml = slot.pop != null && Number(slot.pop) >= 20
+      ? `<span class="wd-hour-pop">${Math.round(Number(slot.pop))}%</span>`
+      : '<span class="wd-hour-pop"></span>';
+    const tempText = slot.temp != null ? formatDisplayTemp(slot.temp) : '—';
+    return `
+      <div class="wd-hour-item ${isHighlight ? 'is-highlight' : ''}" data-wd-hour="${h}">
+        <span class="wd-hour-time">${escapeHtml(timeLabel)}</span>
+        <span class="wd-hour-icon" aria-hidden="true">${weatherSvgIcon(slot.code, slot.isDay === 0)}</span>
+        ${popHtml}
+        <span class="wd-hour-temp">${escapeHtml(tempText)}</span>
+      </div>`;
+  }).join('');
+
+  requestAnimationFrame(() => {
+    const targetCard = strip.querySelector(`.wd-hour-item[data-wd-hour="${nowHour}"]`);
+    if (targetCard && typeof targetCard.scrollIntoView === 'function') {
+      targetCard.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
+    }
+  });
+}
+
+function openWeatherDetailModal() {
+  const w = state.profile.weather || {};
+  if (!w.city || w.latitude == null || w.longitude == null) {
+    syncWeatherSettings();
+    openModal('modal-weather-settings');
+    return;
+  }
+  uiWeatherDetailDay = 'today';
+  renderWeatherDetailModal();
+  openModal('modal-weather-detail');
+  if (!w.detailCache || Date.now() - Number(w.updatedAt || 0) >= 30 * 60 * 1000) {
+    refreshWeather(true);
   }
 }
 
@@ -3580,9 +3930,21 @@ function openDayDetail(dateStr, entry) {
     </div>
     <div class="day-detail-skincare-list">${skincareListHtml}</div>`;
 
+  const dayWeather = entry?.weather || state.weatherHistory?.[dateStr] || (isToday ? state.today?.weather : null);
+  let dayWeatherHtml = '';
+  if (dayWeather && (Number.isFinite(Number(dayWeather.min)) || Number.isFinite(Number(dayWeather.max)))) {
+    const wRange = formatTempRange(dayWeather.min, dayWeather.max);
+    const wLabel = dayWeather.label || weatherText(dayWeather.code, false)[0] || '';
+    dayWeatherHtml = `
+      <div class="day-detail-weather-pill">
+        <span class="day-detail-weather-icon" aria-hidden="true">${weatherSvgIcon(dayWeather.code, false)}</span>
+        <span>當日氣溫 ${escapeHtml(wRange)}${wLabel ? `・${escapeHtml(wLabel)}` : ''}</span>
+      </div>`;
+  }
+
   const hasLaundryRecord = laundryHistoryDates().has(dateStr);
   const laundryToggleHtml = `<label class="checkbox-row day-laundry-toggle"><input type="checkbox" id="toggleDayLaundry" ${hasLaundryRecord ? 'checked' : ''}><span>這天有洗衣服</span></label>`;
-  body.innerHTML = laundryToggleHtml + outfitContentHtml + skincareSectionHtml;
+  body.innerHTML = dayWeatherHtml + laundryToggleHtml + outfitContentHtml + skincareSectionHtml;
 
   const laundryToggle = document.getElementById('toggleDayLaundry');
   if (laundryToggle) laundryToggle.addEventListener('change', () => {
@@ -7714,7 +8076,9 @@ async function cloudSyncFingerprint(source = state) {
   const copy = JSON.parse(JSON.stringify(source || {}));
   delete copy.updatedAt; delete copy.syncMeta; delete copy.geminiApiKey; delete copy.forceUpdateAt; delete copy.forceUpdateReason;
   if (copy.profile?.weather && typeof copy.profile.weather === 'object') {
-    delete copy.profile.weather.current; delete copy.profile.weather.updatedAt;
+    delete copy.profile.weather.current;
+    delete copy.profile.weather.updatedAt;
+    delete copy.profile.weather.detailCache;
   }
   const stable = value => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object'
     ? Object.fromEntries(Object.keys(value).sort().map(k => [k, stable(value[k])])) : value;
@@ -8362,7 +8726,11 @@ function wireEvents() {
     backfillShowHiddenSlots = false;
 
     const isToday = backfillDraft.date === todayStr();
+    const existingEntry = state.ootdHistory.find(e => e.date === backfillDraft.date);
     const entry = { date: backfillDraft.date };
+    if (existingEntry?.weather || state.weatherHistory?.[backfillDraft.date]) {
+      entry.weather = existingEntry?.weather || state.weatherHistory[backfillDraft.date];
+    }
     ALL_SLOTS.forEach(s => {
       if (backfillDraft[s]) {
         entry[s] = backfillDraft[s];
@@ -9504,6 +9872,21 @@ function wireEvents() {
     e.target.value = '';
   });
   document.getElementById('btnClearAvatar').addEventListener('click', () => { state.profile.avatar = ''; saveState(); renderAvatar(); toast('已移除自訂頭像'); });
+  // Home weather pill -> detail comparison modal
+  document.getElementById('sceneWeather')?.addEventListener('click', openWeatherDetailModal);
+  document.getElementById('btnWeatherDetailSettings')?.addEventListener('click', () => {
+    syncWeatherSettings();
+    pushModal('modal-weather-settings');
+  });
+  document.getElementById('wdDaySegment')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-wd-day]');
+    if (!btn) return;
+    const day = btn.getAttribute('data-wd-day');
+    if (day !== 'today' && day !== 'yesterday') return;
+    uiWeatherDetailDay = day;
+    renderWeatherDetailModal();
+  });
+
   // Weather settings modal entrance
   document.getElementById('btnOpenWeatherSettings')?.addEventListener('click', () => {
     syncWeatherSettings();
@@ -9620,6 +10003,7 @@ function wireEvents() {
           longitude: lon,
           timezone: 'auto',
           current: null,
+          detailCache: null,
           updatedAt: 0,
         });
         saveState({ action: `設定天氣地點為「${areaLabel}」` });
