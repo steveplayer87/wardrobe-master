@@ -2068,6 +2068,50 @@ html, body { overflow-x: hidden; overscroll-behavior-x: none; }
   box-sizing: border-box;
 }
 #confirmBody { white-space: pre-line; line-height: 1.55; }
+#confirmBody.has-html { white-space: normal; line-height: 1.4; }
+
+.laundry-pinned-consumable-card {
+  margin: 8px 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  position: relative;
+  transition: all 0.15s ease;
+}
+.laundry-pinned-consumable-card.is-selectable .item-card-check {
+  position: static;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-line, #cbd5e1);
+  background: var(--color-surface, #fff);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.laundry-pinned-consumable-card.is-selected {
+  outline: 2px solid var(--color-denim, #2c4270);
+  outline-offset: -2px;
+  background: var(--subtle-bg, #f1f5f9) !important;
+}
+.laundry-pinned-consumable-card.is-selected .item-card-check {
+  background: var(--color-denim, #2c4270);
+  border-color: var(--color-denim, #2c4270);
+}
+.laundry-pinned-consumable-card.is-selected .item-card-check::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+}
 
 @media (max-width: 380px) {
   .wash-boost-toggle { font-size: 9.5px; padding-left: 6px; padding-right: 6px; }

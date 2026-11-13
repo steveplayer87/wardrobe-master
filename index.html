@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261112_123">
+<link rel="stylesheet" href="styles.css?v=20261113_124">
 </head>
 <body>
 
@@ -1427,7 +1427,7 @@
   <div class="modal-sheet" id="modal-confirm" data-modal>
     <div class="modal-handle"></div>
     <div class="modal-head"><h2 id="confirmTitle">確定嗎？</h2></div>
-    <p class="section-intro" id="confirmBody" style="margin:0 0 16px"></p>
+    <div class="section-intro" id="confirmBody" style="margin:0 0 16px"></div>
     <div class="settings-actions" id="confirmActions" style="flex-wrap:wrap"></div>
   </div>
 
@@ -1639,7 +1639,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v123', K='wm_seen_version', seen=null;
+  var V='v124', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1649,7 +1649,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261112_123"></script>
-<script src="app.js?v=20261112_123"></script>
+<script src="seed-items.js?v=20261113_124"></script>
+<script src="app.js?v=20261113_124"></script>
 </body>
 </html>
