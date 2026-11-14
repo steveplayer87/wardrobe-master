@@ -776,11 +776,26 @@ export default {
           if (!imgData) {
             return new Response("Not found", { status: 404, headers: corsHeaders });
           }
-          return new Response(imgData, {
+          // KV stores the original Data URI (data:image/...;base64,...).
+          // Decode it before responding so <img> receives actual image bytes.
+          const dataUriMatch = String(imgData).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/);
+          if (!dataUriMatch) {
+            return new Response("Invalid image data", {
+              status: 415,
+              headers: { ...corsHeaders, "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }
+            });
+          }
+          const mimeType = dataUriMatch[1].toLowerCase();
+          const binary = atob(dataUriMatch[2].replace(/\s/g, ""));
+          const imageBytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) imageBytes[i] = binary.charCodeAt(i);
+          return new Response(imageBytes, {
             headers: {
               ...corsHeaders,
-              "Content-Type": "text/plain",
-              "Cache-Control": "public, max-age=31536000, immutable"
+              "Content-Type": mimeType,
+              "Content-Length": String(imageBytes.byteLength),
+              "X-Content-Type-Options": "nosniff",
+              "Cache-Control": "public, max-age=3600"
             }
           });
         }

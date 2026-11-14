@@ -8631,10 +8631,10 @@ async function restoreWardrobeFromCloud(options = {}) {
 
       cloudState.items.forEach(it => {
         if (it.image && it.image.startsWith('/api/image/')) {
-          it.image = `${CLOUDFLARE_WORKER_URL}${it.image}`;
+          it.image = `${CLOUDFLARE_WORKER_URL}${it.image}?v=2`;
         }
         if (it.imageBack && it.imageBack.startsWith('/api/image/')) {
-          it.imageBack = `${CLOUDFLARE_WORKER_URL}${it.imageBack}`;
+          it.imageBack = `${CLOUDFLARE_WORKER_URL}${it.imageBack}?v=2`;
         }
       });
 
