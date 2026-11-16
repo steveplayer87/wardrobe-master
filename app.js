@@ -578,12 +578,28 @@ let currentAiGenResultUrl = null;
 function openAiClothGenModal() {
   const modal = document.getElementById('modal-ai-clothing-gen');
   if (!modal) return;
+  const promptInput = document.getElementById('aiGenPrompt');
   const catInput = document.getElementById('aiGenCategory');
   const previewWrap = document.getElementById('aiGenPreviewWrap');
   const resultImg = document.getElementById('aiGenResultImg');
   const applyBtn = document.getElementById('btnApplyAiClothGen');
   const chipWrap = document.getElementById('aiGenNameChipWrap');
   const chipBtn = document.getElementById('btnAiGenUseNameChip');
+  const progressStatus = document.getElementById('aiGenProgressStatus');
+  const transBox = document.getElementById('aiGenTranslationBox');
+  const runBtn = document.getElementById('btnRunAiClothGen');
+
+  // 清空上次提示詞與進度歷程，確保每次開啟皆乾淨
+  if (promptInput) promptInput.value = '';
+  if (progressStatus) {
+    progressStatus.textContent = '';
+    progressStatus.classList.add('is-hidden');
+  }
+  if (transBox) transBox.classList.add('is-hidden');
+  if (runBtn) {
+    runBtn.disabled = false;
+    runBtn.textContent = '開始生成並自動去背';
+  }
 
   const itemName = (document.getElementById('fieldName')?.value || '').trim();
   if (chipWrap && chipBtn) {
@@ -621,7 +637,7 @@ function processCutoutAndNormalize(base64Data, category) {
         const imgData = ctx1.getImageData(0, 0, iw, ih);
         const data = imgData.data;
 
-        // 取四個角落像素取平均作為背景色（通常為純白棚拍 #FFFFFF）
+        // 1. 取四角像素平均值做為基準背景色（通常為純白棚拍 #FFFFFF）
         const corners = [
           0,
           (iw - 1) * 4,
@@ -636,22 +652,104 @@ function processCutoutAndNormalize(base64Data, category) {
         });
         bgR /= 4; bgG /= 4; bgB /= 4;
 
-        let minX = iw, minY = ih, maxX = 0, maxY = 0;
-        const total = data.length;
+        // 2. 邊緣連通泛洪（BFS Edge-Connected Flood Fill）
+        // 唯有從圖片四周外邊緣連通的背景像素才去除；
+        // 白色衣物內部與純白布料因被衣物邊緣輪廓所包圍阻隔，絕不誤刪！
+        const visited = new Uint8Array(iw * ih);
+        const queue = new Int32Array(iw * ih);
+        let qHead = 0, qTail = 0;
 
-        for (let i = 0; i < total; i += 4) {
-          const r = data[i], g = data[i + 1], b = data[i + 2];
-          const dist = Math.hypot(r - bgR, g - bgG, b - bgB);
-          if (dist < 32) {
-            data[i + 3] = 0;
-          } else if (dist < 52) {
-            data[i + 3] = Math.round(((dist - 32) / 20) * 255);
+        const isBgPixel = (r, g, b) => {
+          return Math.hypot(r - bgR, g - bgG, b - bgB) < 42;
+        };
+
+        // 將四個外邊緣上的背景像素加入 BFS 隊列
+        for (let x = 0; x < iw; x++) {
+          const topIdx = x;
+          const topPixel = topIdx * 4;
+          if (isBgPixel(data[topPixel], data[topPixel + 1], data[topPixel + 2])) {
+            visited[topIdx] = 1;
+            queue[qTail++] = topIdx;
           }
+          const botIdx = (ih - 1) * iw + x;
+          const botPixel = botIdx * 4;
+          if (isBgPixel(data[botPixel], data[botPixel + 1], data[botPixel + 2])) {
+            visited[botIdx] = 1;
+            queue[qTail++] = botIdx;
+          }
+        }
+        for (let y = 0; y < ih; y++) {
+          const leftIdx = y * iw;
+          const leftPixel = leftIdx * 4;
+          if (!visited[leftIdx] && isBgPixel(data[leftPixel], data[leftPixel + 1], data[leftPixel + 2])) {
+            visited[leftIdx] = 1;
+            queue[qTail++] = leftIdx;
+          }
+          const rightIdx = y * iw + (iw - 1);
+          const rightPixel = rightIdx * 4;
+          if (!visited[rightIdx] && isBgPixel(data[rightPixel], data[rightPixel + 1], data[rightPixel + 2])) {
+            visited[rightIdx] = 1;
+            queue[qTail++] = rightIdx;
+          }
+        }
 
-          if (data[i + 3] > 20) {
-            const pixelIdx = i / 4;
-            const px = pixelIdx % iw;
-            const py = Math.floor(pixelIdx / iw);
+        // BFS 泛洪擴散
+        while (qHead < qTail) {
+          const cur = queue[qHead++];
+          const cx = cur % iw;
+          const cy = Math.floor(cur / iw);
+
+          if (cx > 0) {
+            const left = cur - 1;
+            if (!visited[left]) {
+              const p = left * 4;
+              if (isBgPixel(data[p], data[p + 1], data[p + 2])) {
+                visited[left] = 1;
+                queue[qTail++] = left;
+              }
+            }
+          }
+          if (cx < iw - 1) {
+            const right = cur + 1;
+            if (!visited[right]) {
+              const p = right * 4;
+              if (isBgPixel(data[p], data[p + 1], data[p + 2])) {
+                visited[right] = 1;
+                queue[qTail++] = right;
+              }
+            }
+          }
+          if (cy > 0) {
+            const top = cur - iw;
+            if (!visited[top]) {
+              const p = top * 4;
+              if (isBgPixel(data[p], data[p + 1], data[p + 2])) {
+                visited[top] = 1;
+                queue[qTail++] = top;
+              }
+            }
+          }
+          if (cy < ih - 1) {
+            const bot = cur + iw;
+            if (!visited[bot]) {
+              const p = bot * 4;
+              if (isBgPixel(data[p], data[p + 1], data[p + 2])) {
+                visited[bot] = 1;
+                queue[qTail++] = bot;
+              }
+            }
+          }
+        }
+
+        // 3. 將所有被連通標記為背景的像素設為完全透明，其餘像素（包含白色衣物內部）保持完整不透明
+        let minX = iw, minY = ih, maxX = 0, maxY = 0;
+        for (let pIdx = 0; pIdx < iw * ih; pIdx++) {
+          const byteIdx = pIdx * 4;
+          if (visited[pIdx]) {
+            data[byteIdx + 3] = 0;
+          } else {
+            const px = pIdx % iw;
+            const py = Math.floor(pIdx / iw);
             if (px < minX) minX = px;
             if (px > maxX) maxX = px;
             if (py < minY) minY = py;
@@ -660,7 +758,7 @@ function processCutoutAndNormalize(base64Data, category) {
         }
         ctx1.putImageData(imgData, 0, 0);
 
-        // 若無有效像素則返回原圖
+        // 若無有效衣物像素則返回原圖
         if (maxX <= minX || maxY <= minY) {
           resolve(c1.toDataURL('image/png'));
           return;
@@ -669,47 +767,24 @@ function processCutoutAndNormalize(base64Data, category) {
         const bboxW = maxX - minX + 1;
         const bboxH = maxY - minY + 1;
 
-        // 規格化至與資料庫 1:1 吻合的 1080 x 1080 標準正方形畫布
-        const normSize = 1080;
+        // 4. 嚴格尺寸規格化：依據專案圖片標準緊湊對齊真實邊界並加上 4% 均勻呼吸留白
+        // 導出透明 PNG，讓衣櫥卡片 (1:1)、詳情頁 (4:5) 與穿搭槽 (1.08 / 0.78 等) 以 object-fit: contain 呈現時
+        // 尺寸完全與既有衣物 1:1 吻合，不再雙重留白或過小
+        const padX = Math.round(bboxW * 0.04);
+        const padY = Math.round(bboxH * 0.04);
+        const cropX = Math.max(0, minX - padX);
+        const cropY = Math.max(0, minY - padY);
+        const cropW = Math.min(iw - cropX, bboxW + padX * 2);
+        const cropH = Math.min(ih - cropY, bboxH + padY * 2);
+
         const c2 = document.createElement('canvas');
-        c2.width = normSize;
-        c2.height = normSize;
+        c2.width = cropW;
+        c2.height = cropH;
         const ctx2 = c2.getContext('2d');
         ctx2.imageSmoothingEnabled = true;
         ctx2.imageSmoothingQuality = 'high';
+        ctx2.drawImage(c1, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-        let targetW, targetH;
-        if (category === 'bottom') {
-          // 長褲高度錨定 89%，短褲高度錨定 82%（完全符合資料庫統計）
-          const isShorts = (bboxH / bboxW) < 1.35;
-          targetH = normSize * (isShorts ? 0.82 : 0.89);
-          targetW = (bboxW / bboxH) * targetH;
-          if (targetW > normSize * 0.90) {
-            const scaleDown = (normSize * 0.90) / targetW;
-            targetW *= scaleDown;
-            targetH *= scaleDown;
-          }
-        } else if (['top', 'outer', 'inner', 'thermal'].includes(category)) {
-          // 上衣／外套：寬度固定為 76%（與資料庫 131 件衣物 1:1 精準吻合）
-          targetW = normSize * 0.76;
-          targetH = (bboxH / bboxW) * targetW;
-          if (targetH > normSize * 0.90) {
-            const scaleDown = (normSize * 0.90) / targetH;
-            targetW *= scaleDown;
-            targetH *= scaleDown;
-          }
-        } else {
-          // 配件、帽款與鞋類：最長邊 80% 等比置中
-          const maxDim = normSize * 0.80;
-          const scale = Math.min(maxDim / bboxW, maxDim / bboxH);
-          targetW = bboxW * scale;
-          targetH = bboxH * scale;
-        }
-
-        const destX = (normSize - targetW) / 2;
-        const destY = (normSize - targetH) / 2;
-
-        ctx2.drawImage(c1, minX, minY, bboxW, bboxH, destX, destY, targetW, targetH);
         resolve(c2.toDataURL('image/png'));
       } catch (err) {
         reject(err);
@@ -3904,6 +3979,7 @@ let uiWardrobeFilters = { status: 'all', tags: [], colors: [], brands: [], inver
 let uiSearchQuery = '';
 let uiSelectMode = false;
 let uiSelectedIds = new Set();
+let didDragSelectMove = false;
 
 const PRESET_SYSTEM_TAGS = ['.內衣', '.保暖衣', '.睡衣', '.睡褲'];
 
@@ -3992,13 +4068,25 @@ const WARDROBE_CAT_ORDER = {
 };
 
 let uiWardrobeCompact = localStorage.getItem('wm_wardrobe_compact') === 'true';
+let uiDenseCols = localStorage.getItem('wm_wardrobe_dense_cols') || '10';
 let lastNonRetiredCat = 'all';
 
 function updateCompactGridState() {
   const grid = document.getElementById('wardrobeGrid');
   const btn = document.getElementById('btnWardrobeCompactGrid');
-  if (grid) grid.classList.toggle('is-dense-grid', uiWardrobeCompact);
+  const scaleBtn = document.getElementById('btnDenseScaleToggle');
+  const scaleLabel = document.getElementById('denseScaleLabel');
+
+  if (grid) {
+    grid.classList.toggle('is-dense-grid', uiWardrobeCompact);
+    grid.classList.toggle('is-dense-8', uiWardrobeCompact && uiDenseCols === '8');
+    grid.classList.toggle('is-dense-10', uiWardrobeCompact && uiDenseCols === '10');
+  }
   if (btn) btn.classList.toggle('is-active', uiWardrobeCompact);
+  if (scaleBtn) {
+    scaleBtn.classList.toggle('is-hidden', !uiWardrobeCompact);
+    if (scaleLabel) scaleLabel.textContent = `${uiDenseCols} 列`;
+  }
 }
 
 function getVisibleWardrobeItems() {
@@ -4198,6 +4286,7 @@ function buildItemCard(item, opts) {
   }
   card.addEventListener('click', () => {
     if (longPressFired) { longPressFired = false; return; }
+    if (didDragSelectMove) return;
     if (opts.onTap) { opts.onTap(item); return; }
     if (opts.onClick) { opts.onClick(item); return; }
     if (opts.isLaundrySelectMode) toggleLaundryItemSelection(item.id, card);
@@ -9927,6 +10016,11 @@ function wireEvents() {
     localStorage.setItem('wm_wardrobe_compact', String(uiWardrobeCompact));
     updateCompactGridState();
   });
+  document.getElementById('btnDenseScaleToggle')?.addEventListener('click', () => {
+    uiDenseCols = uiDenseCols === '8' ? '10' : '8';
+    try { localStorage.setItem('wm_wardrobe_dense_cols', uiDenseCols); } catch (e) {}
+    updateCompactGridState();
+  });
   document.getElementById('btnAddItem').addEventListener('click', () => openAddModal(null));
   const retiredBanner = document.getElementById('retiredBanner');
   const handleRetiredClick = () => {
@@ -10083,6 +10177,77 @@ function wireEvents() {
   }
   document.getElementById('btnSelectMode').addEventListener('click', () => setSelectMode(!uiSelectMode));
   document.getElementById('btnSelectCancel')?.addEventListener('click', () => setSelectMode(false));
+
+  let isDragSelecting = false;
+  let dragSelectTargetState = true;
+  let dragTouchedIds = new Set();
+  let dragStartPos = null;
+
+  function setupWardrobeGridDragSelect() {
+    const grid = document.getElementById('wardrobeGrid');
+    if (!grid || grid._dragSelectWired) return;
+    grid._dragSelectWired = true;
+
+    grid.addEventListener('touchstart', e => {
+      if (!uiSelectMode) return;
+      const card = e.target.closest('.item-card[data-id]');
+      if (!card) return;
+      const t = e.touches[0];
+      dragStartPos = { x: t.clientX, y: t.clientY };
+      dragTouchedIds.clear();
+      isDragSelecting = true;
+      didDragSelectMove = false;
+      const itemId = card.dataset.id;
+      dragSelectTargetState = !uiSelectedIds.has(itemId);
+    }, { passive: true });
+
+    grid.addEventListener('touchmove', e => {
+      if (!isDragSelecting || !uiSelectMode) return;
+      const t = e.touches[0];
+      const dx = Math.abs(t.clientX - dragStartPos.x);
+      const dy = Math.abs(t.clientY - dragStartPos.y);
+      if (!didDragSelectMove && (dx > 8 || dy > 8)) {
+        didDragSelectMove = true;
+      }
+      if (didDragSelectMove) {
+        if (e.cancelable) e.preventDefault();
+        const el = document.elementFromPoint(t.clientX, t.clientY);
+        const card = el ? el.closest('#wardrobeGrid .item-card[data-id]') : null;
+        if (card) {
+          const itemId = card.dataset.id;
+          if (itemId && !dragTouchedIds.has(itemId)) {
+            dragTouchedIds.add(itemId);
+            if (dragSelectTargetState) {
+              uiSelectedIds.add(itemId);
+            } else {
+              uiSelectedIds.delete(itemId);
+            }
+            card.classList.toggle('is-selected', dragSelectTargetState);
+            updateSelectBarUi();
+          }
+        }
+      }
+    }, { passive: false });
+
+    const finishDrag = () => {
+      if (isDragSelecting) {
+        isDragSelecting = false;
+        dragStartPos = null;
+        if (didDragSelectMove) {
+          setTimeout(() => {
+            didDragSelectMove = false;
+            dragTouchedIds.clear();
+          }, 120);
+        } else {
+          dragTouchedIds.clear();
+        }
+      }
+    };
+
+    grid.addEventListener('touchend', finishDrag, { passive: true });
+    grid.addEventListener('touchcancel', finishDrag, { passive: true });
+  }
+  setupWardrobeGridDragSelect();
   document.getElementById('btnSelectAll').addEventListener('click', () => {
     const visible = getVisibleWardrobeItems();
     const allSelected = visible.length > 0 && visible.every(i => uiSelectedIds.has(i.id));
@@ -10456,38 +10621,62 @@ function wireEvents() {
 
   // AI 服飾生成與調色器事件綁定
   document.getElementById('btnOpenAiClothGen')?.addEventListener('click', openAiClothGenModal);
-  document.getElementById('btnRunAiClothGen')?.addEventListener('click', runAiClothGen);
-  document.getElementById('btnApplyAiClothGen')?.addEventListener('click', applyAiClothGenResult);
-
-  document.getElementById('btnAiGenUseNameChip')?.addEventListener('click', () => {
-    const promptInput = document.getElementById('aiGenPrompt');
-    const chipBtn = document.getElementById('btnAiGenUseNameChip');
-    const chipWrap = document.getElementById('aiGenNameChipWrap');
-    const nameVal = chipBtn?.textContent?.trim() || '';
-    if (promptInput && nameVal) {
-      if (promptInput.value.trim()) {
-        promptInput.value = promptInput.value.trim() + ' ' + nameVal;
-      } else {
-        promptInput.value = nameVal;
-      }
-      promptInput.focus();
-    }
-    if (chipWrap) {
-      chipWrap.style.display = 'none'; // 點擊完該膠囊立即消失
-    }
-  });
 
   const aiPromptEl = document.getElementById('aiGenPrompt');
   const aiModalEl = document.getElementById('modal-ai-clothing-gen');
+
+  const runAiBtn = document.getElementById('btnRunAiClothGen');
+  if (runAiBtn) {
+    const handleRunAi = e => {
+      if (document.activeElement === aiPromptEl) {
+        aiPromptEl?.blur();
+      }
+      runAiClothGen();
+    };
+    runAiBtn.addEventListener('pointerdown', handleRunAi);
+    runAiBtn.addEventListener('click', handleRunAi);
+  }
+
+  document.getElementById('btnApplyAiClothGen')?.addEventListener('click', applyAiClothGenResult);
+
+  const nameChipBtn = document.getElementById('btnAiGenUseNameChip');
+  if (nameChipBtn) {
+    const handleUseNameChip = e => {
+      if (e && e.cancelable) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const promptInput = document.getElementById('aiGenPrompt');
+      const chipWrap = document.getElementById('aiGenNameChipWrap');
+      const nameVal = nameChipBtn?.textContent?.trim() || '';
+      if (promptInput && nameVal) {
+        if (promptInput.value.trim()) {
+          promptInput.value = promptInput.value.trim() + ' ' + nameVal;
+        } else {
+          promptInput.value = nameVal;
+        }
+      }
+      if (chipWrap) {
+        chipWrap.style.display = 'none'; // 點擊完該膠囊立即消失
+      }
+    };
+    nameChipBtn.addEventListener('pointerdown', handleUseNameChip);
+    nameChipBtn.addEventListener('click', handleUseNameChip);
+  }
+
   if (aiPromptEl && aiModalEl) {
+    let blurTimer = null;
     aiPromptEl.addEventListener('focus', () => {
+      if (blurTimer) clearTimeout(blurTimer);
       aiModalEl.classList.add('keyboard-open');
       setTimeout(() => {
         aiPromptEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }, 180);
     });
     aiPromptEl.addEventListener('blur', () => {
-      aiModalEl.classList.remove('keyboard-open');
+      blurTimer = setTimeout(() => {
+        aiModalEl.classList.remove('keyboard-open');
+      }, 250);
     });
   }
 
@@ -11209,7 +11398,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v132';
+const CURRENT_APP_VERSION = 'v133';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';

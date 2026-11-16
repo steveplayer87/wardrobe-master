@@ -619,26 +619,45 @@ svg { width: 100%; height: 100%; display: block; }
 
 .item-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 12px; padding-bottom: 20px; }
 
-/* Compact Wardrobe View: 10 items per row, photo only */
+/* Compact Wardrobe View: 8 or 10 items per row, photo only, no border unless selected */
 #wardrobeGrid.is-dense-grid {
   grid-template-columns: repeat(10, 1fr) !important;
   gap: 3px !important;
   padding-bottom: 30px !important;
 }
+#wardrobeGrid.is-dense-grid.is-dense-8 {
+  grid-template-columns: repeat(8, 1fr) !important;
+  gap: 4px !important;
+}
+#wardrobeGrid.is-dense-grid.is-dense-10 {
+  grid-template-columns: repeat(10, 1fr) !important;
+  gap: 3px !important;
+}
 #wardrobeGrid.is-dense-grid .item-card {
   padding: 0 !important;
   border-radius: 4px !important;
   box-shadow: none !important;
-  border: 1px solid var(--color-line) !important;
-  background: var(--color-surface) !important;
+  border: 1.5px solid transparent !important;
+  background: transparent !important;
   overflow: hidden !important;
   height: auto !important;
   cursor: pointer;
+  box-sizing: border-box !important;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+#wardrobeGrid.is-dense-grid .item-card.is-selected {
+  border: 1.5px solid var(--color-primary, #3b82f6) !important;
+  background: rgba(59, 130, 246, 0.14) !important;
+  border-radius: 5px !important;
+  transform: scale(0.96);
 }
 #wardrobeGrid.is-dense-grid .item-photo {
   aspect-ratio: 1 / 1 !important;
   height: auto !important;
   border-radius: 3px !important;
+  background-color: transparent !important;
 }
 #wardrobeGrid.is-dense-grid .item-info,
 #wardrobeGrid.is-dense-grid .item-status-dot,
@@ -649,8 +668,32 @@ svg { width: 100%; height: 100%; display: block; }
   display: none !important;
 }
 #wardrobeGrid.is-dense-grid .item-card:hover {
-  outline: 2px solid var(--color-primary, #3b82f6);
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.3) !important;
   z-index: 2;
+}
+
+/* Dense Scale Toggle Button */
+.btn-dense-scale {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-dense-scale:active {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  transform: scale(0.96);
 }
 .item-card {
   background: var(--color-surface);
