@@ -31,6 +31,104 @@ export default {
         });
       }
 
+      // 1b. AI 服飾平鋪生圖端點（金鑰存在 Worker Secret，前端免填金鑰）
+      if (path === "/api/generate-clothing-image" && request.method === "POST") {
+        const body = await request.json().catch(() => ({}));
+        const userPrompt = (body.prompt || "").trim();
+        const category = body.category || "top";
+        const view = body.view || "front";
+        if (!userPrompt) {
+          return new Response(JSON.stringify({ success: false, error: "PROMPT_REQUIRED" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        const viewDesc = view === "back" ? "Back view" : "Front view";
+        const fullPrompt = [
+          `Ultra-high-definition e-commerce catalog flat lay product photograph of ${userPrompt}.`,
+          `View: ${viewDesc}, perfectly upright orientation, completely centered.`,
+          `Arrangement: laid completely flat, smooth, wrinkle-free, no hanger, no mannequin, no human model.`,
+          `Sleeves and silhouette: horizontally extended or symmetrically spread downwards at identical angles, maintaining perfect mirror symmetry.`,
+          `Details & Material: authentic fabric texture (e.g., French terry, corduroy, cotton weave), precise collar, ribbing, seams, hardware, and stitching.`,
+          `Lighting & Studio: even studio softbox lighting, zero cast shadows, razor-sharp edges on a seamless, pure solid white background (#FFFFFF) for clean extraction.`
+        ].join(" ");
+
+        let base64Image = null;
+        let lastError = null;
+
+        // A. 優先使用 Worker Secret 中的 GEMINI_API_KEY
+        if (env.GEMINI_API_KEY) {
+          try {
+            const imagenUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+            const resp = await fetch(imagenUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                instances: [{ prompt: fullPrompt }],
+                parameters: { sampleCount: 1, aspectRatio: "1:1", outputMimeType: "image/png" }
+              })
+            });
+            if (resp.ok) {
+              const data = await resp.json();
+              const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+              if (b64) base64Image = `data:image/png;base64,${b64}`;
+            } else {
+              const errTxt = await resp.text();
+              lastError = `Imagen: ${resp.status} - ${errTxt.slice(0, 160)}`;
+            }
+          } catch (e) {
+            lastError = `Imagen fetch error: ${e.message}`;
+          }
+        }
+
+        // B. 備援：若未成功且有 Cloudflare Workers AI 綁定，使用 FLUX.1-schnell 產生
+        if (!base64Image && env.AI) {
+          try {
+            const aiResp = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
+              prompt: fullPrompt,
+              steps: 4
+            });
+            if (aiResp && aiResp.image) {
+              base64Image = `data:image/jpeg;base64,${aiResp.image}`;
+            } else if (aiResp) {
+              const buf = aiResp instanceof ReadableStream || aiResp instanceof Response
+                ? await new Response(aiResp).arrayBuffer()
+                : (aiResp instanceof ArrayBuffer ? aiResp : null);
+              if (buf) {
+                let binary = "";
+                const bytes = new Uint8Array(buf);
+                const len = bytes.byteLength;
+                for (let i = 0; i < len; i++) {
+                  binary += String.fromCharCode(bytes[i]);
+                }
+                base64Image = `data:image/jpeg;base64,${btoa(binary)}`;
+              }
+            }
+          } catch (e) {
+            lastError = (lastError ? lastError + "; " : "") + `Cloudflare AI error: ${e.message}`;
+          }
+        }
+
+        if (!base64Image) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: "GENERATION_FAILED",
+            detail: lastError || "No image generator available or quota reached"
+          }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          image: base64Image,
+          category,
+          view
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
       // 2. 中央氣象署今明 36 小時預報。API key 僅存 Worker Secret，不傳回前端。
       if (path === "/api/weather-forecast" && request.method === "GET") {
         if (!env.CWA_API_KEY) {

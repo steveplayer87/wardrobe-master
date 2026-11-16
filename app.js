@@ -713,7 +713,6 @@ async function runAiClothGen() {
   const promptInput = document.getElementById('aiGenPrompt');
   const catInput = document.getElementById('aiGenCategory');
   const viewInput = document.getElementById('aiGenView');
-  const keyInput = document.getElementById('aiGenApiKey');
   const runBtn = document.getElementById('btnRunAiClothGen');
   const previewWrap = document.getElementById('aiGenPreviewWrap');
   const resultImg = document.getElementById('aiGenResultImg');
@@ -722,66 +721,40 @@ async function runAiClothGen() {
   const userPrompt = (promptInput?.value || '').trim();
   const category = catInput?.value || 'top';
   const view = viewInput?.value || 'front';
-  const apiKey = (keyInput?.value || '').trim();
 
   if (!userPrompt) {
     toast('請輸入單品外觀描述');
     return;
   }
-  if (!apiKey) {
-    toast('請輸入 Gemini API Key');
-    return;
-  }
 
-  localStorage.setItem('wm_gemini_api_key', apiKey);
   runBtn.disabled = true;
-  runBtn.textContent = '生成與去背處理中…';
-
-  const viewDesc = view === 'back' ? 'Back view' : 'Front view';
-  const fullPrompt = [
-    `Ultra-high-definition e-commerce catalog flat lay product photograph of ${userPrompt}.`,
-    `View: ${viewDesc}, perfectly upright orientation, completely centered.`,
-    `Arrangement: laid completely flat, smooth, wrinkle-free, no hanger, no mannequin, no human model.`,
-    `Sleeves and silhouette: horizontally extended or symmetrically spread downwards at identical angles, maintaining perfect mirror symmetry.`,
-    `Details & Material: authentic fabric texture (e.g., French terry, corduroy, cotton weave), precise collar, ribbing, seams, hardware, and stitching.`,
-    `Lighting & Studio: even studio softbox lighting, zero cast shadows, razor-sharp edges on a seamless, pure solid white background (#FFFFFF) for clean extraction.`
-  ].join(' ');
+  runBtn.textContent = '雲端生成與去背處理中…';
 
   try {
     let imgBase64 = null;
-    const imagenUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(apiKey)}`;
-    const resp = await fetch(imagenUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instances: [{ prompt: fullPrompt }],
-        parameters: { sampleCount: 1, aspectRatio: '1:1', outputMimeType: 'image/png' }
-      })
-    });
 
-    if (resp.ok) {
-      const data = await resp.json();
-      const b64 = data.predictions?.[0]?.bytesBase64Encoded;
-      if (b64) imgBase64 = `data:image/png;base64,${b64}`;
-    }
-
-    if (!imgBase64) {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const gResp = await fetch(geminiUrl, {
+    // 優先呼叫 Cloudflare Worker 雲端端點（金鑰安全儲存於雲端 Secret，免前端填寫）
+    try {
+      const resp = await fetch(`${CLOUDFLARE_WORKER_URL}/api/generate-clothing-image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `Generate flat lay clothing photo on pure white background: ${fullPrompt}` }] }]
-        })
+        body: JSON.stringify({ prompt: userPrompt, category, view })
       });
-      if (!gResp.ok) {
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success && data.image) {
+          imgBase64 = data.image;
+        }
+      } else {
         const errJson = await resp.json().catch(() => ({}));
-        throw new Error(errJson.error?.message || `API 端點錯誤 (${resp.status})`);
+        console.warn('Worker gen error:', errJson);
       }
+    } catch (e) {
+      console.warn('Worker call failed:', e);
     }
 
     if (!imgBase64) {
-      throw new Error('未取得生成圖片資料，請確認 API Key 是否具備 Imagen 權限');
+      throw new Error('雲端生圖服務暫時忙碌，請稍候重試');
     }
 
     const cutUrl = await processCutoutAndNormalize(imgBase64, category);
@@ -790,9 +763,9 @@ async function runAiClothGen() {
     if (resultImg) resultImg.src = cutUrl;
     if (previewWrap) previewWrap.classList.remove('is-hidden');
     if (applyBtn) applyBtn.classList.remove('is-hidden');
-    toast('已完成生成與去背規格化');
+    toast('已完成生成、去背與尺寸規格化');
   } catch (err) {
-    toast(`生成失敗：${err.message || '請確認網路與金鑰'}`);
+    toast(`生成失敗：${err.message || '請確認網路連線'}`);
   } finally {
     runBtn.disabled = false;
     runBtn.textContent = '開始生成並自動去背';

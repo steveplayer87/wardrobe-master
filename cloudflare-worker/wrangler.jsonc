@@ -4,6 +4,9 @@
   "main": "worker.js",
   "compatibility_date": "2026-10-19",
   "triggers": { "crons": [] },
+  "ai": {
+    "binding": "AI"
+  },
   "kv_namespaces": [
     {
       "binding": "WARDROBE_STORE",
