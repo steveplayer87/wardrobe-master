@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261116_128">
+<link rel="stylesheet" href="styles.css?v=20261116_129">
 </head>
 <body>
 
@@ -1086,7 +1086,23 @@
         <div class="ai-gen-preview-card" style="width:83.5%;max-width:280px;aspect-ratio:4/5;margin:0 auto;border-radius:var(--radius-l, 18px);border:1.5px solid rgba(220,226,235,0.85);box-shadow:0 12px 28px -8px rgba(28,35,51,0.14);background:repeating-conic-gradient(#f1f5f9 0 25%, #fff 0 50%) 50% / 16px 16px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
           <img id="aiGenResultImg" src="" alt="生成預覽" style="max-width:96%;max-height:96%;object-fit:contain;">
         </div>
+
+        <!-- 翻譯與處理過程資訊塊 -->
+        <div id="aiGenTranslationBox" class="is-hidden" style="margin-top:10px;text-align:left;background:var(--color-surface);border:1px solid var(--color-line);border-radius:12px;padding:10px 14px;font-size:12px;line-height:1.5;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-weight:700;color:var(--color-ink);">AI 語意轉譯歷程</span>
+            <span id="aiGenTransEngine" style="font-size:11px;color:var(--color-ink-muted);background:var(--color-bg);padding:2px 8px;border-radius:10px;border:1px solid var(--color-line);"></span>
+          </div>
+          <div style="color:var(--color-ink-soft);font-size:11.5px;margin-bottom:4px;">
+            <span style="font-weight:600;color:var(--color-ink);">原始輸入：</span><span id="aiGenTransOriginal"></span>
+          </div>
+          <div style="color:var(--color-ink-soft);font-size:11.5px;">
+            <span style="font-weight:600;color:var(--color-ink);">轉譯關鍵字：</span><span id="aiGenTransResult" style="font-family:monospace;font-size:11px;color:var(--color-ink);word-break:break-all;"></span>
+          </div>
+        </div>
       </div>
+
+      <p id="aiGenProgressStatus" class="is-hidden" style="font-size:12px;color:var(--color-ink-muted);font-weight:600;margin:4px 0 0;text-align:center;"></p>
 
       <div class="settings-actions" style="margin-top:8px;">
         <button type="button" class="btn-primary" id="btnRunAiClothGen" style="margin-top:0;">開始生成並自動去背</button>
@@ -1140,20 +1156,28 @@
   <div class="modal-sheet" id="modal-release-notes" data-modal>
     <div class="modal-handle"></div>
     <div class="modal-head">
-      <h2 id="releaseNotesTitle">已更新至 v128</h2>
+      <h2 id="releaseNotesTitle">已更新至 v129</h2>
       <button class="modal-close" data-close aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div class="release-notes-body" style="padding:4px 0 16px;">
       <div id="releaseNotesCurrentWrap">
         <ul id="releaseNotesList" style="margin:0 0 16px 0;padding-left:18px;font-size:13.5px;line-height:1.75;color:var(--color-ink);">
-          <li>AI 生成抽屜防鍵盤遮擋：輸入框聚焦時自動升起並保留操作視野</li>
-          <li>提示詞輸入框下方新增單品名稱快速膠囊（點擊即代入並消失）</li>
-          <li>AI 生成預覽框與調色畫布統一改為單品詳情頁之 4:5 比例</li>
+          <li>服飾語意轉譯中樞：中文描述自動經由 Google Gemini Flash 精準轉譯為電商規格</li>
+          <li>透明顯示轉譯歷程：呈現原始中文、英文轉譯關鍵字與所屬引擎來源</li>
+          <li>三階段生成進度提示：轉譯、平鋪生圖與智慧去背即時步驟回饋</li>
         </ul>
       </div>
 
       <div id="releaseNotesHistoryWrap" class="is-hidden" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--color-line);">
         <p style="font-size:12px;font-weight:700;color:var(--color-ink-muted);margin:0 0 10px;">歷史版本更新紀錄</p>
+        <div class="release-history-item" style="margin-bottom:14px;">
+          <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v128</p>
+          <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
+            <li>AI 生成抽屜防鍵盤遮擋：輸入框聚焦時自動升起並保留操作視野</li>
+            <li>提示詞輸入框下方新增單品名稱快速膠囊（點擊即代入並消失）</li>
+            <li>AI 生成預覽框與調色畫布統一改為單品詳情頁之 4:5 比例</li>
+          </ul>
+        </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v126</p>
           <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
@@ -1808,7 +1832,7 @@
 </div>
 
 
-<script src="seed-items.js?v=20261116_128"></script>
-<script src="app.js?v=20261116_128"></script>
+<script src="seed-items.js?v=20261116_129"></script>
+<script src="app.js?v=20261116_129"></script>
 </body>
 </html>

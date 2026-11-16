@@ -43,8 +43,10 @@ export default {
           });
         }
 
-        // 1. 中文轉英文服裝語意解析（避免生圖模型無法識別中文色彩與品項）
+        // 1. 中文轉英文服裝語意解析（優先使用 Gemini Flash 專屬服飾翻譯，次選 Workers AI，最後辭典錨定）
         let englishPrompt = userPrompt;
+        let translationSource = "Direct (No Translation)";
+
         if (/[\u4e00-\u9fa5]/.test(userPrompt)) {
           // 色彩關鍵詞強制錨定
           let colorEn = "";
@@ -57,7 +59,7 @@ export default {
 
           // 服飾款式強制錨定
           let itemEn = "";
-          if (/內衣|汗衫|內搭/.test(userPrompt)) itemEn = "short-sleeve crewneck undershirt, inner base-layer tee";
+          if (/內衣|汗衫|內搭/.test(userPrompt)) itemEn = "short-sleeve inner undershirt crewneck base-layer tee";
           else if (/素色T|短T|短袖T|T恤|踢恤/.test(userPrompt)) itemEn = "plain basic crewneck t-shirt";
           else if (/長T|長袖T/.test(userPrompt)) itemEn = "plain long-sleeve crewneck t-shirt";
           else if (/大學T|衛衣/.test(userPrompt)) itemEn = "plain crewneck sweatshirt";
@@ -66,9 +68,40 @@ export default {
           else if (/長褲|休閒長褲|工作褲/.test(userPrompt)) itemEn = "plain casual trousers, straight-leg pants";
           else if (/牛仔褲/.test(userPrompt)) itemEn = "classic denim jeans";
 
-          // 若有 Workers AI，使用 LLM 翻譯整段描述
+          // A. 優先使用 Google Gemini Flash 進行中文服裝語意轉譯
+          let geminiTranslated = "";
+          if (env.GEMINI_API_KEY) {
+            try {
+              const geminiTransUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`;
+              const transPrompt = [
+                "You are a fashion e-commerce catalog specialist. Translate the Chinese clothing description into concise English keywords for flat lay product photography.",
+                "Specify: exact solid color, garment type, cut, sleeve length, collar type.",
+                "Strict rules: If user mentions '黑色', ensure 'solid jet black' is prominent. If user mentions '內衣', translate to 'short-sleeve inner undershirt crewneck base-layer tee'.",
+                "Output ONLY the English keywords, no punctuation, no markdown, no explanation.",
+                `User description: ${userPrompt}`
+              ].join("\n");
+
+              const gResp = await fetch(geminiTransUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: transPrompt }] }]
+                })
+              });
+              if (gResp.ok) {
+                const gData = await gResp.json();
+                const txt = gData.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+                if (txt) {
+                  geminiTranslated = txt.replace(/^["']|["']$/g, "").replace(/\n.*/g, "").trim();
+                  translationSource = "Google Gemini Flash";
+                }
+              }
+            } catch (_) {}
+          }
+
+          // B. 備援使用 Workers AI (Llama 3.1)
           let llmTranslated = "";
-          if (env.AI) {
+          if (!geminiTranslated && env.AI) {
             try {
               const transResp = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
                 messages: [
@@ -85,12 +118,19 @@ export default {
               });
               if (transResp && transResp.response) {
                 llmTranslated = transResp.response.trim().replace(/^["']|["']$/g, "").replace(/\n.*/g, "");
+                translationSource = "Cloudflare Llama 3.1";
               }
             } catch (_) {}
           }
 
-          if (colorEn && itemEn) {
+          if (geminiTranslated) {
+            englishPrompt = geminiTranslated;
+            if (colorEn && !englishPrompt.toLowerCase().includes("black") && !englishPrompt.toLowerCase().includes("white")) {
+              englishPrompt = `${colorEn} ${englishPrompt}`;
+            }
+          } else if (colorEn && itemEn) {
             englishPrompt = `${colorEn} ${itemEn}`;
+            translationSource = "Fashion Keyword Mapping";
           } else if (llmTranslated) {
             englishPrompt = llmTranslated;
             if (colorEn && !englishPrompt.toLowerCase().includes("black") && !englishPrompt.toLowerCase().includes("white")) {
@@ -98,6 +138,7 @@ export default {
             }
           } else {
             englishPrompt = [colorEn, itemEn, userPrompt].filter(Boolean).join(" ");
+            translationSource = "Fallback Concatenation";
           }
         }
 
@@ -182,7 +223,9 @@ export default {
           success: true,
           image: base64Image,
           category,
-          view
+          view,
+          translatedPrompt: englishPrompt,
+          translationSource: translationSource
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });

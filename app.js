@@ -728,6 +728,11 @@ async function runAiClothGen() {
   const previewWrap = document.getElementById('aiGenPreviewWrap');
   const resultImg = document.getElementById('aiGenResultImg');
   const applyBtn = document.getElementById('btnApplyAiClothGen');
+  const progressStatus = document.getElementById('aiGenProgressStatus');
+  const transBox = document.getElementById('aiGenTranslationBox');
+  const transOrig = document.getElementById('aiGenTransOriginal');
+  const transRes = document.getElementById('aiGenTransResult');
+  const transEng = document.getElementById('aiGenTransEngine');
 
   const userPrompt = (promptInput?.value || '').trim();
   const category = catInput?.value || 'top';
@@ -739,12 +744,23 @@ async function runAiClothGen() {
   }
 
   runBtn.disabled = true;
-  runBtn.textContent = '雲端生成與去背處理中…';
+  runBtn.textContent = '1/3 解析語意與轉譯中…';
+  if (progressStatus) {
+    progressStatus.textContent = '步驟 1/3：AI 語義解析與轉譯中…';
+    progressStatus.classList.remove('is-hidden');
+  }
+  if (transBox) transBox.classList.add('is-hidden');
 
   try {
     let imgBase64 = null;
+    let respData = null;
 
-    // 優先呼叫 Cloudflare Worker 雲端端點（金鑰安全儲存於雲端 Secret，免前端填寫）
+    if (progressStatus) {
+      progressStatus.textContent = '步驟 2/3：雲端電商平鋪生圖運算中…';
+    }
+    runBtn.textContent = '2/3 電商型錄平鋪生圖中…';
+
+    // 呼叫 Cloudflare Worker 雲端端點（金鑰安全儲存於雲端 Secret，免前端填寫）
     try {
       const resp = await fetch(`${CLOUDFLARE_WORKER_URL}/api/generate-clothing-image`, {
         method: 'POST',
@@ -752,9 +768,9 @@ async function runAiClothGen() {
         body: JSON.stringify({ prompt: userPrompt, category, view })
       });
       if (resp.ok) {
-        const data = await resp.json();
-        if (data.success && data.image) {
-          imgBase64 = data.image;
+        respData = await resp.json();
+        if (respData.success && respData.image) {
+          imgBase64 = respData.image;
         }
       } else {
         const errJson = await resp.json().catch(() => ({}));
@@ -768,14 +784,32 @@ async function runAiClothGen() {
       throw new Error('雲端生圖服務暫時忙碌，請稍候重試');
     }
 
+    if (progressStatus) {
+      progressStatus.textContent = '步驟 3/3：自動智慧去背與尺寸規格化…';
+    }
+    runBtn.textContent = '3/3 智慧去背與尺寸校準…';
+
     const cutUrl = await processCutoutAndNormalize(imgBase64, category);
     currentAiGenResultUrl = cutUrl;
 
     if (resultImg) resultImg.src = cutUrl;
     if (previewWrap) previewWrap.classList.remove('is-hidden');
     if (applyBtn) applyBtn.classList.remove('is-hidden');
+
+    // 顯示轉譯歷程資訊塊
+    if (transBox && respData) {
+      if (transOrig) transOrig.textContent = userPrompt;
+      if (transRes) transRes.textContent = respData.translatedPrompt || '(無需轉譯)';
+      if (transEng) transEng.textContent = respData.translationSource || 'Cloudflare AI';
+      transBox.classList.remove('is-hidden');
+    }
+
+    if (progressStatus) {
+      progressStatus.textContent = '已完成生成、精準去背與尺寸規格化';
+    }
     toast('已完成生成、去背與尺寸規格化');
   } catch (err) {
+    if (progressStatus) progressStatus.textContent = `生成失敗：${err.message || '請確認網路連線'}`;
     toast(`生成失敗：${err.message || '請確認網路連線'}`);
   } finally {
     runBtn.disabled = false;
@@ -11066,7 +11100,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v128';
+const CURRENT_APP_VERSION = 'v129';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
