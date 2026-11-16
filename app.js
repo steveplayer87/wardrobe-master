@@ -11020,7 +11020,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v125';
+const CURRENT_APP_VERSION = 'v126';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
