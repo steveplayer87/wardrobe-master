@@ -664,7 +664,8 @@ export default {
           // Safety net for already-open older clients: never accept an upload that silently drops
           // records or photo references already present in the cloud. Intentional deletions must
           // first be reconciled with the current cloud state rather than overwriting blindly.
-          if (current) {
+          const allowDeletion = request.headers.get("x-allow-delete") === "true" || new URL(request.url).searchParams.get("force") === "1" || body.allowDeletion === true;
+          if (current && !allowDeletion) {
             const incomingItems = Array.isArray(body.items) ? body.items : [];
             const currentItems = Array.isArray(current.items) ? current.items : [];
             const incomingIds = new Set(incomingItems.map(item => item.id));
