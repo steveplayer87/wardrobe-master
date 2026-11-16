@@ -43,13 +43,72 @@ export default {
           });
         }
 
+        // 1. 中文轉英文服裝語意解析（避免生圖模型無法識別中文色彩與品項）
+        let englishPrompt = userPrompt;
+        if (/[\u4e00-\u9fa5]/.test(userPrompt)) {
+          // 色彩關鍵詞強制錨定
+          let colorEn = "";
+          if (/深黑|全黑|純黑|黑/.test(userPrompt)) colorEn = "solid jet black";
+          else if (/純白|米白|白/.test(userPrompt)) colorEn = "solid clean white";
+          else if (/深灰|鐵灰|灰/.test(userPrompt)) colorEn = "solid heather grey";
+          else if (/深藍|藏青|海軍藍|藍/.test(userPrompt)) colorEn = "solid navy blue";
+          else if (/軍綠|墨綠|綠/.test(userPrompt)) colorEn = "solid olive green";
+          else if (/卡其|駝色|奶茶/.test(userPrompt)) colorEn = "solid khaki beige";
+
+          // 服飾款式強制錨定
+          let itemEn = "";
+          if (/內衣|汗衫|內搭/.test(userPrompt)) itemEn = "short-sleeve crewneck undershirt, inner base-layer tee";
+          else if (/素色T|短T|短袖T|T恤|踢恤/.test(userPrompt)) itemEn = "plain basic crewneck t-shirt";
+          else if (/長T|長袖T/.test(userPrompt)) itemEn = "plain long-sleeve crewneck t-shirt";
+          else if (/大學T|衛衣/.test(userPrompt)) itemEn = "plain crewneck sweatshirt";
+          else if (/帽T|連帽衫/.test(userPrompt)) itemEn = "plain hooded sweatshirt";
+          else if (/短褲|運動短褲/.test(userPrompt)) itemEn = "plain casual shorts";
+          else if (/長褲|休閒長褲|工作褲/.test(userPrompt)) itemEn = "plain casual trousers, straight-leg pants";
+          else if (/牛仔褲/.test(userPrompt)) itemEn = "classic denim jeans";
+
+          // 若有 Workers AI，使用 LLM 翻譯整段描述
+          let llmTranslated = "";
+          if (env.AI) {
+            try {
+              const transResp = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
+                messages: [
+                  {
+                    role: "system",
+                    content: "Translate the Chinese clothing description into concise English keywords for fashion e-commerce. Specify exact color, clothing type, and cut. Output ONLY the English keywords, nothing else."
+                  },
+                  {
+                    role: "user",
+                    content: userPrompt
+                  }
+                ],
+                max_tokens: 50
+              });
+              if (transResp && transResp.response) {
+                llmTranslated = transResp.response.trim().replace(/^["']|["']$/g, "").replace(/\n.*/g, "");
+              }
+            } catch (_) {}
+          }
+
+          if (colorEn && itemEn) {
+            englishPrompt = `${colorEn} ${itemEn}`;
+          } else if (llmTranslated) {
+            englishPrompt = llmTranslated;
+            if (colorEn && !englishPrompt.toLowerCase().includes("black") && !englishPrompt.toLowerCase().includes("white")) {
+              englishPrompt = `${colorEn} ${englishPrompt}`;
+            }
+          } else {
+            englishPrompt = [colorEn, itemEn, userPrompt].filter(Boolean).join(" ");
+          }
+        }
+
         const viewDesc = view === "back" ? "Back view" : "Front view";
         const fullPrompt = [
-          `Ultra-high-definition e-commerce catalog flat lay product photograph of ${userPrompt}.`,
+          `Professional e-commerce flat lay catalog product photograph of a ${englishPrompt}.`,
+          `Garment Color: strictly single solid color matching description.`,
           `View: ${viewDesc}, perfectly upright orientation, completely centered.`,
           `Arrangement: laid completely flat, smooth, wrinkle-free, no hanger, no mannequin, no human model.`,
           `Sleeves and silhouette: horizontally extended or symmetrically spread downwards at identical angles, maintaining perfect mirror symmetry.`,
-          `Details & Material: authentic fabric texture (e.g., French terry, corduroy, cotton weave), precise collar, ribbing, seams, hardware, and stitching.`,
+          `Texture: authentic clean garment textile weave, precise collar, ribbing, seams, and fine stitching.`,
           `Lighting & Studio: even studio softbox lighting, zero cast shadows, razor-sharp edges on a seamless, pure solid white background (#FFFFFF) for clean extraction.`
         ].join(" ");
 

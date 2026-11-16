@@ -11066,7 +11066,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v127';
+const CURRENT_APP_VERSION = 'v128';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
