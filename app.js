@@ -11051,6 +11051,10 @@ function wireEvents() {
   });
 
   document.getElementById('btnOpenReleaseNotes')?.addEventListener('click', () => {
+    const historyWrap = document.getElementById('releaseNotesHistoryWrap');
+    const titleEl = document.getElementById('releaseNotesTitle');
+    if (historyWrap) historyWrap.classList.remove('is-hidden');
+    if (titleEl) titleEl.textContent = '版本資訊與更新紀錄';
     openModal('modal-release-notes');
   });
   document.getElementById('btnCloseReleaseNotes')?.addEventListener('click', () => {
@@ -11062,7 +11066,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v126';
+const CURRENT_APP_VERSION = 'v127';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
@@ -11070,6 +11074,10 @@ function checkVersionUpdateNotice() {
   try { seen = localStorage.getItem(K); } catch (e) {}
   if (seen === CURRENT_APP_VERSION) return;
   setTimeout(() => {
+    const historyWrap = document.getElementById('releaseNotesHistoryWrap');
+    const titleEl = document.getElementById('releaseNotesTitle');
+    if (historyWrap) historyWrap.classList.add('is-hidden');
+    if (titleEl) titleEl.textContent = `已更新至 ${CURRENT_APP_VERSION}`;
     openModal('modal-release-notes');
     try { localStorage.setItem(K, CURRENT_APP_VERSION); } catch (e) {}
   }, 700);
