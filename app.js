@@ -11008,8 +11008,29 @@ function wireEvents() {
     document.getElementById('settingsForm')?.requestSubmit();
   });
 
+  document.getElementById('btnOpenReleaseNotes')?.addEventListener('click', () => {
+    openModal('modal-release-notes');
+  });
+  document.getElementById('btnCloseReleaseNotes')?.addEventListener('click', () => {
+    try { localStorage.setItem('wm_seen_version', CURRENT_APP_VERSION); } catch (e) {}
+    closeModal();
+  });
+
   setupInspirationCarousel();
   setupSandboxInteractions();
+}
+
+const CURRENT_APP_VERSION = 'v125';
+
+function checkVersionUpdateNotice() {
+  const K = 'wm_seen_version';
+  let seen = null;
+  try { seen = localStorage.getItem(K); } catch (e) {}
+  if (seen === CURRENT_APP_VERSION) return;
+  setTimeout(() => {
+    openModal('modal-release-notes');
+    try { localStorage.setItem(K, CURRENT_APP_VERSION); } catch (e) {}
+  }, 700);
 }
 
 /* ============================================================
@@ -12158,6 +12179,7 @@ async function init() {
     renderAll();
     updateHistoryControls();
     refreshWeather(false);
+    checkVersionUpdateNotice();
     cloudAutoSyncReady = true;
     // App 啟動時自動同步一次；之後切回前景時最多每 15 分鐘觸發一次，避免頻繁查詢 Notion。
     if (navigator.onLine) {
