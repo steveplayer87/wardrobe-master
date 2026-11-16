@@ -1124,6 +1124,17 @@ function hydrateState(rawObj) {
         }
       }
     }
+    const isKaws = (i.name && i.name.toLowerCase().includes('kaws')) || i.id === 'mwisn1dc6d2suh' || i.id === 'mwipvxwfpnwx1w';
+    if (isKaws && !i.collab) {
+      i.collab = {
+        name: 'KAWS UNIVERSE',
+        brand: 'Uniqlo',
+        url: 'https://www.uniqlo.com/tw/public/uqtw/special-feature/ut/kaws-universe/index.html',
+        image: 'https://image.uniqlo.com/UQ/ST3/jp/imagesother/UT/lineup/26fw/kaws/26fw_KAWSUNIVERSE_GL_750_750.jpg',
+        subtitle: 'UNIQLO UT 聯名特輯',
+        desc: '以「We are better together」為主題，KAWS 特別創作全新地球、月亮與太陽角色。'
+      };
+    }
     return i;
   });
   return {
@@ -5915,13 +5926,31 @@ function openItemDetail(itemId) {
         <span class="detail-color-circle" style="background-color:${item.colorHex || getColorHexByName(item.color) || '#888'};" title="${escapeHtml(item.color || '')}"></span>
       ` : ''}
       ${item.brand ? `<div class="detail-brand" style="margin:0">${brandIconMarkup(item, 'medium')}<span>${escapeHtml(item.brand)}</span></div>` : ''}
+      ${item.collab ? `
+        <button type="button" class="detail-collab-badge" id="btnOpenCollabBadge">
+          ${item.collab.image ? `<img src="${escapeHtml(item.collab.image)}" class="collab-badge-thumb" alt="" />` : ''}
+          <span class="collab-badge-name">${escapeHtml(item.collab.name || '合作特輯')}</span>
+          <svg class="collab-badge-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      ` : ''}
     </div>
     ${item.material ? `
       <div class="detail-material-row">
         <span class="material-tag"><span class="icon-inline">${ICONS.layers}</span><span>材質：${escapeHtml(item.material)}</span></span>
       </div>
     ` : ''}
-    <p class="detail-tags">${categoryLabel(item.category)}${lengthLabel ? ' · ' + lengthLabel : ''}${item.tags && item.tags.length ? ' · ' + item.tags.filter(t => t !== lengthLabel).map(escapeHtml).join('、') : ''} · ${statusLabel}</p>
+    <p class="detail-tags">${(() => {
+      const parts = [];
+      const cLabel = categoryLabel(item.category);
+      if (cLabel) parts.push(cLabel);
+      if (lengthLabel) parts.push(lengthLabel);
+      if (item.tags && item.tags.length) {
+        const extraTags = item.tags.filter(t => t && t.trim() && t !== lengthLabel);
+        if (extraTags.length) parts.push(extraTags.map(escapeHtml).join('、'));
+      }
+      if (statusLabel) parts.push(statusLabel);
+      return parts.join(' · ');
+    })()}</p>
     ${item.extraWash && ['dirty', 'resting'].includes(item.status) ? '<p class="wash-boost-current">已標記：加強清洗</p>' : ''}
     <div class="detail-stats">
       <div class="detail-stat"><b>${item.wearCount||0}</b><span>本輪穿著</span></div>
@@ -6000,6 +6029,14 @@ function openItemDetail(itemId) {
     modalReturnTo = 'modal-item';
     openAddModal(item.id);
   });
+
+  const btnCollabBadge = body.querySelector('#btnOpenCollabBadge');
+  if (btnCollabBadge && item.collab) {
+    btnCollabBadge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCollabDetail(item.collab);
+    });
+  }
 
   const photoContainer = body.querySelector('#detailPhotoContainer');
   if (photoContainer) {
@@ -6184,6 +6221,42 @@ function openItemDetail(itemId) {
     if (aTempRack) aTempRack.addEventListener('click', () => { sendToTempRackNow(item.id); closeModal(); });
   }
   openModal('modal-item');
+}
+
+function openCollabDetail(collab) {
+  if (!collab) return;
+  const modal = document.getElementById('modal-collab-detail');
+  if (!modal) return;
+  const titleEl = modal.querySelector('#collabModalTitle');
+  const thumbEl = modal.querySelector('#collabModalThumb');
+  const nameEl = modal.querySelector('#collabModalName');
+  const subEl = modal.querySelector('#collabModalSubtitle');
+  const descEl = modal.querySelector('#collabModalDesc');
+  const linkEl = modal.querySelector('#collabModalLink');
+
+  if (titleEl) titleEl.textContent = '合作活動特輯';
+  if (thumbEl) {
+    thumbEl.src = collab.image || '';
+    thumbEl.alt = collab.name || '';
+  }
+  if (nameEl) nameEl.textContent = collab.name || '';
+  if (subEl) {
+    subEl.textContent = collab.subtitle || '';
+    subEl.style.display = collab.subtitle ? '' : 'none';
+  }
+  if (descEl) {
+    descEl.textContent = collab.desc || '';
+    descEl.style.display = collab.desc ? '' : 'none';
+  }
+  if (linkEl) {
+    if (collab.url) {
+      linkEl.href = collab.url;
+      linkEl.style.display = '';
+    } else {
+      linkEl.style.display = 'none';
+    }
+  }
+  openModal('modal-collab-detail');
 }
 
 function openPhotoOptions(item, side = 'front') {
@@ -11119,7 +11192,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v130';
+const CURRENT_APP_VERSION = 'v131';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';

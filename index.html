@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261116_130">
+<link rel="stylesheet" href="styles.css?v=20261116_131">
 </head>
 <body>
 
@@ -1152,23 +1152,53 @@
     </div>
   </div>
 
+  <!-- Collab Detail Modal -->
+  <div class="modal-sheet" id="modal-collab-detail" data-modal>
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <h2 id="collabModalTitle">合作活動特輯</h2>
+      <button class="modal-close" data-close aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="collab-modal-body" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:8px 0 24px;">
+      <div class="collab-thumb-wrap" style="width:260px;height:260px;max-width:82vw;max-height:82vw;aspect-ratio:1/1;border-radius:var(--radius-l, 18px);border:1px solid var(--color-line);overflow:hidden;box-shadow:var(--shadow-card);background:var(--color-surface-2);flex-shrink:0;">
+        <img id="collabModalThumb" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">
+      </div>
+      <div style="text-align:center;width:100%;max-width:320px;padding:0 8px;box-sizing:border-box;">
+        <h3 id="collabModalName" style="font-size:18px;font-weight:800;color:var(--color-ink);margin:0 0 4px;letter-spacing:-0.2px;"></h3>
+        <p id="collabModalSubtitle" style="font-size:13px;font-weight:600;color:var(--color-ink-muted);margin:0 0 8px;"></p>
+        <p id="collabModalDesc" style="font-size:12.5px;color:var(--color-ink-soft);line-height:1.6;margin:0;"></p>
+      </div>
+      <a id="collabModalLink" href="#" target="_blank" rel="noopener noreferrer" class="btn-primary" style="width:85%;max-width:320px;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;box-sizing:border-box;margin-top:4px;">
+        <span>前往官方活動特輯</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      </a>
+    </div>
+  </div>
+
   <!-- Release Notes Modal -->
   <div class="modal-sheet" id="modal-release-notes" data-modal>
     <div class="modal-handle"></div>
     <div class="modal-head">
-      <h2 id="releaseNotesTitle">已更新至 v130</h2>
+      <h2 id="releaseNotesTitle">已更新至 v131</h2>
       <button class="modal-close" data-close aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div class="release-notes-body" style="padding:4px 0 16px;">
       <div id="releaseNotesCurrentWrap">
         <ul id="releaseNotesList" style="margin:0 0 16px 0;padding-left:18px;font-size:13.5px;line-height:1.75;color:var(--color-ink);">
-          <li>編輯未儲存防護修復</li>
-          <li>子抽屜平滑退回上一層</li>
+          <li>品牌合作活動標籤與專屬子抽屜</li>
+          <li>單品詳情標籤空值重複分隔點修正</li>
         </ul>
       </div>
 
       <div id="releaseNotesHistoryWrap" class="is-hidden" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--color-line);">
         <p style="font-size:12px;font-weight:700;color:var(--color-ink-muted);margin:0 0 10px;">歷史版本更新紀錄</p>
+        <div class="release-history-item" style="margin-bottom:14px;">
+          <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v130</p>
+          <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
+            <li>編輯未儲存防護修復</li>
+            <li>子抽屜平滑退回上一層</li>
+          </ul>
+        </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v129</p>
           <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
@@ -1839,7 +1869,7 @@
 </div>
 
 
-<script src="seed-items.js?v=20261116_130"></script>
-<script src="app.js?v=20261116_130"></script>
+<script src="seed-items.js?v=20261116_131"></script>
+<script src="app.js?v=20261116_131"></script>
 </body>
 </html>

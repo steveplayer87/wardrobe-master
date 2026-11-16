@@ -3428,6 +3428,48 @@ body.night-page input[type="range"]::-moz-range-track {
   flex-shrink: 0;
 }
 
+/* Detail Collaboration Badge */
+.detail-collab-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 2px 9px 2px 3px;
+  border-radius: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: transform var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+.detail-collab-badge:active {
+  transform: scale(0.97);
+  background: var(--color-surface-2);
+}
+.collab-badge-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
+}
+.collab-badge-name {
+  white-space: nowrap;
+  letter-spacing: -0.2px;
+}
+.collab-badge-arrow {
+  width: 12px;
+  height: 12px;
+  stroke: var(--color-ink-muted);
+  flex-shrink: 0;
+}
+
 /* Detail Archive Button */
 .detail-archive-wrap {
   margin-top: 24px;
