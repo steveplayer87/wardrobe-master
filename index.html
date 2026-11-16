@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261113_124">
+<link rel="stylesheet" href="styles.css?v=20261116_125">
 </head>
 <body>
 
@@ -179,6 +179,7 @@
         <div class="sort-row">
           <select class="sort-select" id="sortSelect">
             <option value="recent">最近新增</option>
+            <option value="category">分類</option>
             <option value="wearCount">穿著次數</option>
             <option value="lastWorn">最近穿著</option>
             <option value="modified">最近修改</option>
@@ -192,6 +193,9 @@
               <span data-icon="search"></span>
             </button>
             <button class="select-mode-btn" id="btnSelectMode">選取</button>
+            <button type="button" class="icon-only-btn compact-grid-btn" id="btnWardrobeCompactGrid" aria-label="緊湊微縮圖檢視" title="切換緊湊微縮圖">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            </button>
           </div>
         </div>
         <div class="search-row is-hidden" id="searchRow">
@@ -203,7 +207,7 @@
       <div class="item-grid" id="wardrobeGrid"></div>
       <div class="retired-banner" id="retiredBanner" role="button" tabindex="0" aria-label="開啟典藏">
         <span class="retired-banner-icon" data-icon="retired"></span>
-        <div><p class="retired-banner-title">典藏</p><p class="retired-banner-sub">已退役的單品會安靜收在這裡，不列入日常衣櫥。</p></div>
+        <div><p class="retired-banner-title" id="retiredBannerTitle">典藏</p><p class="retired-banner-sub" id="retiredBannerSub">已退役的單品會安靜收在這裡，不列入日常衣櫥。</p></div>
       </div>
       <p class="empty-hint" id="wardrobeEmpty" hidden>衣櫥還是空的，點右下角加入第一件衣物吧</p>
       <div class="is-hidden" id="deleteCategoryWrap" style="margin:16px 0 90px">
@@ -418,13 +422,25 @@
       </div>
     </div>
     <form class="form" id="addItemForm">
-      <label class="photo-upload" id="photoUploadArea">
-        <input type="file" accept="image/*" id="photoInput" multiple hidden>
-        <span class="photo-placeholder" id="photoPreviewWrap">
-          <span data-icon="camera"></span>
-          <span>上傳照片（可一次選2張，第2張當背面）</span>
-        </span>
-      </label>
+      <div class="photo-upload-wrap" style="position:relative;">
+        <label class="photo-upload" id="photoUploadArea">
+          <input type="file" accept="image/*" id="photoInput" multiple hidden>
+          <span class="photo-placeholder" id="photoPreviewWrap">
+            <span data-icon="camera"></span>
+            <span>上傳照片（可一次選2張，第2張當背面）</span>
+          </span>
+        </label>
+        <div class="photo-floating-actions" style="position:absolute;right:10px;bottom:10px;display:flex;gap:6px;z-index:5;">
+          <button type="button" class="photo-floating-btn" id="btnOpenColorTuner" aria-label="調色器" title="局部 HSB 調色器" style="display:none;background:rgba(255,255,255,0.94);border:1px solid var(--color-line);border-radius:20px;padding:6px 10px;font-size:12px;font-weight:700;color:var(--color-ink);box-shadow:var(--shadow-s);align-items:center;gap:4px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+            <span>調色</span>
+          </button>
+          <button type="button" class="photo-floating-btn" id="btnOpenAiClothGen" aria-label="AI 生成衣服" title="AI 生成衣服" style="background:rgba(255,255,255,0.94);border:1px solid var(--color-line);border-radius:20px;padding:6px 10px;font-size:12px;font-weight:700;color:var(--color-ink);box-shadow:var(--shadow-s);display:flex;align-items:center;gap:4px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+            <span>AI 生成</span>
+          </button>
+        </div>
+      </div>
       <div class="photo-back-hint-wrap" id="photoBackHintWrap" hidden>
         <p class="photo-back-hint" id="photoBackHint">已加入背面照片</p>
         <button type="button" class="photo-swap-btn" id="btnSwapPhotos">交換正反</button>
@@ -814,7 +830,7 @@
     <div class="weather-alert-actions"><button type="button" class="btn-secondary" data-close>稍後再看</button><button type="button" class="btn-primary" id="btnWeatherAlertWardrobe">前往衣櫥</button></div>
   </div>
 
-  <!-- Weather Detail Modal (Today vs Yesterday Comparison & Hourly Strip) -->
+  <!-- Weather Detail Modal (Today vs Yesterday Comparison & Hourly Strip & Trend Chart) -->
   <div class="modal-sheet modal-sheet-tall" id="modal-weather-detail" data-modal>
     <div class="modal-handle"></div>
     <div class="modal-head">
@@ -839,7 +855,6 @@
         </div>
         <div class="wd-hero-divider" aria-hidden="true"></div>
         <div class="wd-today-col">
-          <span class="wd-col-caption" id="wdTodayCaption">今日此時</span>
           <div class="wd-today-main">
             <span class="wd-today-temp" id="wdTodayTemp">—</span>
             <div class="wd-today-cond">
@@ -847,24 +862,35 @@
               <span class="wd-today-label" id="wdTodayLabel">—</span>
             </div>
           </div>
-          <div class="wd-delta-pill" id="wdDeltaPill">比對昨日此時…</div>
+          <div class="wd-today-sub">
+            <div class="wd-delta-pill" id="wdDeltaPill">比對昨日此時…</div>
+            <span class="wd-humidity-badge" id="wdTodayHumidity">濕度 —%</span>
+          </div>
         </div>
       </div>
 
       <div class="wd-range-row" id="wdRangeRow">
-        <span id="wdTodayRange">今日：—</span>
-        <span id="wdYesterdayRange">昨日：—</span>
+        <div class="wd-range-yesterday" id="wdYesterdayRange">昨日全日：—</div>
+        <div class="wd-range-divider" aria-hidden="true"></div>
+        <div class="wd-range-today" id="wdTodayRange">今日全日：—</div>
       </div>
 
       <div class="wd-hourly-section">
         <div class="wd-hourly-header">
-          <span class="wd-hourly-title">逐時天氣變化</span>
-          <div class="segment wd-day-segment" id="wdDaySegment" role="tablist" aria-label="查看今天或昨天">
-            <button type="button" class="segment-btn is-active" data-wd-day="today" role="tab" aria-selected="true">今天</button>
-            <button type="button" class="segment-btn" data-wd-day="yesterday" role="tab" aria-selected="false">昨天</button>
-          </div>
+          <span class="wd-hourly-title">逐時天氣比對</span>
+          <span class="wd-hourly-legend" id="wdHourlyLegend">上排今日・下排昨日（向左滑回溯）</span>
         </div>
-        <div class="wd-hourly-strip" id="wdHourlyStrip" aria-label="每小時天氣列表"></div>
+        <div class="wd-hourly-strip" id="wdHourlyStrip" aria-label="雙排每小時天氣列表"></div>
+      </div>
+
+      <div class="wd-trend-section">
+        <div class="wd-trend-header">
+          <span class="wd-trend-title">氣溫趨勢折線圖</span>
+          <span class="wd-trend-hint">過去兩週實測與未來預報</span>
+        </div>
+        <div class="wd-trend-chart-container" id="wdTrendChartContainer">
+          <div class="wd-trend-chart-scroll" id="wdTrendChartScroll"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1011,6 +1037,95 @@
     <div class="modal-head"><h2 id="numberGridTitle">選擇次數</h2><button class="modal-close" data-close><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
     <div class="number-grid" id="numberGrid"></div>
     <p class="number-grid-caption is-hidden" id="numberGridCaption">太臭了！</p>
+  </div>
+
+  <!-- AI Clothing Generator Modal -->
+  <div class="modal-sheet modal-sheet-tall" id="modal-ai-clothing-gen" data-modal>
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <h2>AI 生成電商平鋪單品</h2>
+      <button class="modal-close" data-close aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="ai-gen-body" style="display:flex;flex-direction:column;gap:12px;padding-bottom:20px;">
+      <label class="field">單品外觀描述
+        <textarea id="aiGenPrompt" rows="3" placeholder="例如：簡單平凡的黑色素色T恤、米白色復古水洗連帽衫、深灰直筒燈芯絨長褲…" style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:13.5px;border-radius:12px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-ink);line-height:1.45;"></textarea>
+      </label>
+      <div class="field-row" style="display:flex;gap:10px;">
+        <label class="field" style="flex:1;">單品類型
+          <select id="aiGenCategory" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-ink);">
+            <option value="top">上衣（Top）</option>
+            <option value="outer">外套（Outer）</option>
+            <option value="bottom">褲裝（Bottom）</option>
+            <option value="shoes">鞋款（Shoes）</option>
+            <option value="hat">帽款（Hat）</option>
+            <option value="accessory">配件（Accessory）</option>
+          </select>
+        </label>
+        <label class="field" style="flex:1;">視角
+          <select id="aiGenView" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-ink);">
+            <option value="front">正視角（Front View）</option>
+            <option value="back">背視角（Back View）</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">Gemini API Key
+        <input type="password" id="aiGenApiKey" placeholder="輸入 Google AI Studio Gemini API Key" style="width:100%;box-sizing:border-box;padding:9px 12px;font-size:13px;border-radius:10px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-ink);">
+      </label>
+      <p style="font-size:11.5px;color:var(--color-ink-muted);margin:0;">系統將自動套用超高畫質專業電商型錄頂視平鋪規格、袖管對稱、純白棚拍與邊緣去背處理。</p>
+      
+      <div id="aiGenPreviewWrap" class="is-hidden" style="margin-top:6px;text-align:center;">
+        <p style="font-size:12px;font-weight:700;color:var(--color-ink);margin:0 0 6px;">生成與去背預覽：</p>
+        <div style="width:200px;height:200px;margin:0 auto;border-radius:16px;border:1px solid var(--color-line);background:repeating-conic-gradient(#f1f5f9 0 25%, #fff 0 50%) 50% / 14px 14px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+          <img id="aiGenResultImg" src="" alt="生成預覽" style="max-width:100%;max-height:100%;object-fit:contain;">
+        </div>
+      </div>
+
+      <div class="settings-actions" style="margin-top:8px;">
+        <button type="button" class="btn-primary" id="btnRunAiClothGen" style="margin-top:0;">開始生成並自動去背</button>
+        <button type="button" class="btn-secondary is-hidden" id="btnApplyAiClothGen">採用為此單品照片</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Color Tuner Modal (Selective HSB Adjustment) -->
+  <div class="modal-sheet modal-sheet-tall" id="modal-color-tuner" data-modal>
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <h2>吸管局部調色器 (HSB)</h2>
+      <button class="modal-close" data-close aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="color-tuner-body" style="display:flex;flex-direction:column;gap:12px;padding-bottom:20px;">
+      <div style="position:relative;width:100%;max-width:320px;height:280px;margin:0 auto;border-radius:16px;border:1px solid var(--color-line);background:repeating-conic-gradient(#f1f5f9 0 25%, #fff 0 50%) 50% / 14px 14px;overflow:hidden;cursor:crosshair;display:flex;align-items:center;justify-content:center;">
+        <canvas id="colorTunerCanvas" style="max-width:100%;max-height:100%;object-fit:contain;"></canvas>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;justify-content:center;background:var(--color-surface);border:1px solid var(--color-line);border-radius:12px;padding:8px 12px;">
+        <span style="font-size:12px;font-weight:700;color:var(--color-ink);">已吸取目標色：</span>
+        <span id="colorTunerTargetSwatch" style="width:24px;height:24px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--color-line);background:#ccc;"></span>
+        <span id="colorTunerTargetHsbText" style="font-size:11.5px;color:var(--color-ink-soft);font-variant-numeric:tabular-nums;">請點擊上方照片吸取衣服顏色</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <label class="field" style="margin:0;">色相微調 (Hue)
+          <input type="range" id="colorTunerHue" min="-180" max="180" value="0" style="width:100%;">
+          <span id="colorTunerHueVal" style="font-size:11px;color:var(--color-ink-muted);display:block;text-align:right;">0°</span>
+        </label>
+        <label class="field" style="margin:0;">飽和度微調 (Saturation)
+          <input type="range" id="colorTunerSat" min="-50" max="50" value="0" style="width:100%;">
+          <span id="colorTunerSatVal" style="font-size:11px;color:var(--color-ink-muted);display:block;text-align:right;">0%</span>
+        </label>
+        <label class="field" style="margin:0;">亮度微調 (Brightness)
+          <input type="range" id="colorTunerBright" min="-50" max="50" value="0" style="width:100%;">
+          <span id="colorTunerBrightVal" style="font-size:11px;color:var(--color-ink-muted);display:block;text-align:right;">0%</span>
+        </label>
+        <label class="field" style="margin:0;">選取色彩容差範圍 (Tolerance)
+          <input type="range" id="colorTunerTolerance" min="10" max="60" value="30" style="width:100%;">
+          <span id="colorTunerToleranceVal" style="font-size:11px;color:var(--color-ink-muted);display:block;text-align:right;">適中 (30)</span>
+        </label>
+      </div>
+      <div class="settings-actions" style="margin-top:6px;">
+        <button type="button" class="btn-secondary" id="btnResetColorTuner">重設原色</button>
+        <button type="button" class="btn-primary" id="btnSaveColorTuner" style="margin-top:0;">儲存調色</button>
+      </div>
+    </div>
   </div>
 
   <!-- Photo adjust: crop/zoom/pan to the category's standard aspect ratio -->
@@ -1639,7 +1754,7 @@
 <script>
 /* Update notice: shows "已更新至 vN" once after each new version. Bump V together with the ?v= numbers. */
 (function(){
-  var V='v124', K='wm_seen_version', seen=null;
+  var V='v125', K='wm_seen_version', seen=null;
   try{seen=localStorage.getItem(K)}catch(e){}
   if(seen===V) return;
   var t=document.getElementById('verToast');
@@ -1649,7 +1764,7 @@
   try{localStorage.setItem(K,V)}catch(e){}
 })();
 </script>
-<script src="seed-items.js?v=20261113_124"></script>
-<script src="app.js?v=20261113_124"></script>
+<script src="seed-items.js?v=20261116_125"></script>
+<script src="app.js?v=20261116_125"></script>
 </body>
 </html>

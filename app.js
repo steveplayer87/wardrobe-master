@@ -567,6 +567,429 @@ function wirePhotoAdjust() {
   });
 }
 
+/* ---------------------------- AI Clothing Gen & Selective Color Tuner ---------------------------- */
+function syncPhotoTunerBtnVisibility() {
+  const btn = document.getElementById('btnOpenColorTuner');
+  if (btn) btn.style.display = pendingPhoto ? 'inline-flex' : 'none';
+}
+
+let currentAiGenResultUrl = null;
+
+function openAiClothGenModal() {
+  const modal = document.getElementById('modal-ai-clothing-gen');
+  if (!modal) return;
+  const keyInput = document.getElementById('aiGenApiKey');
+  const catInput = document.getElementById('aiGenCategory');
+  const previewWrap = document.getElementById('aiGenPreviewWrap');
+  const resultImg = document.getElementById('aiGenResultImg');
+  const applyBtn = document.getElementById('btnApplyAiClothGen');
+
+  if (keyInput) keyInput.value = localStorage.getItem('wm_gemini_api_key') || '';
+  if (catInput && pendingCategory) catInput.value = pendingCategory;
+  if (previewWrap) previewWrap.classList.add('is-hidden');
+  if (resultImg) resultImg.src = '';
+  if (applyBtn) applyBtn.classList.add('is-hidden');
+  currentAiGenResultUrl = null;
+
+  openModal('modal-ai-clothing-gen');
+}
+
+function processCutoutAndNormalize(base64Data, category) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const iw = img.naturalWidth || 1024;
+        const ih = img.naturalHeight || 1024;
+        const c1 = document.createElement('canvas');
+        c1.width = iw;
+        c1.height = ih;
+        const ctx1 = c1.getContext('2d');
+        ctx1.drawImage(img, 0, 0);
+
+        const imgData = ctx1.getImageData(0, 0, iw, ih);
+        const data = imgData.data;
+
+        // 取四個角落像素取平均作為背景色（通常為純白棚拍 #FFFFFF）
+        const corners = [
+          0,
+          (iw - 1) * 4,
+          ((ih - 1) * iw) * 4,
+          ((ih - 1) * iw + (iw - 1)) * 4
+        ];
+        let bgR = 0, bgG = 0, bgB = 0;
+        corners.forEach(idx => {
+          bgR += data[idx];
+          bgG += data[idx + 1];
+          bgB += data[idx + 2];
+        });
+        bgR /= 4; bgG /= 4; bgB /= 4;
+
+        let minX = iw, minY = ih, maxX = 0, maxY = 0;
+        const total = data.length;
+
+        for (let i = 0; i < total; i += 4) {
+          const r = data[i], g = data[i + 1], b = data[i + 2];
+          const dist = Math.hypot(r - bgR, g - bgG, b - bgB);
+          if (dist < 32) {
+            data[i + 3] = 0;
+          } else if (dist < 52) {
+            data[i + 3] = Math.round(((dist - 32) / 20) * 255);
+          }
+
+          if (data[i + 3] > 20) {
+            const pixelIdx = i / 4;
+            const px = pixelIdx % iw;
+            const py = Math.floor(pixelIdx / iw);
+            if (px < minX) minX = px;
+            if (px > maxX) maxX = px;
+            if (py < minY) minY = py;
+            if (py > maxY) maxY = py;
+          }
+        }
+        ctx1.putImageData(imgData, 0, 0);
+
+        // 若無有效像素則返回原圖
+        if (maxX <= minX || maxY <= minY) {
+          resolve(c1.toDataURL('image/png'));
+          return;
+        }
+
+        const bboxW = maxX - minX + 1;
+        const bboxH = maxY - minY + 1;
+
+        // 規格化至 800 x 800 正方形畫布
+        const normSize = 800;
+        const c2 = document.createElement('canvas');
+        c2.width = normSize;
+        c2.height = normSize;
+        const ctx2 = c2.getContext('2d');
+        ctx2.imageSmoothingEnabled = true;
+        ctx2.imageSmoothingQuality = 'high';
+
+        let targetW, targetH;
+        if (category === 'bottom') {
+          // 褲子：高度固定為 88%
+          targetH = normSize * 0.88;
+          targetW = (bboxW / bboxH) * targetH;
+          if (targetW > normSize * 0.90) {
+            const scaleDown = (normSize * 0.90) / targetW;
+            targetW *= scaleDown;
+            targetH *= scaleDown;
+          }
+        } else if (['top', 'outer', 'inner', 'thermal'].includes(category)) {
+          // 上衣／外套：寬度固定為 85%
+          targetW = normSize * 0.85;
+          targetH = (bboxH / bboxW) * targetW;
+          if (targetH > normSize * 0.90) {
+            const scaleDown = (normSize * 0.90) / targetH;
+            targetW *= scaleDown;
+            targetH *= scaleDown;
+          }
+        } else {
+          // 其他單品：82% 等比置中
+          const maxDim = normSize * 0.82;
+          const scale = Math.min(maxDim / bboxW, maxDim / bboxH);
+          targetW = bboxW * scale;
+          targetH = bboxH * scale;
+        }
+
+        const destX = (normSize - targetW) / 2;
+        const destY = (normSize - targetH) / 2;
+
+        ctx2.drawImage(c1, minX, minY, bboxW, bboxH, destX, destY, targetW, targetH);
+        resolve(c2.toDataURL('image/png'));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = () => reject(new Error('圖片載入失敗'));
+    img.src = base64Data;
+  });
+}
+
+async function runAiClothGen() {
+  const promptInput = document.getElementById('aiGenPrompt');
+  const catInput = document.getElementById('aiGenCategory');
+  const viewInput = document.getElementById('aiGenView');
+  const keyInput = document.getElementById('aiGenApiKey');
+  const runBtn = document.getElementById('btnRunAiClothGen');
+  const previewWrap = document.getElementById('aiGenPreviewWrap');
+  const resultImg = document.getElementById('aiGenResultImg');
+  const applyBtn = document.getElementById('btnApplyAiClothGen');
+
+  const userPrompt = (promptInput?.value || '').trim();
+  const category = catInput?.value || 'top';
+  const view = viewInput?.value || 'front';
+  const apiKey = (keyInput?.value || '').trim();
+
+  if (!userPrompt) {
+    toast('請輸入單品外觀描述');
+    return;
+  }
+  if (!apiKey) {
+    toast('請輸入 Gemini API Key');
+    return;
+  }
+
+  localStorage.setItem('wm_gemini_api_key', apiKey);
+  runBtn.disabled = true;
+  runBtn.textContent = '生成與去背處理中…';
+
+  const viewDesc = view === 'back' ? 'Back view' : 'Front view';
+  const fullPrompt = [
+    `Ultra-high-definition e-commerce catalog flat lay product photograph of ${userPrompt}.`,
+    `View: ${viewDesc}, perfectly upright orientation, completely centered.`,
+    `Arrangement: laid completely flat, smooth, wrinkle-free, no hanger, no mannequin, no human model.`,
+    `Sleeves and silhouette: horizontally extended or symmetrically spread downwards at identical angles, maintaining perfect mirror symmetry.`,
+    `Details & Material: authentic fabric texture (e.g., French terry, corduroy, cotton weave), precise collar, ribbing, seams, hardware, and stitching.`,
+    `Lighting & Studio: even studio softbox lighting, zero cast shadows, razor-sharp edges on a seamless, pure solid white background (#FFFFFF) for clean extraction.`
+  ].join(' ');
+
+  try {
+    let imgBase64 = null;
+    const imagenUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(apiKey)}`;
+    const resp = await fetch(imagenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instances: [{ prompt: fullPrompt }],
+        parameters: { sampleCount: 1, aspectRatio: '1:1', outputMimeType: 'image/png' }
+      })
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+      if (b64) imgBase64 = `data:image/png;base64,${b64}`;
+    }
+
+    if (!imgBase64) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const gResp = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Generate flat lay clothing photo on pure white background: ${fullPrompt}` }] }]
+        })
+      });
+      if (!gResp.ok) {
+        const errJson = await resp.json().catch(() => ({}));
+        throw new Error(errJson.error?.message || `API 端點錯誤 (${resp.status})`);
+      }
+    }
+
+    if (!imgBase64) {
+      throw new Error('未取得生成圖片資料，請確認 API Key 是否具備 Imagen 權限');
+    }
+
+    const cutUrl = await processCutoutAndNormalize(imgBase64, category);
+    currentAiGenResultUrl = cutUrl;
+
+    if (resultImg) resultImg.src = cutUrl;
+    if (previewWrap) previewWrap.classList.remove('is-hidden');
+    if (applyBtn) applyBtn.classList.remove('is-hidden');
+    toast('已完成生成與去背規格化');
+  } catch (err) {
+    toast(`生成失敗：${err.message || '請確認網路與金鑰'}`);
+  } finally {
+    runBtn.disabled = false;
+    runBtn.textContent = '開始生成並自動去背';
+  }
+}
+
+function applyAiClothGenResult() {
+  if (!currentAiGenResultUrl) return;
+  pendingPhoto = currentAiGenResultUrl;
+  const wrap = document.getElementById('photoPreviewWrap');
+  if (wrap) {
+    wrap.setAttribute('style', `background-color:transparent;background-image:url('${pendingPhoto}')`);
+    wrap.classList.add('has-photo');
+    wrap.innerHTML = '';
+  }
+  formDirty = true;
+  syncPhotoTunerBtnVisibility();
+  closeModal();
+  toast('已套用 AI 生成單品照片');
+}
+
+/* ---------------------------- Selective HSB Color Tuner ---------------------------- */
+let tunerOriginalData = null;
+let tunerTargetHsb = null;
+
+function rgbToHsb(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0;
+  if (d > 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h = Math.round(h * 60);
+    if (h < 0) h += 360;
+  }
+  const s = max === 0 ? 0 : Math.round((d / max) * 100);
+  const brightness = Math.round(max * 100);
+  return { h, s, b: brightness };
+}
+
+function hsbToRgb(h, s, b) {
+  h = ((h % 360) + 360) % 360;
+  s /= 100;
+  b /= 100;
+  const k = (n) => (n + h / 60) % 6;
+  const f = (n) => b * (1 - s * Math.max(0, Math.min(k(n), 4 - k(n), 1)));
+  return [Math.round(f(5) * 255), Math.round(f(1) * 255), Math.round(f(3) * 255)];
+}
+
+function openColorTunerModal() {
+  if (!pendingPhoto) {
+    toast('目前尚無照片可調色');
+    return;
+  }
+  const canvas = document.getElementById('colorTunerCanvas');
+  if (!canvas) return;
+
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    canvas.width = img.naturalWidth || 600;
+    canvas.height = img.naturalHeight || 600;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0);
+    tunerOriginalData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    tunerTargetHsb = null;
+
+    const swatch = document.getElementById('colorTunerTargetSwatch');
+    const txt = document.getElementById('colorTunerTargetHsbText');
+    if (swatch) swatch.style.background = '#ccc';
+    if (txt) txt.textContent = '請點擊上方照片吸取衣服顏色';
+
+    const hInput = document.getElementById('colorTunerHue');
+    const sInput = document.getElementById('colorTunerSat');
+    const bInput = document.getElementById('colorTunerBright');
+    const tInput = document.getElementById('colorTunerTolerance');
+    if (hInput) hInput.value = '0';
+    if (sInput) sInput.value = '0';
+    if (bInput) bInput.value = '0';
+    if (tInput) tInput.value = '30';
+    updateColorTunerSliderLabels();
+
+    openModal('modal-color-tuner');
+  };
+  img.src = pendingPhoto;
+}
+
+function updateColorTunerSliderLabels() {
+  const h = document.getElementById('colorTunerHue')?.value || 0;
+  const s = document.getElementById('colorTunerSat')?.value || 0;
+  const b = document.getElementById('colorTunerBright')?.value || 0;
+  const t = document.getElementById('colorTunerTolerance')?.value || 30;
+
+  const hLbl = document.getElementById('colorTunerHueVal');
+  const sLbl = document.getElementById('colorTunerSatVal');
+  const bLbl = document.getElementById('colorTunerBrightVal');
+  const tLbl = document.getElementById('colorTunerToleranceVal');
+
+  if (hLbl) hLbl.textContent = `${h}°`;
+  if (sLbl) sLbl.textContent = `${s}%`;
+  if (bLbl) bLbl.textContent = `${b}%`;
+  if (tLbl) tLbl.textContent = `容差 (${t})`;
+}
+
+function applyHsbTuning() {
+  const canvas = document.getElementById('colorTunerCanvas');
+  if (!canvas || !tunerOriginalData || !tunerTargetHsb) return;
+  const ctx = canvas.getContext('2d');
+  const dHue = Number(document.getElementById('colorTunerHue')?.value || 0);
+  const dSat = Number(document.getElementById('colorTunerSat')?.value || 0);
+  const dBrt = Number(document.getElementById('colorTunerBright')?.value || 0);
+  const tol = Number(document.getElementById('colorTunerTolerance')?.value || 30);
+
+  const imgData = ctx.createImageData(tunerOriginalData.width, tunerOriginalData.height);
+  const src = tunerOriginalData.data;
+  const dst = imgData.data;
+  const len = src.length;
+
+  const targetH = tunerTargetHsb.h;
+  const targetS = tunerTargetHsb.s;
+  const targetB = tunerTargetHsb.b;
+
+  for (let i = 0; i < len; i += 4) {
+    const a = src[i + 3];
+    dst[i + 3] = a;
+    if (a < 15) {
+      dst[i] = src[i];
+      dst[i + 1] = src[i + 1];
+      dst[i + 2] = src[i + 2];
+      continue;
+    }
+    const r = src[i], g = src[i + 1], b = src[i + 2];
+    const hsb = rgbToHsb(r, g, b);
+
+    let dh = Math.abs(hsb.h - targetH);
+    if (dh > 180) dh = 360 - dh;
+    const dhNorm = dh / 180;
+    const dsNorm = Math.abs(hsb.s - targetS) / 100;
+    const dbNorm = Math.abs(hsb.b - targetB) / 100;
+
+    const dist = Math.sqrt(dhNorm * dhNorm * 0.65 + dsNorm * dsNorm * 0.2 + dbNorm * dbNorm * 0.15) * 100;
+
+    if (dist <= tol) {
+      const weight = 1 - (dist / tol);
+      const newH = (hsb.h + dHue * weight + 360) % 360;
+      const newS = Math.max(0, Math.min(100, hsb.s + dSat * weight));
+      const newB = Math.max(0, Math.min(100, hsb.b + dBrt * weight));
+      const [nr, ng, nb] = hsbToRgb(newH, newS, newB);
+      dst[i] = nr;
+      dst[i + 1] = ng;
+      dst[i + 2] = nb;
+    } else {
+      dst[i] = r;
+      dst[i + 1] = g;
+      dst[i + 2] = b;
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+}
+
+function resetColorTuner() {
+  const canvas = document.getElementById('colorTunerCanvas');
+  if (!canvas || !tunerOriginalData) return;
+  const ctx = canvas.getContext('2d');
+  ctx.putImageData(tunerOriginalData, 0, 0);
+  const hInput = document.getElementById('colorTunerHue');
+  const sInput = document.getElementById('colorTunerSat');
+  const bInput = document.getElementById('colorTunerBright');
+  const tInput = document.getElementById('colorTunerTolerance');
+  if (hInput) hInput.value = '0';
+  if (sInput) sInput.value = '0';
+  if (bInput) bInput.value = '0';
+  if (tInput) tInput.value = '30';
+  updateColorTunerSliderLabels();
+}
+
+function saveColorTunerResult() {
+  const canvas = document.getElementById('colorTunerCanvas');
+  if (!canvas) return;
+  pendingPhoto = canvas.toDataURL('image/png');
+  const wrap = document.getElementById('photoPreviewWrap');
+  if (wrap) {
+    wrap.setAttribute('style', `background-color:transparent;background-image:url('${pendingPhoto}')`);
+    wrap.classList.add('has-photo');
+    wrap.innerHTML = '';
+  }
+  formDirty = true;
+  syncPhotoTunerBtnVisibility();
+  closeModal();
+  saveState({ action: '單品照片調色' });
+  toast('已儲存調色設定');
+}
+
 /* ---------------------------- State ---------------------------- */
 function defaultState() {
   return {
@@ -2339,7 +2762,7 @@ async function refreshWeather(force = false) {
     }
   } catch (_) {}
 
-  // 2. 備援：若 Worker 尚未部署 /api/weather-detail 或為海外地點，改以 Open-Meteo（含昨日 past_days=1）補齊
+  // 2. 備援：若 Worker 尚未部署 /api/weather-detail 或為海外地點，改以 Open-Meteo（含過去兩週 14 天與逐時歷史）補齊
   try {
     const params = new URLSearchParams({
       latitude: String(w.latitude),
@@ -2347,8 +2770,8 @@ async function refreshWeather(force = false) {
       current: 'temperature_2m,weather_code,is_day,relative_humidity_2m',
       hourly: 'temperature_2m,weather_code,is_day',
       daily: 'temperature_2m_max,temperature_2m_min,weather_code',
-      past_days: '1',
-      forecast_days: '2',
+      past_days: '14',
+      forecast_days: '7',
       timezone: 'auto'
     });
     const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
@@ -2358,6 +2781,9 @@ async function refreshWeather(force = false) {
     const yDateObj = new Date(`${todayDate}T12:00:00`);
     yDateObj.setDate(yDateObj.getDate() - 1);
     const yesterdayDate = `${yDateObj.getFullYear()}-${String(yDateObj.getMonth() + 1).padStart(2, '0')}-${String(yDateObj.getDate()).padStart(2, '0')}`;
+    const dbDateObj = new Date(`${yesterdayDate}T12:00:00`);
+    dbDateObj.setDate(dbDateObj.getDate() - 1);
+    const dayBeforeDate = `${dbDateObj.getFullYear()}-${String(dbDateObj.getMonth() + 1).padStart(2, '0')}-${String(dbDateObj.getDate()).padStart(2, '0')}`;
     const currentHour = new Date().getHours();
 
     const times = data.hourly?.time || [];
@@ -2379,7 +2805,7 @@ async function refreshWeather(force = false) {
           code: codeVal,
           label: weatherText(codeVal, dayFlag === 0)[0],
           isDay: dayFlag,
-          actual: targetDate === yesterdayDate || h <= currentHour,
+          actual: targetDate === yesterdayDate || targetDate === dayBeforeDate || h <= currentHour,
           pop: null
         });
       }
@@ -2387,6 +2813,7 @@ async function refreshWeather(force = false) {
     };
     const todayHours = extractDayHours(todayDate);
     const yesterdayHours = extractDayHours(yesterdayDate);
+    const dayBeforeHours = extractDayHours(dayBeforeDate);
     const dailyTimes = data.daily?.time || [];
     const tIdx = dailyTimes.indexOf(todayDate);
     const yIdx = dailyTimes.indexOf(yesterdayDate);
@@ -2398,9 +2825,10 @@ async function refreshWeather(force = false) {
     await applyWeatherPayload(
       data.current || null,
       {
-        source: 'Open-Meteo（備援）',
+        source: 'Open-Meteo（即時）',
         todayDate,
         yesterdayDate,
+        dayBeforeDate,
         currentHour,
         todayMin,
         todayMax,
@@ -2409,6 +2837,14 @@ async function refreshWeather(force = false) {
         yesterdaySameHour: yesterdayHours[currentHour]?.temp != null ? yesterdayHours[currentHour] : null,
         todayHours,
         yesterdayHours,
+        dayBeforeHours,
+        humidity: data.current?.relative_humidity_2m ?? null,
+        dailyTrend: {
+          times: dailyTimes,
+          maxs: data.daily?.temperature_2m_max || [],
+          mins: data.daily?.temperature_2m_min || [],
+          codes: data.daily?.weather_code || []
+        },
         fetchedAt: Date.now()
       },
       data.timezone || 'auto'
@@ -2455,13 +2891,14 @@ function renderWeatherDetailModal() {
   } else {
     if (yIconEl) yIconEl.innerHTML = weatherSvgIcon(2, false);
     if (yTempEl) yTempEl.textContent = '—';
-    if (yLabelEl) yLabelEl.textContent = '待累積昨日資料';
+    if (yLabelEl) yLabelEl.textContent = '昨日資料同步中';
   }
 
   const tTempEl = document.getElementById('wdTodayTemp');
   const tIconEl = document.getElementById('wdTodayIcon');
   const tLabelEl = document.getElementById('wdTodayLabel');
   const deltaEl = document.getElementById('wdDeltaPill');
+  const humEl = document.getElementById('wdTodayHumidity');
   if (tTempEl) tTempEl.textContent = formatDisplayTemp(curTemp) || '—';
   if (tIconEl) tIconEl.innerHTML = weatherSvgIcon(curCode, curIsNight);
   if (tLabelEl) tLabelEl.textContent = curLabel || '—';
@@ -2472,54 +2909,229 @@ function renderWeatherDetailModal() {
     if (delta.tone === 'warmer') deltaEl.classList.add('is-warmer');
     else if (delta.tone === 'cooler') deltaEl.classList.add('is-cooler');
   }
+  if (humEl) {
+    const hVal = detail.humidity ?? current?.relative_humidity_2m ?? current?.humidity;
+    humEl.textContent = hVal != null ? `濕度 ${Math.round(Number(hVal))}%` : '濕度適中';
+  }
 
   const tRangeEl = document.getElementById('wdTodayRange');
   const yRangeEl = document.getElementById('wdYesterdayRange');
-  if (tRangeEl) tRangeEl.textContent = `今日區間：${formatTempRange(detail.todayMin, detail.todayMax)}`;
-  if (yRangeEl) yRangeEl.textContent = `昨日區間：${formatTempRange(detail.yesterdayMin, detail.yesterdayMax)}`;
+  if (tRangeEl) tRangeEl.textContent = `今日全日：${formatTempRange(detail.todayMin, detail.todayMax)}`;
+  if (yRangeEl) yRangeEl.textContent = `昨日全日：${formatTempRange(detail.yesterdayMin, detail.yesterdayMax)}`;
 
-  document.querySelectorAll('#wdDaySegment .segment-btn').forEach(btn => {
-    const active = btn.getAttribute('data-wd-day') === uiWeatherDetailDay;
-    btn.classList.toggle('is-active', active);
-    btn.setAttribute('aria-selected', active ? 'true' : 'false');
-  });
+  // 雙排逐時氣象列表（向左可滑動接續昨天 vs 前天）
+  renderWeatherHourlyDualStrip(detail, nowHour);
 
+  // 過去兩週與未來趨勢折線圖
+  renderWeatherTrendChart(detail.dailyTrend);
+}
+
+function renderWeatherHourlyDualStrip(detail, nowHour) {
   const strip = document.getElementById('wdHourlyStrip');
   if (!strip) return;
-  const list = uiWeatherDetailDay === 'yesterday'
-    ? (Array.isArray(detail.yesterdayHours) ? detail.yesterdayHours : [])
-    : (Array.isArray(detail.todayHours) ? detail.todayHours : []);
+  const todayList = Array.isArray(detail.todayHours) ? detail.todayHours : [];
+  const yesterdayList = Array.isArray(detail.yesterdayHours) ? detail.yesterdayHours : [];
+  const dayBeforeList = Array.isArray(detail.dayBeforeHours) ? detail.dayBeforeHours : [];
 
-  if (!list.length) {
+  if (!todayList.length && !yesterdayList.length) {
     strip.innerHTML = '<p class="settings-helper" style="margin:12px auto;">尚無逐時氣象資料，請稍後再更新。</p>';
     return;
   }
 
-  strip.innerHTML = list.map(slot => {
-    const h = Number(slot.hour);
-    const isHighlight = h === nowHour;
-    const timeLabel = uiWeatherDetailDay === 'today' && isHighlight
-      ? '現在'
-      : `${String(h).padStart(2, '0')}:00`;
-    const popHtml = slot.pop != null && Number(slot.pop) >= 20
-      ? `<span class="wd-hour-pop">${Math.round(Number(slot.pop))}%</span>`
-      : '<span class="wd-hour-pop"></span>';
-    const tempText = slot.temp != null ? formatDisplayTemp(slot.temp) : '—';
-    return `
-      <div class="wd-hour-item ${isHighlight ? 'is-highlight' : ''}" data-wd-hour="${h}">
-        <span class="wd-hour-time">${escapeHtml(timeLabel)}</span>
-        <span class="wd-hour-icon" aria-hidden="true">${weatherSvgIcon(slot.code, slot.isDay === 0)}</span>
-        ${popHtml}
-        <span class="wd-hour-temp">${escapeHtml(tempText)}</span>
-      </div>`;
-  }).join('');
+  const cardsHtml = [];
+
+  // 1. 昨天 vs 前天（置於左側，往左滑動即可回溯）
+  if (yesterdayList.length) {
+    yesterdayList.forEach(ySlot => {
+      const h = Number(ySlot.hour);
+      const dbSlot = dayBeforeList[h] || null;
+      const topTemp = ySlot.temp != null ? formatDisplayTemp(ySlot.temp) : '—';
+      const btmTemp = dbSlot && dbSlot.temp != null ? formatDisplayTemp(dbSlot.temp) : '—';
+      cardsHtml.push(`
+        <div class="wd-hourly-dual-col" data-wd-day="yesterday" data-wd-hour="${h}">
+          <span class="wd-dual-day-badge">昨天</span>
+          <span class="wd-dual-time">${String(h).padStart(2, '0')}:00</span>
+          <div class="wd-dual-row-today" title="昨天 ${h}:00">
+            <span class="wd-hour-icon">${weatherSvgIcon(ySlot.code, ySlot.isDay === 0)}</span>
+            <span class="wd-hour-temp">${escapeHtml(topTemp)}</span>
+          </div>
+          <div class="wd-dual-row-yesterday" title="前天 ${h}:00 對比">
+            <span class="wd-hour-icon" style="transform:scale(0.85);">${weatherSvgIcon(dbSlot?.code ?? 2, dbSlot?.isDay === 0)}</span>
+            <span class="wd-hour-temp">${escapeHtml(btmTemp)}</span>
+          </div>
+        </div>
+      `);
+    });
+  }
+
+  // 2. 今天 vs 昨天（置於右側，上排今日，下排昨日）
+  if (todayList.length) {
+    todayList.forEach(tSlot => {
+      const h = Number(tSlot.hour);
+      const isHighlight = h === nowHour;
+      const ySlot = yesterdayList[h] || null;
+      const topTemp = tSlot.temp != null ? formatDisplayTemp(tSlot.temp) : '—';
+      const btmTemp = ySlot && ySlot.temp != null ? formatDisplayTemp(ySlot.temp) : '—';
+      const timeLabel = isHighlight ? '現在' : `${String(h).padStart(2, '0')}:00`;
+      cardsHtml.push(`
+        <div class="wd-hourly-dual-col ${isHighlight ? 'is-highlight' : ''}" data-wd-day="today" data-wd-hour="${h}">
+          <span class="wd-dual-day-badge" style="${isHighlight ? 'background:rgba(58,136,233,0.22);color:#1d4ed8;' : ''}">今天</span>
+          <span class="wd-dual-time">${escapeHtml(timeLabel)}</span>
+          <div class="wd-dual-row-today" title="今日 ${h}:00">
+            <span class="wd-hour-icon">${weatherSvgIcon(tSlot.code, tSlot.isDay === 0)}</span>
+            <span class="wd-hour-temp">${escapeHtml(topTemp)}</span>
+          </div>
+          <div class="wd-dual-row-yesterday" title="昨日 ${h}:00 對比">
+            <span class="wd-hour-icon" style="transform:scale(0.85);">${weatherSvgIcon(ySlot?.code ?? 2, ySlot?.isDay === 0)}</span>
+            <span class="wd-hour-temp">${escapeHtml(btmTemp)}</span>
+          </div>
+        </div>
+      `);
+    });
+  }
+
+  strip.innerHTML = cardsHtml.join('');
 
   requestAnimationFrame(() => {
-    const targetCard = strip.querySelector(`.wd-hour-item[data-wd-hour="${nowHour}"]`);
-    if (targetCard && typeof targetCard.scrollIntoView === 'function') {
-      targetCard.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
+    const target = strip.querySelector(`.wd-hourly-dual-col[data-wd-day="today"][data-wd-hour="${nowHour}"]`);
+    if (target && typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
     }
   });
+}
+
+function renderWeatherTrendChart(trend) {
+  const container = document.getElementById('wdTrendChartScroll');
+  if (!container) return;
+  if (!trend || !Array.isArray(trend.times) || !trend.times.length) {
+    container.innerHTML = '<p class="settings-helper" style="padding:16px 8px;margin:0;">氣溫走勢資料載入中…</p>';
+    return;
+  }
+
+  const times = trend.times;
+  const maxs = trend.maxs.map(v => Number.isFinite(Number(v)) ? Math.round(Number(v)) : 22);
+  const mins = trend.mins.map(v => Number.isFinite(Number(v)) ? Math.round(Number(v)) : 16);
+  const codes = trend.codes || [];
+  const count = times.length;
+  const todayIndex = times.indexOf(todayStr());
+
+  const colW = 54;
+  const totalW = count * colW;
+  const chartH = 170;
+  const padTop = 38;
+  const padBtm = 32;
+  const plotH = chartH - padTop - padBtm;
+
+  const allVals = [...maxs, ...mins];
+  const absMax = Math.max(...allVals) + 2;
+  const absMin = Math.min(...allVals) - 2;
+  const range = Math.max(1, absMax - absMin);
+
+  const getY = val => Math.round(padTop + (absMax - val) / range * plotH);
+  const getX = idx => Math.round(idx * colW + colW / 2);
+
+  const maxPoints = maxs.map((val, idx) => ({ x: getX(idx), y: getY(val), val }));
+  const minPoints = mins.map((val, idx) => ({ x: getX(idx), y: getY(val), val }));
+
+  const maxPathD = maxPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  const minPathD = minPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+  let iconsHtml = '';
+  let labelsHtml = '';
+
+  for (let i = 0; i < count; i++) {
+    const x = getX(i);
+    const dateStr = times[i];
+    const isToday = i === todayIndex;
+    const parts = dateStr.split('-');
+    const displayDate = isToday ? '今天' : `${Number(parts[1])}/${Number(parts[2])}`;
+
+    // 在天氣有變化或開頭的節點上緣繪製 SVG 天氣圖示
+    const prevCode = i > 0 ? codes[i - 1] : -1;
+    const curCode = codes[i] ?? 0;
+    const isWeatherChange = i === 0 || curCode !== prevCode || isToday;
+    if (isWeatherChange) {
+      iconsHtml += `
+        <g transform="translate(${x - 11}, 6)">
+          ${weatherSvgIcon(curCode, false)}
+        </g>
+      `;
+    }
+
+    labelsHtml += `
+      <text x="${x}" y="${chartH - 8}" text-anchor="middle" font-size="10.5" font-weight="${isToday ? '800' : '600'}" fill="${isToday ? '#2563eb' : '#64748b'}">${displayDate}</text>
+    `;
+  }
+
+  const svgHtml = `
+    <svg width="${totalW}" height="${chartH}" style="display:block;overflow:visible;">
+      ${todayIndex >= 0 ? `<rect x="${todayIndex * colW + 4}" y="2" width="${colW - 8}" height="${chartH - 4}" rx="12" fill="rgba(58,136,233,0.08)" />` : ''}
+      <path d="${maxPathD}" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="${minPathD}" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      ${maxPoints.map(p => `
+        <circle cx="${p.x}" cy="${p.y}" r="3.5" fill="#f97316" stroke="#fff" stroke-width="1.5" />
+        <text x="${p.x}" y="${p.y - 7}" text-anchor="middle" font-size="10.5" font-weight="750" fill="#c2410c">${p.val}°</text>
+      `).join('')}
+      ${minPoints.map(p => `
+        <circle cx="${p.x}" cy="${p.y}" r="3.5" fill="#3b82f6" stroke="#fff" stroke-width="1.5" />
+        <text x="${p.x}" y="${p.y + 14}" text-anchor="middle" font-size="10.5" font-weight="750" fill="#1d4ed8">${p.val}°</text>
+      `).join('')}
+      ${iconsHtml}
+      ${labelsHtml}
+    </svg>
+  `;
+
+  container.innerHTML = svgHtml;
+
+  requestAnimationFrame(() => {
+    if (todayIndex >= 0) {
+      const scrollPos = Math.max(0, todayIndex * colW - (container.clientWidth / 2) + (colW / 2));
+      container.scrollLeft = scrollPos;
+    }
+  });
+}
+
+async function refreshCurrentLocationAndWeather() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        let cityName = state.profile.weather?.city || '目前位置';
+        let areaLabel = state.profile.weather?.area || '';
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=zh-TW`, {
+            headers: { 'User-Agent': 'WardrobeMasterApp/1.0' }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const addr = data.address || {};
+            const city = addr.city || addr.county || addr.state || '';
+            const town = addr.town || addr.suburb || addr.district || '';
+            if (city || town) {
+              areaLabel = `${city}${town}`;
+              cityName = town || city || '目前位置';
+            }
+          }
+        } catch (_) {}
+        if (!areaLabel) areaLabel = cityName;
+        state.profile.weather = Object.assign(state.profile.weather || {}, {
+          city: cityName,
+          area: areaLabel,
+          latitude: lat,
+          longitude: lon
+        });
+        saveState({ skipHistory: true });
+        await refreshWeather(true);
+      },
+      () => {
+        refreshWeather(true);
+      },
+      { timeout: 8000, maximumAge: 60000 }
+    );
+  } else {
+    refreshWeather(true);
+  }
 }
 
 function openWeatherDetailModal() {
@@ -2532,9 +3144,7 @@ function openWeatherDetailModal() {
   uiWeatherDetailDay = 'today';
   renderWeatherDetailModal();
   openModal('modal-weather-detail');
-  if (!w.detailCache || Date.now() - Number(w.updatedAt || 0) >= 30 * 60 * 1000) {
-    refreshWeather(true);
-  }
+  refreshCurrentLocationAndWeather();
 }
 
 function syncHomeRackExpansion() {
@@ -3339,6 +3949,29 @@ function itemMatchesFilters(item, filters) {
   return matched;
 }
 
+const WARDROBE_CAT_ORDER = {
+  top: 10,
+  inner: 12,
+  thermal: 14,
+  outer: 20,
+  bottom: 30,
+  shoes: 40,
+  hat: 50,
+  bag: 60,
+  accessory: 70,
+  other: 80
+};
+
+let uiWardrobeCompact = localStorage.getItem('wm_wardrobe_compact') === 'true';
+let lastNonRetiredCat = 'all';
+
+function updateCompactGridState() {
+  const grid = document.getElementById('wardrobeGrid');
+  const btn = document.getElementById('btnWardrobeCompactGrid');
+  if (grid) grid.classList.toggle('is-dense-grid', uiWardrobeCompact);
+  if (btn) btn.classList.toggle('is-active', uiWardrobeCompact);
+}
+
 function getVisibleWardrobeItems() {
   let items = state.items.filter(i => {
     if (uiWardrobeCat === 'all') { if (i.status === 'retired') return false; }
@@ -3349,6 +3982,12 @@ function getVisibleWardrobeItems() {
     return true;
   });
   return items.slice().sort((a, b) => {
+    if (uiWardrobeSort === 'category') {
+      const oA = WARDROBE_CAT_ORDER[a.category] ?? 99;
+      const oB = WARDROBE_CAT_ORDER[b.category] ?? 99;
+      if (oA !== oB) return oA - oB;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    }
     if (uiWardrobeSort === 'wearCount') return (b.wearCount||0) - (a.wearCount||0);
     if (uiWardrobeSort === 'lastWorn') return (b.lastWornDate||'').localeCompare(a.lastWornDate||'');
     if (uiWardrobeSort === 'modified') return (Number(b.modifiedAt || b.createdAt || 0) - Number(a.modifiedAt || a.createdAt || 0));
@@ -3361,6 +4000,9 @@ function renderWardrobe() {
   const emptyHint = document.getElementById('wardrobeEmpty');
   const items = getVisibleWardrobeItems();
   const retiredView = uiWardrobeCat === 'retired';
+  if (!retiredView) {
+    lastNonRetiredCat = uiWardrobeCat;
+  }
   document.getElementById('view-wardrobe').classList.toggle('is-retired-view', retiredView);
   document.getElementById('mainScroll')?.classList.toggle('is-retired-scroll', retiredView && activeView === 'wardrobe');
   document.getElementById('app')?.classList.toggle('is-retired-view', retiredView && activeView === 'wardrobe');
@@ -3368,13 +4010,25 @@ function renderWardrobe() {
   const isNight = current && current.is_day != null ? Number(current.is_day) === 0 : (new Date().getHours() >= 18 || new Date().getHours() < 6);
   syncHomeThemeColor(activeView === 'home', isNight);
   const retiredBanner = document.getElementById('retiredBanner');
-  if (retiredBanner) retiredBanner.hidden = !retiredView;
+  if (retiredBanner) {
+    retiredBanner.hidden = false;
+    const titleEl = document.getElementById('retiredBannerTitle');
+    const subEl = document.getElementById('retiredBannerSub');
+    if (retiredView) {
+      if (titleEl) titleEl.textContent = '返回主要衣櫥';
+      if (subEl) subEl.textContent = '點擊回到日常衣櫥清單';
+    } else {
+      if (titleEl) titleEl.textContent = '已典藏衣物';
+      if (subEl) subEl.textContent = '暫時不穿或已退役的單品放在這裡';
+    }
+  }
   document.getElementById('itemCount').textContent = retiredView ? `典藏・${items.length} 件` : `${items.length} 件`;
   document.getElementById('filterBadge').hidden = !isFilterActive();
   grid.innerHTML = '';
   emptyHint.hidden = items.length !== 0 || uiWardrobeCat !== 'all' || isFilterActive() || !!uiSearchQuery;
   items.forEach(item => grid.appendChild(buildItemCard(item)));
   document.getElementById('deleteCategoryWrap').classList.toggle('is-hidden', !uiWardrobeCat.startsWith('custom-'));
+  updateCompactGridState();
 }
 function toggleItemSelection(id, cardEl) {
   if (uiSelectedIds.has(id)) uiSelectedIds.delete(id); else uiSelectedIds.add(id);
@@ -4024,7 +4678,101 @@ function openDayDetail(dateStr, entry) {
     card.addEventListener('click', () => openSkincareModal(card.dataset.skincareId));
   });
 
+  wireDayDetailSwipe(dateStr);
   openModal('modal-day');
+}
+
+let currentDayDetailDate = null;
+
+function shiftDayDetailDate(dateStr, offsetDays) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + offsetDays);
+  const ny = dt.getFullYear();
+  const nm = String(dt.getMonth() + 1).padStart(2, '0');
+  const nd = String(dt.getDate()).padStart(2, '0');
+  return `${ny}-${nm}-${nd}`;
+}
+
+function wireDayDetailSwipe(dateStr) {
+  currentDayDetailDate = dateStr;
+  const body = document.getElementById('dayDetailBody');
+  const titleEl = document.getElementById('dayDetailTitle');
+  if (!body || !titleEl || body._hasDaySwipe) return;
+  body._hasDaySwipe = true;
+
+  let startX = 0, startY = 0, currentX = 0, dragging = false, horizontal = false;
+
+  body.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    currentX = startX;
+    dragging = true;
+    horizontal = false;
+    body.style.transition = 'none';
+  }, { passive: true });
+
+  body.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    currentX = e.touches[0].clientX;
+    const dx = currentX - startX;
+    const dy = e.touches[0].clientY - startY;
+
+    if (!horizontal && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+      horizontal = true;
+    }
+
+    if (horizontal) {
+      if (e.cancelable) e.preventDefault();
+      body.style.transform = `translateX(${dx}px)`;
+      const bodyW = body.clientWidth || 320;
+      const ratio = Math.abs(dx) / bodyW;
+      if (ratio >= 0.45) {
+        const targetDate = shiftDayDetailDate(currentDayDetailDate, dx < 0 ? 1 : -1);
+        titleEl.textContent = `${formatDayWithWeekday(targetDate)} 的紀錄`;
+      } else {
+        titleEl.textContent = `${formatDayWithWeekday(currentDayDetailDate)} 的紀錄`;
+      }
+    }
+  }, { passive: false });
+
+  const endSwipe = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (horizontal) {
+      const dx = currentX - startX;
+      const threshold = 65;
+      if (Math.abs(dx) >= threshold) {
+        const targetDate = shiftDayDetailDate(currentDayDetailDate, dx < 0 ? 1 : -1);
+        body.style.transition = 'transform 0.16s ease-out, opacity 0.16s ease-out';
+        body.style.transform = `translateX(${dx < 0 ? -100 : 100}%)`;
+        body.style.opacity = '0';
+        setTimeout(() => {
+          body.style.transition = 'none';
+          body.style.transform = `translateX(${dx < 0 ? 100 : -100}%)`;
+          const targetEntry = (state.ootdHistory || []).find(it => it.date === targetDate) || (targetDate === todayStr() ? state.today : null);
+          openDayDetail(targetDate, targetEntry);
+          requestAnimationFrame(() => {
+            body.style.transition = 'transform 0.22s var(--ease-sheet), opacity 0.22s var(--ease-sheet)';
+            body.style.transform = 'translateX(0)';
+            body.style.opacity = '1';
+          });
+        }, 150);
+      } else {
+        body.style.transition = 'transform 0.2s cubic-bezier(0.25, 1, 0.5, 1)';
+        body.style.transform = 'translateX(0)';
+        titleEl.textContent = `${formatDayWithWeekday(currentDayDetailDate)} 的紀錄`;
+        setTimeout(() => {
+          body.style.transition = '';
+        }, 200);
+      }
+    }
+    horizontal = false;
+  };
+
+  body.addEventListener('touchend', endSwipe);
+  body.addEventListener('touchcancel', endSwipe);
 }
 
 
@@ -6117,6 +6865,7 @@ function openAddModal(editId = null) {
   renderTagPickerChips();
   renderMaterialPickerChips();
   renderColorForm();
+  syncPhotoTunerBtnVisibility();
   formDirty = false; // the population above doesn't count as a user edit
   const addSheet = document.getElementById('modal-add');
   if (addSheet) addSheet.scrollTop = 0;
@@ -7000,11 +7749,22 @@ function enableSwipeToClose(sheet) {
     if (!dragging) return;
     currentY = e.touches[0].clientY;
     const dy = currentY - startY;
+    const overlay = document.getElementById('modalOverlay');
     if (dy > 0 && sheet.scrollTop <= 0) {
       if (e.cancelable) e.preventDefault();
       sheet.style.transform = `translateY(${dy}px)`;
+      if (overlay) {
+        const sheetH = sheet.offsetHeight || 500;
+        const progress = Math.min(1, dy / sheetH);
+        overlay.style.transition = 'none';
+        overlay.style.opacity = String(Math.max(0, 1 - progress * 0.85));
+      }
     } else if (dy <= 0) {
       sheet.style.transform = 'translateY(0)';
+      if (overlay) {
+        overlay.style.transition = 'none';
+        overlay.style.opacity = '1';
+      }
     }
   }, { passive: false });
 
@@ -7013,6 +7773,7 @@ function enableSwipeToClose(sheet) {
     dragging = false;
     sheet.classList.remove('is-dragging');
     const dy = currentY - startY;
+    const overlay = document.getElementById('modalOverlay');
     if (dy > threshold) {
       if (sheet.id === 'modal-item' && editingInDetailDrawer) {
         unmountEditFormFromDetailDrawer();
@@ -7022,19 +7783,39 @@ function enableSwipeToClose(sheet) {
         forceCloseModal({ skipPersist: true });
         sheet.style.transform = '';
         sheet.style.transition = '';
+        if (overlay) {
+          overlay.style.transition = '';
+          overlay.style.opacity = '';
+        }
         startY = 0; currentY = 0;
         return;
       }
       sheet.style.transition = 'transform var(--dur-sheet-close) var(--ease-sheet)';
       sheet.style.transform = 'translateY(100%)';
+      if (overlay) {
+        overlay.style.transition = 'opacity var(--dur-sheet-close) var(--ease-sheet)';
+        overlay.style.opacity = '0';
+      }
       setTimeout(() => {
         closeModal();
         sheet.style.transform = '';
         sheet.style.transition = '';
+        if (overlay) {
+          overlay.style.transition = '';
+          overlay.style.opacity = '';
+        }
       }, 220);
     } else {
       sheet.style.transition = 'transform 0.2s cubic-bezier(0.25, 1, 0.5, 1)';
       sheet.style.transform = 'translateY(0)';
+      if (overlay) {
+        overlay.style.transition = 'opacity 0.2s cubic-bezier(0.25, 1, 0.5, 1)';
+        overlay.style.opacity = '1';
+        setTimeout(() => {
+          overlay.style.transition = '';
+          overlay.style.opacity = '';
+        }, 200);
+      }
       setTimeout(() => {
         sheet.style.transform = '';
         sheet.style.transition = '';
@@ -7230,7 +8011,7 @@ function sendSportPantsToLaundry() {
 }
 let tryonCurrentSlot = null, tryonCurrentCategory = null;
 let tryonSearchQuery = '';
-let tryonSort = 'recent';
+let tryonSort = localStorage.getItem('wm_tryon_sort_v1') || 'recent';
 let tryonTitleClickTimer = null;
 let tryonTitleClickCount = 0;
 
@@ -7513,8 +8294,9 @@ function renderTryonGridFor(slot, category) {
 }
 function resetTryonToolbar() {
   tryonSearchQuery = '';
-  tryonSort = 'recent';
-  document.getElementById('tryonSortSelect').value = 'recent';
+  tryonSort = localStorage.getItem('wm_tryon_sort_v1') || 'recent';
+  const sel = document.getElementById('tryonSortSelect');
+  if (sel) sel.value = tryonSort;
   document.getElementById('tryonSearchInput').value = '';
   document.getElementById('tryonSearchRow').classList.add('is-hidden');
 }
@@ -9016,11 +9798,27 @@ function wireEvents() {
 
   // wardrobe: sort + filter + search + select mode
   document.getElementById('sortSelect').addEventListener('change', e => { uiWardrobeSort = e.target.value; renderWardrobe(); });
+  document.getElementById('btnWardrobeCompactGrid')?.addEventListener('click', () => {
+    uiWardrobeCompact = !uiWardrobeCompact;
+    localStorage.setItem('wm_wardrobe_compact', String(uiWardrobeCompact));
+    updateCompactGridState();
+  });
   document.getElementById('btnAddItem').addEventListener('click', () => openAddModal(null));
   const retiredBanner = document.getElementById('retiredBanner');
-  const openRetired = () => { uiWardrobeCat = 'retired'; uiSelectMode = false; uiSelectedIds.clear(); renderCategoryChips(); renderWardrobe(); document.getElementById('mainScroll').scrollTop = 0; };
-  retiredBanner?.addEventListener('click', openRetired);
-  retiredBanner?.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRetired(); } });
+  const handleRetiredClick = () => {
+    if (uiWardrobeCat === 'retired') {
+      uiWardrobeCat = lastNonRetiredCat || 'all';
+    } else {
+      uiWardrobeCat = 'retired';
+    }
+    uiSelectMode = false;
+    uiSelectedIds.clear();
+    renderCategoryChips();
+    renderWardrobe();
+    document.getElementById('mainScroll').scrollTop = 0;
+  };
+  retiredBanner?.addEventListener('click', handleRetiredClick);
+  retiredBanner?.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRetiredClick(); } });
   document.getElementById('btnFilter').addEventListener('click', () => { modalReturnTo = null; openFilterModal('wardrobe'); });
   document.getElementById('filterStatusChips').addEventListener('click', e => {
     const chip = e.target.closest('.chip'); if (!chip) return;
@@ -9088,6 +9886,7 @@ function wireEvents() {
   // try-on picker: sort + search
   document.getElementById('tryonSortSelect').addEventListener('change', e => {
     tryonSort = e.target.value;
+    localStorage.setItem('wm_tryon_sort_v1', tryonSort);
     if (tryonCurrentSlot) renderTryonGridFor(tryonCurrentSlot, tryonCurrentCategory);
   });
   document.getElementById('btnTryonSearch').addEventListener('click', () => {
@@ -9489,6 +10288,7 @@ function wireEvents() {
       wrap.classList.add('has-photo');
       wrap.innerHTML = '';
       document.getElementById('btnReadjustPhoto').classList.toggle('is-hidden', !editingItemId);
+      syncPhotoTunerBtnVisibility();
       autoSaveAddItemDraft();
     } catch (err) {
       toast('照片處理失敗，請換一張試試');
@@ -9514,6 +10314,7 @@ function wireEvents() {
     const hintWrap = document.getElementById('photoBackHintWrap');
     if (hintWrap) hintWrap.hidden = !pendingPhotoBack;
     formDirty = true;
+    syncPhotoTunerBtnVisibility();
     autoSaveAddItemDraft();
     toast('已交換正反面照片');
   });
@@ -9525,8 +10326,52 @@ function wireEvents() {
       const wrap = document.getElementById('photoPreviewWrap');
       wrap.setAttribute('style', `background-image:url('${pendingPhoto}')`);
       formDirty = true;
+      syncPhotoTunerBtnVisibility();
     });
   });
+
+  // AI 服飾生成與調色器事件綁定
+  document.getElementById('btnOpenAiClothGen')?.addEventListener('click', openAiClothGenModal);
+  document.getElementById('btnRunAiClothGen')?.addEventListener('click', runAiClothGen);
+  document.getElementById('btnApplyAiClothGen')?.addEventListener('click', applyAiClothGenResult);
+
+  document.getElementById('btnOpenColorTuner')?.addEventListener('click', openColorTunerModal);
+  const tunerCanvas = document.getElementById('colorTunerCanvas');
+  const handleTunerCanvasPick = e => {
+    if (!tunerCanvas || !tunerOriginalData) return;
+    const rect = tunerCanvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const scaleX = tunerCanvas.width / rect.width;
+    const scaleY = tunerCanvas.height / rect.height;
+    const x = Math.floor((clientX - rect.left) * scaleX);
+    const y = Math.floor((clientY - rect.top) * scaleY);
+
+    const ctx = tunerCanvas.getContext('2d');
+    const p = ctx.getImageData(x, y, 1, 1).data;
+    if (p[3] < 15) {
+      toast('請點選單品有顏色的區域');
+      return;
+    }
+    const hsb = rgbToHsb(p[0], p[1], p[2]);
+    tunerTargetHsb = { h: hsb.h, s: hsb.s, b: hsb.b, r: p[0], g: p[1], b: p[2] };
+
+    const swatch = document.getElementById('colorTunerTargetSwatch');
+    const txt = document.getElementById('colorTunerTargetHsbText');
+    if (swatch) swatch.style.background = `rgb(${p[0]},${p[1]},${p[2]})`;
+    if (txt) txt.textContent = `H: ${hsb.h}°, S: ${hsb.s}%, B: ${hsb.b}%`;
+
+    applyHsbTuning();
+  };
+  tunerCanvas?.addEventListener('click', handleTunerCanvasPick);
+  ['colorTunerHue', 'colorTunerSat', 'colorTunerBright', 'colorTunerTolerance'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      updateColorTunerSliderLabels();
+      applyHsbTuning();
+    });
+  });
+  document.getElementById('btnResetColorTuner')?.addEventListener('click', resetColorTuner);
+  document.getElementById('btnSaveColorTuner')?.addEventListener('click', saveColorTunerResult);
 
   // length toggle — writes directly into the tag list (長/短 are just tags now)
   document.getElementById('lengthToggle').addEventListener('click', e => {
@@ -10163,11 +11008,16 @@ function wireEvents() {
   document.getElementById('btnRedo').addEventListener('click', redoState);
   document.addEventListener('keydown', e => {
     if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
-    if (e.key.toLowerCase() !== 'z') return;
+    const key = e.key.toLowerCase();
+    if (key !== 'z' && key !== 'y') return;
     const target = e.target;
     if (target?.matches?.('input, textarea, select, [contenteditable="true"]')) return;
     e.preventDefault();
-    if (e.shiftKey) redoState(); else undoState();
+    if (key === 'y' || (key === 'z' && e.shiftKey)) {
+      redoState();
+    } else if (key === 'z' && !e.shiftKey) {
+      undoState();
+    }
   });
 
   document.getElementById('settingsForm').addEventListener('submit', e => {
@@ -10383,26 +11233,27 @@ function updateSandboxToolbar() {
     lockLabel.textContent = currentItem.locked ? '解鎖' : '鎖定';
   }
 
+  toolbar.classList.remove('is-hidden');
   const itemRect = itemEl.getBoundingClientRect();
   const vpRect = viewport.getBoundingClientRect();
+  const tbW = toolbar.offsetWidth || 230;
+  const tbH = toolbar.offsetHeight || 38;
 
-  // Position beside the item: default to right side of top edge
-  let top = itemRect.top - vpRect.top - 4;
-  let left = itemRect.right - vpRect.left + 8;
+  // 優先置於選中物件上方置中
+  let top = itemRect.top - vpRect.top - tbH - 8;
+  let left = itemRect.left - vpRect.left + (itemRect.width - tbW) / 2;
 
-  // If too close to right edge of viewport, position above or left
-  if (left + 116 > vpRect.width) {
-    left = Math.max(8, itemRect.left - vpRect.left);
-    top = Math.max(8, itemRect.top - vpRect.top - 34);
+  // 若上方被頂部吃掉，則改置於物件下方
+  if (top < 8) {
+    top = itemRect.bottom - vpRect.top + 8;
   }
 
-  // Clamping within viewport
-  top = Math.max(8, Math.min(vpRect.height - 36, top));
-  left = Math.max(8, Math.min(vpRect.width - 116, left));
+  // 邊界安全防護：絕不超出可視畫布上下左右任何邊緣
+  top = Math.max(8, Math.min(vpRect.height - tbH - 8, top));
+  left = Math.max(8, Math.min(vpRect.width - tbW - 8, left));
 
   toolbar.style.top = `${Math.round(top)}px`;
   toolbar.style.left = `${Math.round(left)}px`;
-  toolbar.classList.remove('is-hidden');
 }
 
 function setupSandboxInteractions() {
