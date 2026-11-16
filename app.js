@@ -7055,9 +7055,13 @@ function closeModal() {
     const prev = modalStack.pop();
     if (prev && prev.id && prev.id !== activeSheet.id) {
       activeSheet.classList.remove('is-shown');
+      activeSheet.style.transition = 'transform var(--dur-sheet-close) var(--ease-sheet)';
+      activeSheet.style.transform = 'translateY(100%)';
       setTimeout(() => {
-        activeSheet.classList.remove('is-active');
+        activeSheet.classList.remove('is-active', 'is-dragging');
         activeSheet.style.zIndex = '';
+        activeSheet.style.transform = '';
+        activeSheet.style.transition = '';
       }, 220);
 
       const prevSheet = document.getElementById(prev.id);
@@ -7837,7 +7841,8 @@ function enableSwipeToClose(sheet) {
     if (dy > 0 && sheet.scrollTop <= 0) {
       if (e.cancelable) e.preventDefault();
       sheet.style.transform = `translateY(${dy}px)`;
-      if (overlay) {
+      // 只有在當前抽屜為最底層（無上層抽屜堆疊）時，才淡化 overlay
+      if (overlay && modalStack.length === 0) {
         const sheetH = sheet.offsetHeight || 500;
         const progress = Math.min(1, dy / sheetH);
         overlay.style.transition = 'none';
@@ -7845,7 +7850,7 @@ function enableSwipeToClose(sheet) {
       }
     } else if (dy <= 0) {
       sheet.style.transform = 'translateY(0)';
-      if (overlay) {
+      if (overlay && modalStack.length === 0) {
         overlay.style.transition = 'none';
         overlay.style.opacity = '1';
       }
@@ -7897,6 +7902,18 @@ function enableSwipeToClose(sheet) {
         startY = 0; currentY = 0;
         return;
       }
+
+      // 多層子抽屜：完全對齊點擊叉叉（closeModal）的行為，絕不淡化背景、絕不閃爍或重載上層抽屜
+      if (modalStack.length > 0) {
+        if (overlay) {
+          overlay.style.transition = '';
+          overlay.style.opacity = '';
+        }
+        closeModal();
+        startY = 0; currentY = 0;
+        return;
+      }
+
       sheet.style.transition = 'transform var(--dur-sheet-close) var(--ease-sheet)';
       sheet.style.transform = 'translateY(100%)';
       if (overlay) {
@@ -7915,7 +7932,7 @@ function enableSwipeToClose(sheet) {
     } else {
       sheet.style.transition = 'transform 0.2s cubic-bezier(0.25, 1, 0.5, 1)';
       sheet.style.transform = 'translateY(0)';
-      if (overlay) {
+      if (overlay && modalStack.length === 0) {
         overlay.style.transition = 'opacity 0.2s cubic-bezier(0.25, 1, 0.5, 1)';
         overlay.style.opacity = '1';
         setTimeout(() => {
@@ -11192,7 +11209,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v131';
+const CURRENT_APP_VERSION = 'v132';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
