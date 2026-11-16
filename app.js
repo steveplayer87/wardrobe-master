@@ -8338,17 +8338,6 @@ let tryonTitleClickTimer = null;
 let tryonTitleClickCount = 0;
 
 function handleTryonTitleClick() {
-  const extraCats = ['outer', 'accessory', 'hat', 'pajamaTop', 'sportPants', 'pajamaBottom'];
-  if (extraCats.includes(tryonCurrentSlot)) {
-    const idx = extraCats.indexOf(tryonCurrentSlot);
-    const nextCat = extraCats[(idx + 1) % extraCats.length];
-    const chipsWrap = document.getElementById('tryonCategoryChips');
-    if (chipsWrap) {
-      chipsWrap.querySelectorAll('.chip').forEach(c => c.classList.toggle('is-active', c.dataset.cat === nextCat));
-    }
-    renderTryonGridFor(nextCat, nextCat);
-    return;
-  }
   if (!['top', 'inner', 'thermal'].includes(tryonCurrentSlot)) return;
   tryonTitleClickCount++;
   if (tryonTitleClickCount === 1) {
@@ -8665,6 +8654,8 @@ function addExtrasClearAction() {
 function openExtrasPicker() {
   window._pajamaChangingMode = false;
   window._sportPantsChangingMode = false;
+  const titleBtn = document.getElementById('tryonTitleBtn');
+  if (titleBtn) titleBtn.classList.remove('is-switchable');
   document.getElementById('tryonTitle').textContent = '選擇其他單品';
   resetTryonToolbar();
   const chipsWrap = document.getElementById('tryonCategoryChips');
@@ -11555,7 +11546,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v134';
+const CURRENT_APP_VERSION = 'v135';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
