@@ -50,8 +50,8 @@ export default {
         if (/[\u4e00-\u9fa5]/.test(userPrompt)) {
           // 色彩關鍵詞強制錨定
           let colorEn = "";
-          if (/深黑|全黑|純黑|黑/.test(userPrompt)) colorEn = "solid jet black";
-          else if (/純白|米白|白/.test(userPrompt)) colorEn = "solid clean white";
+          if (/深黑|全黑|純黑|黑/.test(userPrompt)) colorEn = "solid jet black (#050505)";
+          else if (/純白|米白|白/.test(userPrompt)) colorEn = "solid clean white (#FFFFFF)";
           else if (/深灰|鐵灰|灰/.test(userPrompt)) colorEn = "solid heather grey";
           else if (/深藍|藏青|海軍藍|藍/.test(userPrompt)) colorEn = "solid navy blue";
           else if (/軍綠|墨綠|綠/.test(userPrompt)) colorEn = "solid olive green";
@@ -76,7 +76,7 @@ export default {
               const transPrompt = [
                 "You are a fashion e-commerce catalog specialist. Translate the Chinese clothing description into concise English keywords for flat lay product photography.",
                 "Specify: exact solid color, garment type, cut, sleeve length, collar type.",
-                "Strict rules: If user mentions '黑色', ensure 'solid jet black' is prominent. If user mentions '內衣', translate to 'short-sleeve inner undershirt crewneck base-layer tee'.",
+                "Strict rules: If user mentions '黑色', ensure 'solid jet black (#050505)' is prominent at the beginning. If user mentions '內衣', translate to 'short-sleeve lightweight cotton undershirt / base-layer tee'.",
                 "Output ONLY the English keywords, no punctuation, no markdown, no explanation.",
                 `User description: ${userPrompt}`
               ].join("\n");
@@ -143,15 +143,22 @@ export default {
         }
 
         const viewDesc = view === "back" ? "Back view" : "Front view";
+
+        // 款式負向排除防護：內衣與短T絕不可生成衛衣或厚羅紋
+        let negativeClause = "";
+        if (/內衣|短T|汗衫|內搭|短袖/.test(userPrompt) || /undershirt|t-shirt|tee/.test(englishPrompt.toLowerCase())) {
+          negativeClause = "short-sleeve, lightweight thin breathable cotton fabric, flat fine neckline, NO long sleeves, NO fleece, NO sweatshirt, NO thick sweater ribbing, NO thick cuffs.";
+        } else if (/褲/.test(userPrompt) || /pants|shorts|trousers|jeans/.test(englishPrompt.toLowerCase())) {
+          negativeClause = "pants laid flat, symmetrical legs, no shirt, no top.";
+        }
+
         const fullPrompt = [
-          `Professional e-commerce flat lay catalog product photograph of a ${englishPrompt}.`,
-          `Garment Color: strictly single solid color matching description.`,
-          `View: ${viewDesc}, perfectly upright orientation, completely centered.`,
-          `Arrangement: laid completely flat, smooth, wrinkle-free, no hanger, no mannequin, no human model.`,
-          `Sleeves and silhouette: horizontally extended or symmetrically spread downwards at identical angles, maintaining perfect mirror symmetry.`,
-          `Texture: authentic clean garment textile weave, precise collar, ribbing, seams, and fine stitching.`,
-          `Lighting & Studio: even studio softbox lighting, zero cast shadows, razor-sharp edges on a seamless, pure solid white background (#FFFFFF) for clean extraction.`
-        ].join(" ");
+          `A solid monochromatic ${englishPrompt}.`,
+          negativeClause,
+          `View: ${viewDesc}, perfectly centered, flat lay e-commerce product photograph.`,
+          `Arrangement: laid completely flat, smooth, wrinkle-free, perfectly symmetrical, no hanger, no model.`,
+          `Isolated on a seamless pure solid white background (#FFFFFF), studio soft lighting, no cast shadows.`
+        ].filter(Boolean).join(" ");
 
         let base64Image = null;
         let lastError = null;

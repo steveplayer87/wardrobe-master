@@ -24,7 +24,7 @@ const ICONS = {
   bottom: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12l1 6.5-1.8 11a1 1 0 0 1-1 .8h-2a1 1 0 0 1-1-.8L12 12l-1.2 9a1 1 0 0 1-1 .8H7.8a1 1 0 0 1-1-.8L5 10l1-6.5Z"/><path d="M6 7.5h12"/></svg>`,
   outer: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 4.5 16 3a4 4 0 0 0-8 0L3.6 4.5A2 2 0 0 0 2 6.5V10c0 .6.4 1 1 1h2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9h2c.6 0 1-.4 1-1V6.5a2 2 0 0 0-1.6-2z"/><path d="M12 7v15"/><path d="M8 3v4.5l4 2.5 4-2.5V3"/></svg>`,
   shoes: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8c0-3.5 1.5-4.5 3-4.5s3 1 3 4.5c0 3-.8 6-.8 8.5 0 2.5-.7 3.5-2.2 3.5S5.8 19 5.8 16.5C5.8 14 5 11.5 5 8Z"/><path d="M5.2 8.5h5.6M5.1 11.5h5.8"/><path d="M13 8c0-3.5 1.5-4.5 3-4.5s3 1 3 4.5c0 3-.8 6-.8 8.5 0 2.5-.7 3.5-2.2 3.5s-2.2-1-2.2-3.5c0-2.5-.8-5-.8-8.5Z"/><path d="M13.2 8.5h5.6M13.1 11.5h5.8"/></svg>`,
-  hat: `<svg viewBox="0 0 24 24" fill="none"><path d="M4.5 15.5c0-4.5 3.3-8 7.5-8s7.5 3.5 7.5 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M2.5 15.5h19" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`,
+  hat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14.5c0-4.5 2.5-8.5 6-8.5s6 4 6 8.5"/><path d="M12 6v8.5"/><path d="M3 15.5c2.5-1.5 6.5-2 9-2s6.5.5 9 2c0 0-2 3-9 3s-9-3-9-3z"/><circle cx="12" cy="5.8" r="0.75" fill="currentColor"/></svg>`,
   accessory: `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M12 12v8.5M9.5 20.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
   pajamaTop: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l8-3 8 3v4a2 2 0 0 1-2 2h-1v7H7v-7H6a2 2 0 0 1-2-2V7z"/><path d="M12 4v16"/><path d="M9 10h6"/></svg>`,
   pajamaBottom: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l1 7-2 11h-3l-2-8-2 8H7L5 10l1-7z"/><path d="M6 7h12"/></svg>`,
@@ -70,7 +70,7 @@ const ICONS = {
   chevronRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`,
 };
 const FIGURE_ICONS = {
-  hat: `<svg viewBox="0 0 50 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 32c0-12 7-20 17-20 8.2 0 14.2 5 15.8 13l.4 7Z" fill="currentColor" fill-opacity=".12"/><path d="M40 27.5c5 .6 8.4 2.6 7.6 5.4-.8 2.6-6.2 2.4-10.8 2.4H8" fill="currentColor" fill-opacity=".12"/><path d="M25 12c-3.2 5-4.2 12-3.6 20M25 12c4 3.6 6 11 5.8 20" opacity=".6"/><circle cx="25" cy="11.2" r="1.6" fill="currentColor" fill-opacity=".55"/></svg>`,
+  hat: `<svg viewBox="0 0 50 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 30c0-10 5.5-18 13-18s13 8 13 18" fill="currentColor" fill-opacity=".12"/><path d="M25 12v18" opacity=".7"/><path d="M6 31.5c5.5-3 14-4 19-4s13.5 1 19 4c0 0-4.5 6.5-19 6.5s-19-6.5-19-6.5z" fill="currentColor" fill-opacity=".15"/><circle cx="25" cy="11.5" r="1.6" fill="currentColor" fill-opacity=".65"/></svg>`,
   top: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 6 8.5 9.8 3 19.2l7 3.6 2-3.3V41.5h24V19.5l2 3.3 7-3.6-5.5-9.4L30.5 6c-1.2 3-3.6 4.6-6.5 4.6S18.7 9 17.5 6Z" fill="currentColor" fill-opacity=".12"/><path d="M17.5 6c1 4.4 3.4 6.8 6.5 6.8S29.5 10.4 30.5 6" opacity=".75"/><path d="M12 37h24M10 22.8l2-3.3M38 22.8l-2-3.3" opacity=".6"/></svg>`,
   bottom: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 5h23l3 37.5h-11L24 18.5l-3.5 24h-11Z" fill="currentColor" fill-opacity=".12"/><path d="M12.9 10.5h22.2M24 10.5v8" opacity=".75"/><path d="M15.5 14.5c1.6 0 3 .6 4 1.6M32.5 14.5c-1.6 0-3 .6-4 1.6" opacity=".6"/><circle cx="24" cy="12.6" r=".9" fill="currentColor" stroke="none" opacity=".7"/></svg>`,
   shoes: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(1 4.5) scale(1.15 1) rotate(-5 12 20)"><path d="M6 6.4C6 2.9 8.6 1 12 1s6 1.9 6 5.4c0 3.9-1.5 6.6-1.7 10.4-.2 3.2 2.1 6.1 2.1 11.2 0 6.7-3 11.4-6.4 11.4s-6.4-4.7-6.4-11.4c0-5.1 2.3-8 2.1-11.2C7.5 13 6 10.3 6 6.4Z" fill="currentColor" fill-opacity=".14"/><path d="M8.7 6.6c0-2 1.3-3.1 3.3-3.1s3.3 1.1 3.3 3.1c0 2-1.2 3.3-3.3 3.3S8.7 8.6 8.7 6.6Z" opacity=".75"/><path d="M9.9 13.2h4.2M9.7 16.2h4.6M9.6 19.2h4.8" opacity=".7"/><path d="M7.4 29.6c2.4 1.8 6.8 1.8 9.2 0" opacity=".65"/></g><g transform="translate(47 4.5) scale(-1.15 1) rotate(-5 12 20)"><path d="M6 6.4C6 2.9 8.6 1 12 1s6 1.9 6 5.4c0 3.9-1.5 6.6-1.7 10.4-.2 3.2 2.1 6.1 2.1 11.2 0 6.7-3 11.4-6.4 11.4s-6.4-4.7-6.4-11.4c0-5.1 2.3-8 2.1-11.2C7.5 13 6 10.3 6 6.4Z" fill="currentColor" fill-opacity=".14"/><path d="M8.7 6.6c0-2 1.3-3.1 3.3-3.1s3.3 1.1 3.3 3.1c0 2-1.2 3.3-3.3 3.3S8.7 8.6 8.7 6.6Z" opacity=".75"/><path d="M9.9 13.2h4.2M9.7 16.2h4.6M9.6 19.2h4.8" opacity=".7"/><path d="M7.4 29.6c2.4 1.8 6.8 1.8 9.2 0" opacity=".65"/></g></svg>`
@@ -580,6 +580,7 @@ function openAiClothGenModal() {
   if (!modal) return;
   const promptInput = document.getElementById('aiGenPrompt');
   const catInput = document.getElementById('aiGenCategory');
+  const viewInput = document.getElementById('aiGenView');
   const previewWrap = document.getElementById('aiGenPreviewWrap');
   const resultImg = document.getElementById('aiGenResultImg');
   const applyBtn = document.getElementById('btnApplyAiClothGen');
@@ -611,7 +612,16 @@ function openAiClothGenModal() {
     }
   }
 
-  if (catInput && pendingCategory) catInput.value = pendingCategory;
+  const currentCat = pendingCategory || 'top';
+  if (catInput) catInput.value = currentCat;
+  document.querySelectorAll('#aiGenCatChips .btn-ai-cat').forEach(b => {
+    b.classList.toggle('is-active', b.dataset.cat === currentCat);
+  });
+  if (viewInput) viewInput.value = 'front';
+  document.querySelectorAll('#aiGenViewSegment .segment-btn').forEach(b => {
+    b.classList.toggle('is-active', b.dataset.view === 'front');
+  });
+
   if (previewWrap) previewWrap.classList.add('is-hidden');
   if (resultImg) resultImg.src = '';
   if (applyBtn) applyBtn.classList.add('is-hidden');
@@ -637,7 +647,7 @@ function processCutoutAndNormalize(base64Data, category) {
         const imgData = ctx1.getImageData(0, 0, iw, ih);
         const data = imgData.data;
 
-        // 1. 取四角像素平均值做為基準背景色（通常為純白棚拍 #FFFFFF）
+        // 1. 取四角像素平均值做為基準背景色（純白棚拍 #FFFFFF）
         const corners = [
           0,
           (iw - 1) * 4,
@@ -653,14 +663,27 @@ function processCutoutAndNormalize(base64Data, category) {
         bgR /= 4; bgG /= 4; bgB /= 4;
 
         // 2. 邊緣連通泛洪（BFS Edge-Connected Flood Fill）
-        // 唯有從圖片四周外邊緣連通的背景像素才去除；
-        // 白色衣物內部與純白布料因被衣物邊緣輪廓所包圍阻隔，絕不誤刪！
+        // 容差設定為 20（高信賴棚拍背景）；同時加入邊緣輪廓梯度硬屏障，
+        // 唯有真正從外圍連通的攝影棚純白背景才清除，白色衣物內部布料絕不誤刪掏空！
         const visited = new Uint8Array(iw * ih);
         const queue = new Int32Array(iw * ih);
         let qHead = 0, qTail = 0;
 
         const isBgPixel = (r, g, b) => {
-          return Math.hypot(r - bgR, g - bgG, b - bgB) < 42;
+          return Math.hypot(r - bgR, g - bgG, b - bgB) < 20;
+        };
+
+        const lum = (pIdx) => {
+          const b = pIdx * 4;
+          return 0.299 * data[b] + 0.587 * data[b + 1] + 0.114 * data[b + 2];
+        };
+        const isBorderSeam = (x, y) => {
+          if (x <= 1 || x >= iw - 2 || y <= 1 || y >= ih - 2) return false;
+          const idx = y * iw + x;
+          const cL = lum(idx);
+          const rL = lum(idx + 1);
+          const bL = lum(idx + iw);
+          return Math.abs(cL - rL) > 8.5 || Math.abs(cL - bL) > 8.5;
         };
 
         // 將四個外邊緣上的背景像素加入 BFS 隊列
@@ -693,7 +716,7 @@ function processCutoutAndNormalize(base64Data, category) {
           }
         }
 
-        // BFS 泛洪擴散
+        // BFS 泛洪擴散（遇到縫線/輪廓硬屏障時停止）
         while (qHead < qTail) {
           const cur = queue[qHead++];
           const cx = cur % iw;
@@ -703,7 +726,7 @@ function processCutoutAndNormalize(base64Data, category) {
             const left = cur - 1;
             if (!visited[left]) {
               const p = left * 4;
-              if (isBgPixel(data[p], data[p + 1], data[p + 2])) {
+              if (isBgPixel(data[p], data[p + 1], data[p + 2]) && !isBorderSeam(cx - 1, cy)) {
                 visited[left] = 1;
                 queue[qTail++] = left;
               }
@@ -713,7 +736,7 @@ function processCutoutAndNormalize(base64Data, category) {
             const right = cur + 1;
             if (!visited[right]) {
               const p = right * 4;
-              if (isBgPixel(data[p], data[p + 1], data[p + 2])) {
+              if (isBgPixel(data[p], data[p + 1], data[p + 2]) && !isBorderSeam(cx + 1, cy)) {
                 visited[right] = 1;
                 queue[qTail++] = right;
               }
@@ -723,7 +746,7 @@ function processCutoutAndNormalize(base64Data, category) {
             const top = cur - iw;
             if (!visited[top]) {
               const p = top * 4;
-              if (isBgPixel(data[p], data[p + 1], data[p + 2])) {
+              if (isBgPixel(data[p], data[p + 1], data[p + 2]) && !isBorderSeam(cx, cy - 1)) {
                 visited[top] = 1;
                 queue[qTail++] = top;
               }
@@ -733,7 +756,7 @@ function processCutoutAndNormalize(base64Data, category) {
             const bot = cur + iw;
             if (!visited[bot]) {
               const p = bot * 4;
-              if (isBgPixel(data[p], data[p + 1], data[p + 2])) {
+              if (isBgPixel(data[p], data[p + 1], data[p + 2]) && !isBorderSeam(cx, cy + 1)) {
                 visited[bot] = 1;
                 queue[qTail++] = bot;
               }
@@ -741,7 +764,7 @@ function processCutoutAndNormalize(base64Data, category) {
           }
         }
 
-        // 3. 將所有被連通標記為背景的像素設為完全透明，其餘像素（包含白色衣物內部）保持完整不透明
+        // 3. 背景像素設為完全透明，白色衣服本體保持完整不透明
         let minX = iw, minY = ih, maxX = 0, maxY = 0;
         for (let pIdx = 0; pIdx < iw * ih; pIdx++) {
           const byteIdx = pIdx * 4;
@@ -758,7 +781,6 @@ function processCutoutAndNormalize(base64Data, category) {
         }
         ctx1.putImageData(imgData, 0, 0);
 
-        // 若無有效衣物像素則返回原圖
         if (maxX <= minX || maxY <= minY) {
           resolve(c1.toDataURL('image/png'));
           return;
@@ -767,9 +789,7 @@ function processCutoutAndNormalize(base64Data, category) {
         const bboxW = maxX - minX + 1;
         const bboxH = maxY - minY + 1;
 
-        // 4. 嚴格尺寸規格化：依據專案圖片標準緊湊對齊真實邊界並加上 4% 均勻呼吸留白
-        // 導出透明 PNG，讓衣櫥卡片 (1:1)、詳情頁 (4:5) 與穿搭槽 (1.08 / 0.78 等) 以 object-fit: contain 呈現時
-        // 尺寸完全與既有衣物 1:1 吻合，不再雙重留白或過小
+        // 4. 緊湊尺寸規格化並保留 4% 均勻呼吸留白
         const padX = Math.round(bboxW * 0.04);
         const padY = Math.round(bboxH * 0.04);
         const cropX = Math.max(0, minX - padX);
@@ -819,23 +839,30 @@ async function runAiClothGen() {
   }
 
   runBtn.disabled = true;
-  runBtn.textContent = '1/3 解析語意與轉譯中…';
-  if (progressStatus) {
-    progressStatus.textContent = '步驟 1/3：AI 語義解析與轉譯中…';
-    progressStatus.classList.remove('is-hidden');
-  }
+
+  // 動態跳動點點動畫
+  let dotCount = 1;
+  let currentStageText = 'AI 語義解析與轉譯中';
+  const updateDotsDisplay = () => {
+    dotCount = (dotCount % 3) + 1;
+    const dots = '.'.repeat(dotCount);
+    if (runBtn) runBtn.textContent = `${currentStageText}${dots}`;
+    if (progressStatus) progressStatus.textContent = `${currentStageText}${dots}`;
+  };
+  updateDotsDisplay();
+  const dotTimer = setInterval(updateDotsDisplay, 380);
+
+  if (progressStatus) progressStatus.classList.remove('is-hidden');
   if (transBox) transBox.classList.add('is-hidden');
 
   try {
     let imgBase64 = null;
     let respData = null;
 
-    if (progressStatus) {
-      progressStatus.textContent = '步驟 2/3：雲端電商平鋪生圖運算中…';
-    }
-    runBtn.textContent = '2/3 電商型錄平鋪生圖中…';
+    currentStageText = '雲端電商平鋪生圖運算中';
+    updateDotsDisplay();
 
-    // 呼叫 Cloudflare Worker 雲端端點（金鑰安全儲存於雲端 Secret，免前端填寫）
+    // 呼叫 Cloudflare Worker 雲端端點
     try {
       const resp = await fetch(`${CLOUDFLARE_WORKER_URL}/api/generate-clothing-image`, {
         method: 'POST',
@@ -850,19 +877,19 @@ async function runAiClothGen() {
       } else {
         const errJson = await resp.json().catch(() => ({}));
         console.warn('Worker gen error:', errJson);
+        throw new Error(errJson.detail || `HTTP ${resp.status}`);
       }
     } catch (e) {
       console.warn('Worker call failed:', e);
+      throw e;
     }
 
     if (!imgBase64) {
-      throw new Error('雲端生圖服務暫時忙碌，請稍候重試');
+      throw new Error('雲端生圖服務未回傳圖片，請稍候重試');
     }
 
-    if (progressStatus) {
-      progressStatus.textContent = '步驟 3/3：自動智慧去背與尺寸規格化…';
-    }
-    runBtn.textContent = '3/3 智慧去背與尺寸校準…';
+    currentStageText = '智慧去背與尺寸校準中';
+    updateDotsDisplay();
 
     const cutUrl = await processCutoutAndNormalize(imgBase64, category);
     currentAiGenResultUrl = cutUrl;
@@ -871,7 +898,6 @@ async function runAiClothGen() {
     if (previewWrap) previewWrap.classList.remove('is-hidden');
     if (applyBtn) applyBtn.classList.remove('is-hidden');
 
-    // 顯示轉譯歷程資訊塊
     if (transBox && respData) {
       if (transOrig) transOrig.textContent = userPrompt;
       if (transRes) transRes.textContent = respData.translatedPrompt || '(無需轉譯)';
@@ -884,9 +910,15 @@ async function runAiClothGen() {
     }
     toast('已完成生成、去背與尺寸規格化');
   } catch (err) {
-    if (progressStatus) progressStatus.textContent = `生成失敗：${err.message || '請確認網路連線'}`;
-    toast(`生成失敗：${err.message || '請確認網路連線'}`);
+    const errMsg = err?.message || String(err);
+    if (progressStatus) progressStatus.textContent = `生成失敗：${errMsg}`;
+    // 自動報錯並複製到剪貼簿
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(`AI生圖失敗：${errMsg}`).catch(() => {});
+    }
+    toast(`生成出錯：${errMsg}（已複製錯誤至剪貼簿）`);
   } finally {
+    clearInterval(dotTimer);
     runBtn.disabled = false;
     runBtn.textContent = '開始生成並自動去背';
   }
@@ -943,23 +975,39 @@ function openColorTunerModal() {
     return;
   }
   const canvas = document.getElementById('colorTunerCanvas');
+  const beforeCanvas = document.getElementById('colorTunerBeforeCanvas');
+  const outlineCanvas = document.getElementById('colorTunerOutlineCanvas');
   if (!canvas) return;
 
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = () => {
-    canvas.width = img.naturalWidth || 600;
-    canvas.height = img.naturalHeight || 600;
+    const w = img.naturalWidth || 600;
+    const h = img.naturalHeight || 600;
+    canvas.width = w; canvas.height = h;
+    if (beforeCanvas) { beforeCanvas.width = w; beforeCanvas.height = h; }
+    if (outlineCanvas) { outlineCanvas.width = w; outlineCanvas.height = h; }
+
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0);
-    tunerOriginalData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    tunerOriginalData = ctx.getImageData(0, 0, w, h);
     tunerTargetHsb = null;
+
+    if (beforeCanvas) {
+      const bCtx = beforeCanvas.getContext('2d');
+      bCtx.clearRect(0, 0, w, h);
+      bCtx.drawImage(img, 0, 0);
+    }
+    if (outlineCanvas) {
+      const oCtx = outlineCanvas.getContext('2d');
+      oCtx.clearRect(0, 0, w, h);
+    }
 
     const swatch = document.getElementById('colorTunerTargetSwatch');
     const txt = document.getElementById('colorTunerTargetHsbText');
     if (swatch) swatch.style.background = '#ccc';
-    if (txt) txt.textContent = '請點擊上方照片吸取衣服顏色';
+    if (txt) txt.textContent = '點擊上方調色預覽吸取衣服顏色';
 
     const hInput = document.getElementById('colorTunerHue');
     const sInput = document.getElementById('colorTunerSat');
@@ -968,7 +1016,7 @@ function openColorTunerModal() {
     if (hInput) hInput.value = '0';
     if (sInput) sInput.value = '0';
     if (bInput) bInput.value = '0';
-    if (tInput) tInput.value = '30';
+    if (tInput) tInput.value = '35';
     updateColorTunerSliderLabels();
 
     openModal('modal-color-tuner');
@@ -980,17 +1028,45 @@ function updateColorTunerSliderLabels() {
   const h = document.getElementById('colorTunerHue')?.value || 0;
   const s = document.getElementById('colorTunerSat')?.value || 0;
   const b = document.getElementById('colorTunerBright')?.value || 0;
-  const t = document.getElementById('colorTunerTolerance')?.value || 30;
+  const t = document.getElementById('colorTunerTolerance')?.value || 35;
 
   const hLbl = document.getElementById('colorTunerHueVal');
   const sLbl = document.getElementById('colorTunerSatVal');
   const bLbl = document.getElementById('colorTunerBrightVal');
   const tLbl = document.getElementById('colorTunerToleranceVal');
 
-  if (hLbl) hLbl.textContent = `${h}°`;
-  if (sLbl) sLbl.textContent = `${s}%`;
-  if (bLbl) bLbl.textContent = `${b}%`;
-  if (tLbl) tLbl.textContent = `容差 (${t})`;
+  if (hLbl) hLbl.textContent = `${h > 0 ? '+' : ''}${h}°`;
+  if (sLbl) sLbl.textContent = `${s > 0 ? '+' : ''}${s}%`;
+  if (bLbl) bLbl.textContent = `${b > 0 ? '+' : ''}${b}%`;
+  if (tLbl) tLbl.textContent = `${t}`;
+}
+
+function renderColorTunerDashedOutline(mask, w, h) {
+  const outlineCanvas = document.getElementById('colorTunerOutlineCanvas');
+  if (!outlineCanvas) return;
+  const oCtx = outlineCanvas.getContext('2d');
+  oCtx.clearRect(0, 0, w, h);
+  if (!mask) return;
+
+  const edgeData = oCtx.createImageData(w, h);
+  const dst = edgeData.data;
+
+  // 尋找遮罩邊界：該點為 1 且四周有為 0 的點
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const idx = y * w + x;
+      if (mask[idx]) {
+        if (!mask[idx - 1] || !mask[idx + 1] || !mask[idx - w] || !mask[idx + w]) {
+          // 以黑虛線節奏標記邊界
+          if ((Math.floor((x + y) / 5) % 2) === 0) {
+            const b = idx * 4;
+            dst[b] = 0; dst[b + 1] = 0; dst[b + 2] = 0; dst[b + 3] = 230;
+          }
+        }
+      }
+    }
+  }
+  oCtx.putImageData(edgeData, 0, 0);
 }
 
 function applyHsbTuning() {
@@ -1000,61 +1076,68 @@ function applyHsbTuning() {
   const dHue = Number(document.getElementById('colorTunerHue')?.value || 0);
   const dSat = Number(document.getElementById('colorTunerSat')?.value || 0);
   const dBrt = Number(document.getElementById('colorTunerBright')?.value || 0);
-  const tol = Number(document.getElementById('colorTunerTolerance')?.value || 30);
+  const tol = Number(document.getElementById('colorTunerTolerance')?.value || 35);
 
-  const imgData = ctx.createImageData(tunerOriginalData.width, tunerOriginalData.height);
+  const w = tunerOriginalData.width;
+  const h = tunerOriginalData.height;
+  const imgData = ctx.createImageData(w, h);
   const src = tunerOriginalData.data;
   const dst = imgData.data;
   const len = src.length;
+  const mask = new Uint8Array(w * h);
 
   const targetH = tunerTargetHsb.h;
   const targetS = tunerTargetHsb.s;
-  const targetB = tunerTargetHsb.b;
+  const isNeutral = targetS < 14;
 
   for (let i = 0; i < len; i += 4) {
     const a = src[i + 3];
     dst[i + 3] = a;
     if (a < 15) {
-      dst[i] = src[i];
-      dst[i + 1] = src[i + 1];
-      dst[i + 2] = src[i + 2];
+      dst[i] = src[i]; dst[i + 1] = src[i + 1]; dst[i + 2] = src[i + 2];
       continue;
     }
     const r = src[i], g = src[i + 1], b = src[i + 2];
     const hsb = rgbToHsb(r, g, b);
 
-    let dh = Math.abs(hsb.h - targetH);
-    if (dh > 180) dh = 360 - dh;
-    const dhNorm = dh / 180;
-    const dsNorm = Math.abs(hsb.s - targetS) / 100;
-    const dbNorm = Math.abs(hsb.b - targetB) / 100;
-
-    const dist = Math.sqrt(dhNorm * dhNorm * 0.65 + dsNorm * dsNorm * 0.2 + dbNorm * dbNorm * 0.15) * 100;
-
-    if (dist <= tol) {
-      const weight = 1 - (dist / tol);
-      const newH = (hsb.h + dHue * weight + 360) % 360;
-      const newS = Math.max(0, Math.min(100, hsb.s + dSat * weight));
-      const newB = Math.max(0, Math.min(100, hsb.b + dBrt * weight));
-      const [nr, ng, nb] = hsbToRgb(newH, newS, newB);
-      dst[i] = nr;
-      dst[i + 1] = ng;
-      dst[i + 2] = nb;
+    let inMask = false;
+    if (isNeutral) {
+      const dr = r - tunerTargetHsb.r, dg = g - tunerTargetHsb.g, db = b - tunerTargetHsb.b;
+      inMask = Math.hypot(dr, dg, db) <= (tol * 2.2);
     } else {
-      dst[i] = r;
-      dst[i + 1] = g;
-      dst[i + 2] = b;
+      let dh = Math.abs(hsb.h - targetH);
+      if (dh > 180) dh = 360 - dh;
+      const angleTol = Math.max(16, tol * 1.1);
+      inMask = (dh <= angleTol) && (hsb.s >= 10);
+    }
+
+    const pIdx = i / 4;
+    if (inMask) {
+      mask[pIdx] = 1;
+      // 完整色相 0~360 旋轉，飽和度與明度平滑伸縮
+      const newH = ((hsb.h + dHue) % 360 + 360) % 360;
+      const newS = Math.max(0, Math.min(100, Math.round(hsb.s * (1 + dSat / 100))));
+      const newB = Math.max(0, Math.min(100, Math.round(hsb.b * (1 + dBrt / 100))));
+      const [nr, ng, nb] = hsbToRgb(newH, newS, newB);
+      dst[i] = nr; dst[i + 1] = ng; dst[i + 2] = nb;
+    } else {
+      dst[i] = r; dst[i + 1] = g; dst[i + 2] = b;
     }
   }
 
   ctx.putImageData(imgData, 0, 0);
+  renderColorTunerDashedOutline(mask, w, h);
 }
 
 function resetColorTuner() {
   const canvas = document.getElementById('colorTunerCanvas');
+  const outlineCanvas = document.getElementById('colorTunerOutlineCanvas');
   if (!canvas || !tunerOriginalData) return;
   const ctx = canvas.getContext('2d');
   ctx.putImageData(tunerOriginalData, 0, 0);
+  if (outlineCanvas) {
+    outlineCanvas.getContext('2d').clearRect(0, 0, outlineCanvas.width, outlineCanvas.height);
+  }
   const hInput = document.getElementById('colorTunerHue');
   const sInput = document.getElementById('colorTunerSat');
   const bInput = document.getElementById('colorTunerBright');
@@ -1062,7 +1145,7 @@ function resetColorTuner() {
   if (hInput) hInput.value = '0';
   if (sInput) sInput.value = '0';
   if (bInput) bInput.value = '0';
-  if (tInput) tInput.value = '30';
+  if (tInput) tInput.value = '35';
   updateColorTunerSliderLabels();
 }
 
@@ -1458,6 +1541,11 @@ function updateHistoryControls() {
   const redo = document.getElementById('btnRedo');
   if (undo) undo.disabled = undoStack.length === 0;
   if (redo) redo.disabled = redoStack.length === 0;
+
+  const headerUndo = document.getElementById('btnHeaderUndo');
+  const headerRedo = document.getElementById('btnHeaderRedo');
+  if (headerUndo) headerUndo.disabled = undoStack.length === 0;
+  if (headerRedo) headerRedo.disabled = redoStack.length === 0;
 
   const undoDesc = document.getElementById('undoActionDesc');
   const redoDesc = document.getElementById('redoActionDesc');
@@ -3974,8 +4062,16 @@ function initBrowsers() {
 
 /* ---- Wardrobe tab ---- */
 let uiWardrobeCat = 'all';
-let uiWardrobeSort = 'recent';
-let uiWardrobeFilters = { status: 'all', tags: [], colors: [], brands: [], invert: false };
+let uiWardrobeSort = (() => {
+  try { return localStorage.getItem('wm_wardrobe_sort') || 'recent'; } catch (_) { return 'recent'; }
+})();
+let uiWardrobeFilters = (() => {
+  try {
+    const raw = localStorage.getItem('wm_wardrobe_filters');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return { status: 'all', tags: [], colors: [], brands: [], invert: false };
+})();
 let uiSearchQuery = '';
 let uiSelectMode = false;
 let uiSelectedIds = new Set();
@@ -4303,8 +4399,12 @@ function buildItemCard(item, opts) {
 
 /* ---- History tab ---- */
 let uiCalMonth = (() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; })();
-let uiRankPeriod = 'all'; // 'all' | 'month' | '30d'
-let uiRankCategory = 'all'; // 'all' | 'top' | 'bottom' | 'outer' | 'shoes' | 'hat' | 'accessory'
+let uiRankPeriod = (() => {
+  try { return localStorage.getItem('wm_rank_period') || 'all'; } catch (_) { return 'all'; }
+})();
+let uiRankCategory = (() => {
+  try { return localStorage.getItem('wm_rank_cat') || 'all'; } catch (_) { return 'all'; }
+})();
 
 function allOotdEntries() {
   const today = todayStr();
@@ -4577,10 +4677,10 @@ function openDayDetail(dateStr, entry) {
     figurePreviewHtml = `
       <div class="day-detail-figure-preview" style="display:flex;justify-content:center;margin-bottom:14px;">
         <div class="figure-board" style="width:min(144px, 42%);padding:10px 8px;background:rgba(44,66,112,0.06);border:1px solid rgba(44,66,112,0.12);border-radius:22px;display:flex;flex-direction:column;align-items:center;gap:0;">
-          ${hatItem ? `<div class="figure-slot figure-hat" style="width:82%;aspect-ratio:2.2;background:transparent;"><span class="figure-thumb" style="aspect-ratio:2.2;background-image:url('${hatImg}');background-repeat:no-repeat;background-position:center;background-size:contain;background-color:transparent;display:flex;align-items:center;justify-content:center;">${hatImg ? '' : categoryIcon('hat')}</span></div>` : ''}
-          ${topItem ? `<div class="figure-slot figure-top" style="width:100%;aspect-ratio:1.08;margin-bottom:${topMarginBottom};z-index:2;position:relative;background:transparent;"><span class="figure-thumb" style="aspect-ratio:1.08;background-image:url('${topImg}');background-repeat:no-repeat;background-position:center bottom;background-size:contain;background-color:transparent;display:flex;align-items:center;justify-content:center;">${topImg ? '' : categoryIcon('top')}</span></div>` : ''}
-          ${bottomItem ? `<div class="figure-slot figure-bottom ${isShorts ? 'is-shorts' : ''}" style="width:${bottomW};aspect-ratio:${bottomRatio};margin-top:0;z-index:1;position:relative;background:transparent;"><span class="figure-thumb" style="aspect-ratio:${bottomRatio};background-image:url('${bottomImg}');background-repeat:no-repeat;background-position:center top;background-size:contain;background-color:transparent;display:flex;align-items:center;justify-content:center;">${bottomImg ? '' : categoryIcon('bottom')}</span></div>` : ''}
-          ${shoesItem ? `<div class="figure-slot figure-shoes" style="width:96%;aspect-ratio:2.2;margin-top:2px;background:transparent;"><span class="figure-thumb" style="aspect-ratio:2.2;background-image:url('${shoesImg}');background-repeat:no-repeat;background-position:center;background-size:contain;background-color:transparent;display:flex;align-items:center;justify-content:center;">${shoesImg ? '' : categoryIcon('shoes')}</span></div>` : ''}
+          ${hatItem ? `<div class="figure-slot figure-hat is-filled has-photo" style="width:82%;aspect-ratio:2.2;background:transparent;border:none!important;"><span class="figure-thumb" style="aspect-ratio:2.2;background-image:url('${hatImg}');background-repeat:no-repeat;background-position:center;background-size:contain;background-color:transparent;border:none!important;box-shadow:none!important;display:flex;align-items:center;justify-content:center;">${hatImg ? '' : categoryIcon('hat')}</span></div>` : ''}
+          ${topItem ? `<div class="figure-slot figure-top is-filled has-photo" style="width:100%;aspect-ratio:1.08;margin-bottom:${topMarginBottom};z-index:2;position:relative;background:transparent;border:none!important;"><span class="figure-thumb" style="aspect-ratio:1.08;background-image:url('${topImg}');background-repeat:no-repeat;background-position:center bottom;background-size:contain;background-color:transparent;border:none!important;box-shadow:none!important;display:flex;align-items:center;justify-content:center;">${topImg ? '' : categoryIcon('top')}</span></div>` : ''}
+          ${bottomItem ? `<div class="figure-slot figure-bottom is-filled has-photo ${isShorts ? 'is-shorts' : ''}" style="width:${bottomW};aspect-ratio:${bottomRatio};margin-top:0;z-index:1;position:relative;background:transparent;border:none!important;"><span class="figure-thumb" style="aspect-ratio:${bottomRatio};background-image:url('${bottomImg}');background-repeat:no-repeat;background-position:center top;background-size:contain;background-color:transparent;border:none!important;box-shadow:none!important;display:flex;align-items:center;justify-content:center;">${bottomImg ? '' : categoryIcon('bottom')}</span></div>` : ''}
+          ${shoesItem ? `<div class="figure-slot figure-shoes is-filled has-photo" style="width:96%;aspect-ratio:2.2;margin-top:2px;background:transparent;border:none!important;"><span class="figure-thumb" style="aspect-ratio:2.2;background-image:url('${shoesImg}');background-repeat:no-repeat;background-position:center;background-size:contain;background-color:transparent;border:none!important;box-shadow:none!important;display:flex;align-items:center;justify-content:center;">${shoesImg ? '' : categoryIcon('shoes')}</span></div>` : ''}
         </div>
       </div>`;
   }
@@ -7930,18 +8030,20 @@ function enableSwipeToClose(sheet) {
     if (dy > 0 && sheet.scrollTop <= 0) {
       if (e.cancelable) e.preventDefault();
       sheet.style.transform = `translateY(${dy}px)`;
-      // 只有在當前抽屜為最底層（無上層抽屜堆疊）時，才淡化 overlay
+      // 只有在當前抽屜為最底層（無上層抽屜堆疊）時，才淡化 overlay 背景暗度（抽屜本體不變透明）
       if (overlay && modalStack.length === 0) {
         const sheetH = sheet.offsetHeight || 500;
         const progress = Math.min(1, dy / sheetH);
         overlay.style.transition = 'none';
-        overlay.style.opacity = String(Math.max(0, 1 - progress * 0.85));
+        overlay.style.opacity = '1';
+        overlay.style.setProperty('--backdrop-alpha', String(0.45 * Math.max(0, 1 - progress * 0.85)));
       }
     } else if (dy <= 0) {
       sheet.style.transform = 'translateY(0)';
       if (overlay && modalStack.length === 0) {
         overlay.style.transition = 'none';
         overlay.style.opacity = '1';
+        overlay.style.removeProperty('--backdrop-alpha');
       }
     }
   }, { passive: false });
@@ -7960,6 +8062,7 @@ function enableSwipeToClose(sheet) {
         if (overlay) {
           overlay.style.transition = 'opacity 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
           overlay.style.opacity = '1';
+          overlay.style.removeProperty('--backdrop-alpha');
         }
         startY = 0; currentY = 0;
         openUnsavedPrompt('item');
@@ -7971,6 +8074,7 @@ function enableSwipeToClose(sheet) {
         if (overlay) {
           overlay.style.transition = 'opacity 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
           overlay.style.opacity = '1';
+          overlay.style.removeProperty('--backdrop-alpha');
         }
         startY = 0; currentY = 0;
         openUnsavedPrompt('wishlist');
@@ -7987,6 +8091,7 @@ function enableSwipeToClose(sheet) {
         if (overlay) {
           overlay.style.transition = '';
           overlay.style.opacity = '';
+          overlay.style.removeProperty('--backdrop-alpha');
         }
         startY = 0; currentY = 0;
         return;
@@ -7997,6 +8102,7 @@ function enableSwipeToClose(sheet) {
         if (overlay) {
           overlay.style.transition = '';
           overlay.style.opacity = '';
+          overlay.style.removeProperty('--backdrop-alpha');
         }
         closeModal();
         startY = 0; currentY = 0;
@@ -8008,6 +8114,7 @@ function enableSwipeToClose(sheet) {
       if (overlay) {
         overlay.style.transition = 'opacity var(--dur-sheet-close) var(--ease-sheet)';
         overlay.style.opacity = '0';
+        overlay.style.removeProperty('--backdrop-alpha');
       }
       setTimeout(() => {
         closeModal();
@@ -8016,6 +8123,7 @@ function enableSwipeToClose(sheet) {
         if (overlay) {
           overlay.style.transition = '';
           overlay.style.opacity = '';
+          overlay.style.removeProperty('--backdrop-alpha');
         }
       }, 220);
     } else {
@@ -8024,6 +8132,7 @@ function enableSwipeToClose(sheet) {
       if (overlay && modalStack.length === 0) {
         overlay.style.transition = 'opacity 0.2s cubic-bezier(0.25, 1, 0.5, 1)';
         overlay.style.opacity = '1';
+        overlay.style.removeProperty('--backdrop-alpha');
         setTimeout(() => {
           overlay.style.transition = '';
           overlay.style.opacity = '';
@@ -8229,6 +8338,17 @@ let tryonTitleClickTimer = null;
 let tryonTitleClickCount = 0;
 
 function handleTryonTitleClick() {
+  const extraCats = ['outer', 'accessory', 'hat', 'pajamaTop', 'sportPants', 'pajamaBottom'];
+  if (extraCats.includes(tryonCurrentSlot)) {
+    const idx = extraCats.indexOf(tryonCurrentSlot);
+    const nextCat = extraCats[(idx + 1) % extraCats.length];
+    const chipsWrap = document.getElementById('tryonCategoryChips');
+    if (chipsWrap) {
+      chipsWrap.querySelectorAll('.chip').forEach(c => c.classList.toggle('is-active', c.dataset.cat === nextCat));
+    }
+    renderTryonGridFor(nextCat, nextCat);
+    return;
+  }
   if (!['top', 'inner', 'thermal'].includes(tryonCurrentSlot)) return;
   tryonTitleClickCount++;
   if (tryonTitleClickCount === 1) {
@@ -8744,6 +8864,7 @@ function renderSavedFilterGroups() {
   });
 }
 function refreshFilteredViews() {
+  try { localStorage.setItem('wm_wardrobe_filters', JSON.stringify(uiWardrobeFilters)); } catch (_) {}
   renderWardrobe();
   renderWishlist();
   if (tryonCurrentSlot) renderTryonGridFor(tryonCurrentSlot, tryonCurrentCategory);
@@ -10010,7 +10131,15 @@ function wireEvents() {
   document.getElementById('btnCloudBackup')?.addEventListener('click', backupWardrobeToCloud);
 
   // wardrobe: sort + filter + search + select mode
-  document.getElementById('sortSelect').addEventListener('change', e => { uiWardrobeSort = e.target.value; renderWardrobe(); });
+  const sortSelectEl = document.getElementById('sortSelect');
+  if (sortSelectEl) {
+    sortSelectEl.value = uiWardrobeSort;
+    sortSelectEl.addEventListener('change', e => {
+      uiWardrobeSort = e.target.value;
+      try { localStorage.setItem('wm_wardrobe_sort', uiWardrobeSort); } catch (_) {}
+      renderWardrobe();
+    });
+  }
   document.getElementById('btnWardrobeCompactGrid')?.addEventListener('click', () => {
     uiWardrobeCompact = !uiWardrobeCompact;
     localStorage.setItem('wm_wardrobe_compact', String(uiWardrobeCompact));
@@ -10482,6 +10611,7 @@ function wireEvents() {
     const btn = e.target.closest('.rank-period-btn');
     if (!btn) return;
     uiRankPeriod = btn.dataset.period;
+    try { localStorage.setItem('wm_rank_period', uiRankPeriod); } catch (_) {}
     if (uiRankPeriod === 'custom') {
       const sInput = document.getElementById('rankStartDate');
       const eInput = document.getElementById('rankEndDate');
@@ -10500,6 +10630,7 @@ function wireEvents() {
     const btn = e.target.closest('.cat-tab');
     if (!btn) return;
     uiRankCategory = btn.dataset.cat;
+    try { localStorage.setItem('wm_rank_cat', uiRankCategory); } catch (_) {}
     renderRank();
   });
   document.getElementById('calPrev').addEventListener('click', () => {
@@ -10619,8 +10750,34 @@ function wireEvents() {
     });
   });
 
+  // 頂部標題列復原與重做按鈕
+  document.getElementById('btnHeaderUndo')?.addEventListener('click', undoState);
+  document.getElementById('btnHeaderRedo')?.addEventListener('click', redoState);
+
   // AI 服飾生成與調色器事件綁定
   document.getElementById('btnOpenAiClothGen')?.addEventListener('click', openAiClothGenModal);
+
+  // AI 服飾類別膠囊選擇
+  document.getElementById('aiGenCatChips')?.addEventListener('click', e => {
+    const btn = e.target.closest('.btn-ai-cat');
+    if (!btn) return;
+    const cat = btn.dataset.cat;
+    const catInput = document.getElementById('aiGenCategory');
+    if (catInput) catInput.value = cat;
+    document.querySelectorAll('#aiGenCatChips .btn-ai-cat').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+  });
+
+  // AI 視角切換選擇
+  document.getElementById('aiGenViewSegment')?.addEventListener('click', e => {
+    const btn = e.target.closest('.segment-btn');
+    if (!btn) return;
+    const view = btn.dataset.view;
+    const viewInput = document.getElementById('aiGenView');
+    if (viewInput) viewInput.value = view;
+    document.querySelectorAll('#aiGenViewSegment .segment-btn').forEach(b => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+  });
 
   const aiPromptEl = document.getElementById('aiGenPrompt');
   const aiModalEl = document.getElementById('modal-ai-clothing-gen');
@@ -11386,7 +11543,7 @@ function wireEvents() {
     const historyWrap = document.getElementById('releaseNotesHistoryWrap');
     const titleEl = document.getElementById('releaseNotesTitle');
     if (historyWrap) historyWrap.classList.remove('is-hidden');
-    if (titleEl) titleEl.textContent = '版本資訊與更新紀錄';
+    if (titleEl) titleEl.textContent = '版本資訊';
     openModal('modal-release-notes');
   });
   document.getElementById('btnCloseReleaseNotes')?.addEventListener('click', () => {
@@ -11398,7 +11555,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v133';
+const CURRENT_APP_VERSION = 'v134';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';

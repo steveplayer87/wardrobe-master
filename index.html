@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261116_133">
+<link rel="stylesheet" href="styles.css?v=20261117_134">
 </head>
 <body>
 
@@ -28,6 +28,12 @@
       <h1 class="header-greeting" id="headerGreeting">哈囉</h1>
     </div>
     <div class="header-actions">
+      <button class="icon-btn" id="btnHeaderUndo" aria-label="復原" title="復原" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px;"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+      </button>
+      <button class="icon-btn" id="btnHeaderRedo" aria-label="重做" title="重做" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px;"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+      </button>
       <button class="icon-btn" id="btnNotifications" aria-label="提醒中心">
         <svg viewBox="0 0 24 24" fill="none"><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         <span class="badge-dot" id="notifBadge" hidden></span>
@@ -435,14 +441,14 @@
             <span>上傳照片（可一次選2張，第2張當背面）</span>
           </span>
         </label>
-        <div class="photo-floating-actions" style="position:absolute;right:10px;bottom:10px;display:flex;gap:6px;z-index:5;">
-          <button type="button" class="photo-floating-btn" id="btnOpenColorTuner" aria-label="調色器" title="局部 HSB 調色器" style="display:none;background:rgba(255,255,255,0.94);border:1px solid var(--color-line);border-radius:20px;padding:6px 10px;font-size:12px;font-weight:700;color:var(--color-ink);box-shadow:var(--shadow-s);align-items:center;gap:4px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
-            <span>調色</span>
-          </button>
-          <button type="button" class="photo-floating-btn" id="btnOpenAiClothGen" aria-label="AI 生成衣服" title="AI 生成衣服" style="background:rgba(255,255,255,0.94);border:1px solid var(--color-line);border-radius:20px;padding:6px 10px;font-size:12px;font-weight:700;color:var(--color-ink);box-shadow:var(--shadow-s);display:flex;align-items:center;gap:4px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+        <div class="photo-floating-actions photo-stacked-actions" style="position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:8px;z-index:5;">
+          <button type="button" class="photo-action-btn" id="btnOpenAiClothGen" aria-label="AI 生成衣服" title="AI 生成衣服" style="height:38px;padding:0 12px;border-radius:10px;background:var(--color-surface);border:1px solid var(--color-border);box-shadow:var(--shadow-card);font-size:12.5px;font-weight:700;color:var(--color-ink);display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
             <span>AI 生成</span>
+          </button>
+          <button type="button" class="photo-action-btn" id="btnOpenColorTuner" aria-label="調色器" title="局部 HSB 調色器" style="display:none;height:38px;padding:0 12px;border-radius:10px;background:var(--color-surface);border:1px solid var(--color-border);box-shadow:var(--shadow-card);font-size:12.5px;font-weight:700;color:var(--color-ink);align-items:center;gap:6px;cursor:pointer;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+            <span>局部調色</span>
           </button>
         </div>
       </div>
@@ -1066,23 +1072,47 @@
         <span style="font-size:11.5px;color:var(--color-ink-muted);">快速代入單品名稱：</span>
         <button type="button" class="btn-chip-name" id="btnAiGenUseNameChip" style="font-size:12px;font-weight:700;padding:4px 12px;border-radius:16px;border:1px solid var(--color-line);background:var(--color-surface);color:var(--color-ink);cursor:pointer;line-height:1.2;"></button>
       </div>
-      <div class="field-row" style="display:flex;gap:10px;">
-        <label class="field" style="flex:1;">單品類型
-          <select id="aiGenCategory" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-ink);">
-            <option value="top">上衣（Top）</option>
-            <option value="outer">外套（Outer）</option>
-            <option value="bottom">褲裝（Bottom）</option>
-            <option value="shoes">鞋款（Shoes）</option>
-            <option value="hat">帽款（Hat）</option>
-            <option value="accessory">配件（Accessory）</option>
-          </select>
-        </label>
-        <label class="field" style="flex:1;">視角
-          <select id="aiGenView" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:10px;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-ink);">
-            <option value="front">正視角（Front View）</option>
-            <option value="back">背視角（Back View）</option>
-          </select>
-        </label>
+      <div class="field" style="margin-bottom:2px;">
+        <span style="font-size:12px;font-weight:700;color:var(--color-ink);display:block;margin-bottom:6px;">單品類型</span>
+        <input type="hidden" id="aiGenCategory" value="top">
+        <div class="ai-cat-chips-scroll" id="aiGenCatChips" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;">
+          <button type="button" class="btn-ai-cat is-active" data-cat="top">
+            <span class="btn-ai-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3 4 8v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-3-5H7z"/><path d="M9 3v4a3 3 0 0 0 6 0V3"/></svg></span>
+            <span>上衣</span>
+          </button>
+          <button type="button" class="btn-ai-cat" data-cat="inner">
+            <span class="btn-ai-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3 4 8v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-3-5H7z"/><path d="M9 3v4a3 3 0 0 0 6 0V3"/></svg></span>
+            <span>內衣</span>
+          </button>
+          <button type="button" class="btn-ai-cat" data-cat="outer">
+            <span class="btn-ai-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 4.5 16 3a4 4 0 0 0-8 0L3.6 4.5A2 2 0 0 0 2 6.5V10c0 .6.4 1 1 1h2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9h2c.6 0 1-.4 1-1V6.5a2 2 0 0 0-1.6-2z"/><path d="M12 7v15"/><path d="M8 3v4.5l4 2.5 4-2.5V3"/></svg></span>
+            <span>外套</span>
+          </button>
+          <button type="button" class="btn-ai-cat" data-cat="bottom">
+            <span class="btn-ai-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12l1 6.5-1.8 11a1 1 0 0 1-1 .8h-2a1 1 0 0 1-1-.8L12 12l-1.2 9a1 1 0 0 1-1 .8H7.8a1 1 0 0 1-1-.8L5 10l1-6.5Z"/><path d="M6 7.5h12"/></svg></span>
+            <span>褲裝</span>
+          </button>
+          <button type="button" class="btn-ai-cat" data-cat="shoes">
+            <span class="btn-ai-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8c0-3.5 1.5-4.5 3-4.5s3 1 3 4.5c0 3-.8 6-.8 8.5 0 2.5-.7 3.5-2.2 3.5S5.8 19 5.8 16.5C5.8 14 5 11.5 5 8Z"/><path d="M5.2 8.5h5.6M5.1 11.5h5.8"/><path d="M13 8c0-3.5 1.5-4.5 3-4.5s3 1 3 4.5c0 3-.8 6-.8 8.5 0 2.5-.7 3.5-2.2 3.5s-2.2-1-2.2-3.5c0-2.5-.8-5-.8-8.5Z"/><path d="M13.2 8.5h5.6M13.1 11.5h5.8"/></svg></span>
+            <span>鞋款</span>
+          </button>
+          <button type="button" class="btn-ai-cat" data-cat="hat">
+            <span class="btn-ai-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14.5c0-4.5 2.5-8.5 6-8.5s6 4 6 8.5"/><path d="M12 6v8.5"/><path d="M3 15.5c2.5-1.5 6.5-2 9-2s6.5.5 9 2c0 0-2 3-9 3s-9-3-9-3z"/><circle cx="12" cy="5.8" r="0.75" fill="currentColor"/></svg></span>
+            <span>帽款</span>
+          </button>
+          <button type="button" class="btn-ai-cat" data-cat="accessory">
+            <span class="btn-ai-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M12 12v8.5M9.5 20.5h5"/></svg></span>
+            <span>配件</span>
+          </button>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:4px;">
+        <span style="font-size:12px;font-weight:700;color:var(--color-ink);display:block;margin-bottom:6px;">視角選擇</span>
+        <input type="hidden" id="aiGenView" value="front">
+        <div class="segment" id="aiGenViewSegment" style="display:flex;width:100%;max-width:220px;">
+          <button type="button" class="segment-btn is-active" data-view="front" style="flex:1;">正視角</button>
+          <button type="button" class="segment-btn" data-view="back" style="flex:1;">背視角</button>
+        </div>
       </div>
       <p style="font-size:11.5px;color:var(--color-ink-muted);margin:0;">已自動連線雲端後端。系統將自動套用超高畫質專業電商型錄頂視平鋪規格、袖管鏡像對稱、純白棚拍與邊緣去背處理。</p>
       
@@ -1123,36 +1153,69 @@
       <h2>吸管局部調色器 (HSB)</h2>
       <button class="modal-close" data-close aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
-    <div class="color-tuner-body" style="display:flex;flex-direction:column;gap:12px;padding-bottom:20px;">
-      <div class="color-tuner-card" style="position:relative;width:83.5%;max-width:280px;aspect-ratio:4/5;margin:0 auto;border-radius:var(--radius-l, 18px);border:1.5px solid rgba(220,226,235,0.85);box-shadow:0 12px 28px -8px rgba(28,35,51,0.14);background:repeating-conic-gradient(#f1f5f9 0 25%, #fff 0 50%) 50% / 16px 16px;overflow:hidden;cursor:crosshair;display:flex;align-items:center;justify-content:center;">
-        <canvas id="colorTunerCanvas" style="max-width:96%;max-height:96%;object-fit:contain;display:block;"></canvas>
+    <div class="color-tuner-body" style="display:flex;flex-direction:column;gap:14px;padding-bottom:12px;">
+      <!-- B/A (Before / After) 對比檢視區 -->
+      <div class="color-tuner-ba-wrap" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:340px;margin:0 auto;">
+        <div class="color-tuner-ba-col" style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <span style="font-size:11px;font-weight:700;color:var(--color-ink-muted);letter-spacing:0.3px;">BEFORE 原圖</span>
+          <div class="color-tuner-card" id="colorTunerBeforeCard" style="position:relative;width:100%;aspect-ratio:1/1;border-radius:14px;border:1px solid var(--color-line);box-shadow:var(--shadow-card);background:repeating-conic-gradient(#f1f5f9 0 25%, #fff 0 50%) 50% / 12px 12px;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+            <canvas id="colorTunerBeforeCanvas" style="max-width:94%;max-height:94%;object-fit:contain;display:block;"></canvas>
+          </div>
+        </div>
+        <div class="color-tuner-ba-col" style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <span style="font-size:11px;font-weight:700;color:var(--color-ink);letter-spacing:0.3px;">AFTER 調色預覽</span>
+          <div class="color-tuner-card" id="colorTunerCard" style="position:relative;width:100%;aspect-ratio:1/1;border-radius:14px;border:1.5px solid var(--color-denim, #2C4270);box-shadow:var(--shadow-card);background:repeating-conic-gradient(#f1f5f9 0 25%, #fff 0 50%) 50% / 12px 12px;overflow:hidden;cursor:crosshair;display:flex;align-items:center;justify-content:center;">
+            <canvas id="colorTunerCanvas" style="max-width:94%;max-height:94%;object-fit:contain;display:block;"></canvas>
+            <canvas id="colorTunerOutlineCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:block;"></canvas>
+          </div>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;justify-content:center;background:var(--color-surface);border:1px solid var(--color-line);border-radius:12px;padding:8px 12px;">
+
+      <div style="display:flex;align-items:center;gap:10px;justify-content:center;background:var(--color-surface);border:1px solid var(--color-line);border-radius:12px;padding:7px 12px;margin:0 auto;width:100%;max-width:340px;box-sizing:border-box;">
         <span style="font-size:12px;font-weight:700;color:var(--color-ink);">已吸取目標色：</span>
-        <span id="colorTunerTargetSwatch" style="width:24px;height:24px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--color-line);background:#ccc;"></span>
-        <span id="colorTunerTargetHsbText" style="font-size:11.5px;color:var(--color-ink-soft);font-variant-numeric:tabular-nums;">請點擊上方照片吸取衣服顏色</span>
+        <span id="colorTunerTargetSwatch" style="width:20px;height:20px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--color-line);background:#ccc;flex-shrink:0;"></span>
+        <span id="colorTunerTargetHsbText" style="font-size:11.5px;color:var(--color-ink-soft);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">點擊上方調色預覽吸取衣服顏色</span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <label class="field" style="margin:0;">色相微調 (Hue)
+
+      <!-- 垂直控制滑桿：色彩容差 -> H -> S -> B -->
+      <div class="color-tuner-controls" style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:340px;margin:0 auto;">
+        <div class="tuner-row" style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;font-weight:700;color:var(--color-ink);">色彩容差</span>
+            <span id="colorTunerToleranceVal" style="font-size:11px;font-weight:600;color:var(--color-ink-muted);">35</span>
+          </div>
+          <input type="range" id="colorTunerTolerance" min="10" max="80" value="35" style="width:100%;">
+        </div>
+
+        <div class="tuner-row" style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;font-weight:700;color:var(--color-ink);">H（色相）</span>
+            <span id="colorTunerHueVal" style="font-size:11px;font-weight:600;color:var(--color-ink-muted);">0°</span>
+          </div>
           <input type="range" id="colorTunerHue" min="-180" max="180" value="0" style="width:100%;">
-          <span id="colorTunerHueVal" style="font-size:11px;color:var(--color-ink-muted);display:block;text-align:right;">0°</span>
-        </label>
-        <label class="field" style="margin:0;">飽和度微調 (Saturation)
-          <input type="range" id="colorTunerSat" min="-50" max="50" value="0" style="width:100%;">
-          <span id="colorTunerSatVal" style="font-size:11px;color:var(--color-ink-muted);display:block;text-align:right;">0%</span>
-        </label>
-        <label class="field" style="margin:0;">亮度微調 (Brightness)
-          <input type="range" id="colorTunerBright" min="-50" max="50" value="0" style="width:100%;">
-          <span id="colorTunerBrightVal" style="font-size:11px;color:var(--color-ink-muted);display:block;text-align:right;">0%</span>
-        </label>
-        <label class="field" style="margin:0;">選取色彩容差範圍 (Tolerance)
-          <input type="range" id="colorTunerTolerance" min="10" max="60" value="30" style="width:100%;">
-          <span id="colorTunerToleranceVal" style="font-size:11px;color:var(--color-ink-muted);display:block;text-align:right;">適中 (30)</span>
-        </label>
+        </div>
+
+        <div class="tuner-row" style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;font-weight:700;color:var(--color-ink);">S（飽和度）</span>
+            <span id="colorTunerSatVal" style="font-size:11px;font-weight:600;color:var(--color-ink-muted);">0%</span>
+          </div>
+          <input type="range" id="colorTunerSat" min="-70" max="70" value="0" style="width:100%;">
+        </div>
+
+        <div class="tuner-row" style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;font-weight:700;color:var(--color-ink);">B（明度）</span>
+            <span id="colorTunerBrightVal" style="font-size:11px;font-weight:600;color:var(--color-ink-muted);">0%</span>
+          </div>
+          <input type="range" id="colorTunerBright" min="-70" max="70" value="0" style="width:100%;">
+        </div>
       </div>
-      <div class="settings-actions" style="margin-top:6px;">
-        <button type="button" class="btn-secondary" id="btnResetColorTuner">重設原色</button>
-        <button type="button" class="btn-primary" id="btnSaveColorTuner" style="margin-top:0;">儲存調色</button>
+
+      <!-- 重設 / 儲存兩按鈕吸底 -->
+      <div class="color-tuner-sticky-footer" style="position:sticky;bottom:0;background:var(--color-bg);padding:10px 0 calc(12px + env(safe-area-inset-bottom));margin-top:8px;display:flex;gap:10px;border-top:1px solid var(--color-line);z-index:10;width:100%;">
+        <button type="button" class="btn-secondary" id="btnResetColorTuner" style="flex:1;height:42px;">重設原色</button>
+        <button type="button" class="btn-primary" id="btnSaveColorTuner" style="flex:1;height:42px;margin-top:0;">儲存調色</button>
       </div>
     </div>
   </div>
@@ -1184,24 +1247,42 @@
   <div class="modal-sheet" id="modal-release-notes" data-modal>
     <div class="modal-handle"></div>
     <div class="modal-head">
-      <h2 id="releaseNotesTitle">已更新至 v133</h2>
+      <h2 id="releaseNotesTitle">版本資訊</h2>
       <button class="modal-close" data-close aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div class="release-notes-body" style="padding:4px 0 16px;">
       <div id="releaseNotesCurrentWrap">
+        <div style="font-size:28px;font-weight:900;letter-spacing:-0.5px;color:var(--color-ink);margin:2px 0 10px;">v134</div>
         <ul id="releaseNotesList" style="margin:0 0 16px 0;padding-left:18px;font-size:13.5px;line-height:1.75;color:var(--color-ink);">
-          <li>白色衣物連通去背防誤刪與緊湊尺寸規格化</li>
-          <li>AI 生成提示詞自動清理與鍵盤直接點擊優化</li>
-          <li>衣櫥小圖全覽純淨無框與 8/10 列切換鈕</li>
-          <li>單品選取拖曳連選手勢</li>
+          <li>黑色與各色系服裝 AI 生成提示詞結構升級</li>
+          <li>AI 生圖載入點點動畫與失敗自動複製剪貼簿</li>
+          <li>白色衣物連通去背防掏空硬邊界保護</li>
+          <li>抽屜下滑暗化背景平滑連動與防圖片扭曲</li>
+          <li>全域帽子圖示更換為正面老帽</li>
+          <li>AI 生圖類別選擇器改為標準圖示膠囊元件</li>
+          <li>衣櫥排序、常穿排行與篩選器持久化儲存</li>
+          <li>穿搭紀錄點進某日消除上衣虛線框殘留</li>
+          <li>照片右側操作鈕升級為上下雙按鈕</li>
+          <li>HSB 局部調色器支援 B/A 對比與黑虛線範圍標示</li>
+          <li>頂部標題列新增復原與重做圖示按鈕</li>
         </ul>
       </div>
 
       <div id="releaseNotesHistoryWrap" class="is-hidden" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--color-line);">
         <p style="font-size:12px;font-weight:700;color:var(--color-ink-muted);margin:0 0 10px;">歷史版本更新紀錄</p>
         <div class="release-history-item" style="margin-bottom:14px;">
+          <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v133</p>
+          <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
+            <li>白色衣物連通去背防誤刪與緊湊尺寸規格化</li>
+            <li>AI 生成提示詞自動清理與鍵盤直接點擊優化</li>
+            <li>衣櫥小圖全覽純淨無框與 8/10 列切換鈕</li>
+            <li>單品選取拖曳連選手勢</li>
+          </ul>
+        </div>
+        <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v132</p>
           <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
+            <li>全域多層子抽屜下滑退出對齊叉叉行為</li>
             <li>全域多層子抽屜下滑退出對齊叉叉行為</li>
             <li>修正下滑背景閃爍與上層抽屜重新載入問題</li>
           </ul>
@@ -1890,7 +1971,7 @@
 </div>
 
 
-<script src="seed-items.js?v=20261116_133"></script>
-<script src="app.js?v=20261116_133"></script>
+<script src="seed-items.js?v=20261117_134"></script>
+<script src="app.js?v=20261117_134"></script>
 </body>
 </html>
