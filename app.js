@@ -578,13 +578,23 @@ let currentAiGenResultUrl = null;
 function openAiClothGenModal() {
   const modal = document.getElementById('modal-ai-clothing-gen');
   if (!modal) return;
-  const keyInput = document.getElementById('aiGenApiKey');
   const catInput = document.getElementById('aiGenCategory');
   const previewWrap = document.getElementById('aiGenPreviewWrap');
   const resultImg = document.getElementById('aiGenResultImg');
   const applyBtn = document.getElementById('btnApplyAiClothGen');
+  const chipWrap = document.getElementById('aiGenNameChipWrap');
+  const chipBtn = document.getElementById('btnAiGenUseNameChip');
 
-  if (keyInput) keyInput.value = localStorage.getItem('wm_gemini_api_key') || '';
+  const itemName = (document.getElementById('fieldName')?.value || '').trim();
+  if (chipWrap && chipBtn) {
+    if (itemName) {
+      chipBtn.textContent = itemName;
+      chipWrap.style.display = 'flex';
+    } else {
+      chipWrap.style.display = 'none';
+    }
+  }
+
   if (catInput && pendingCategory) catInput.value = pendingCategory;
   if (previewWrap) previewWrap.classList.add('is-hidden');
   if (resultImg) resultImg.src = '';
@@ -10308,6 +10318,38 @@ function wireEvents() {
   document.getElementById('btnOpenAiClothGen')?.addEventListener('click', openAiClothGenModal);
   document.getElementById('btnRunAiClothGen')?.addEventListener('click', runAiClothGen);
   document.getElementById('btnApplyAiClothGen')?.addEventListener('click', applyAiClothGenResult);
+
+  document.getElementById('btnAiGenUseNameChip')?.addEventListener('click', () => {
+    const promptInput = document.getElementById('aiGenPrompt');
+    const chipBtn = document.getElementById('btnAiGenUseNameChip');
+    const chipWrap = document.getElementById('aiGenNameChipWrap');
+    const nameVal = chipBtn?.textContent?.trim() || '';
+    if (promptInput && nameVal) {
+      if (promptInput.value.trim()) {
+        promptInput.value = promptInput.value.trim() + ' ' + nameVal;
+      } else {
+        promptInput.value = nameVal;
+      }
+      promptInput.focus();
+    }
+    if (chipWrap) {
+      chipWrap.style.display = 'none'; // 點擊完該膠囊立即消失
+    }
+  });
+
+  const aiPromptEl = document.getElementById('aiGenPrompt');
+  const aiModalEl = document.getElementById('modal-ai-clothing-gen');
+  if (aiPromptEl && aiModalEl) {
+    aiPromptEl.addEventListener('focus', () => {
+      aiModalEl.classList.add('keyboard-open');
+      setTimeout(() => {
+        aiPromptEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }, 180);
+    });
+    aiPromptEl.addEventListener('blur', () => {
+      aiModalEl.classList.remove('keyboard-open');
+    });
+  }
 
   document.getElementById('btnOpenColorTuner')?.addEventListener('click', openColorTunerModal);
   const tunerCanvas = document.getElementById('colorTunerCanvas');

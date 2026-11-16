@@ -841,6 +841,9 @@ svg { width: 100%; height: 100%; display: block; }
 .modal-sheet.is-behind { opacity: 0.94; pointer-events: none !important; }
 .modal-sheet.is-dragging { transition: none; }
 .modal-sheet-tall { max-height: 92dvh; }
+#modal-ai-clothing-gen { min-height: 85dvh; }
+#modal-ai-clothing-gen.keyboard-open { min-height: 94dvh; padding-bottom: 300px; }
+#modal-color-tuner { min-height: 85dvh; }
 .modal-handle { width: 36px; height: 4px; border-radius: 3px; background: var(--color-line); margin: 4px auto 12px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .modal-head h2 { font-size: 17px; font-weight: 800; margin: 0; }
