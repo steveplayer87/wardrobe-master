@@ -6977,7 +6977,30 @@ function closeModal() {
     return;
   }
 
-  // Shared detail drawer: switch from edit form back to details without opening another sheet.
+  // 1. 若當前為子抽屜（modalStack 中有上一層父抽屜），優先平滑返回父抽屜，絕不關閉至主頁或重新觸發父抽屜開啟動畫
+  if (modalStack.length > 0) {
+    const prev = modalStack.pop();
+    if (prev && prev.id && prev.id !== activeSheet.id) {
+      activeSheet.classList.remove('is-shown');
+      setTimeout(() => {
+        activeSheet.classList.remove('is-active');
+        activeSheet.style.zIndex = '';
+      }, 220);
+
+      const prevSheet = document.getElementById(prev.id);
+      if (prevSheet) {
+        prevSheet.classList.remove('is-behind');
+        prevSheet.style.zIndex = String(610 + modalStack.length * 10);
+        modalReturnTo = prev.returnTo || null;
+        if (prev.onReturn) {
+          try { prev.onReturn(); } catch (e) { console.error(e); }
+        }
+      }
+      return;
+    }
+  }
+
+  // 2. 單品詳情抽屜：若處於原地編輯模式，切換回檢視模式
   if (activeSheet?.id === 'modal-item' && editingInDetailDrawer) {
     const returnId = editingItemId;
     unmountEditFormFromDetailDrawer();
@@ -6987,7 +7010,7 @@ function closeModal() {
     return;
   }
 
-  // If canceling out of editing an item, return straight to that item's detail sheet!
+  // 3. 在獨立新增頁面取消編輯單品時，退回該單品詳情
   if (activeSheet?.id === 'modal-add' && editingItemId) {
     const returnId = editingItemId;
     const detailReturnTo = modalReturnTo;
@@ -6998,7 +7021,7 @@ function closeModal() {
     return;
   }
 
-  // if we're picking an item for a backfill draft, closing the picker returns to backfill
+  // 4. 補登紀錄挑選衣物時返回補登頁
   if (backfillDraft && activeSheet?.id === 'modal-tryon') {
     renderBackfillModal();
     activeSheet.classList.remove('is-shown');
@@ -7007,6 +7030,7 @@ function closeModal() {
     return;
   }
 
+  // 5. 單層返回目標
   if (modalReturnTo && activeSheet && activeSheet.id !== modalReturnTo) {
     const target = modalReturnTo;
     modalReturnTo = null;
@@ -7023,37 +7047,6 @@ function closeModal() {
       if (target === 'modal-laundry') renderLaundryOverview();
     }
     return;
-  }
-
-  if (modalStack.length > 0) {
-    const prev = modalStack.pop();
-    if (prev && prev.id && prev.id !== activeSheet?.id) {
-      activeSheet.classList.remove('is-shown');
-      setTimeout(() => {
-        activeSheet.classList.remove('is-active');
-        activeSheet.style.zIndex = '';
-      }, 220);
-
-      const prevSheet = document.getElementById(prev.id);
-      if (prevSheet) {
-        prevSheet.classList.remove('is-behind');
-        prevSheet.style.zIndex = String(610 + modalStack.length * 10);
-        modalReturnTo = prev.returnTo || null;
-        if (prev.id === 'modal-item' && prev.editingItemId) {
-          renderItemDetail(prev.editingItemId);
-        } else if (prev.id === 'modal-tryon' && tryonCurrentSlot) {
-          renderTryonGridFor(tryonCurrentSlot, tryonCurrentCategory);
-        } else if (prev.id === 'modal-rack-overview') {
-          openRackOverview();
-        } else if (prev.id === 'modal-laundry') {
-          renderLaundryOverview();
-        }
-        if (prev.onReturn) {
-          try { prev.onReturn(); } catch (e) { console.error(e); }
-        }
-      }
-      return;
-    }
   }
 
   forceCloseModal();
@@ -7793,6 +7786,29 @@ function enableSwipeToClose(sheet) {
     const dy = currentY - startY;
     const overlay = document.getElementById('modalOverlay');
     if (dy > threshold) {
+      if ((sheet.id === 'modal-add' || (sheet.id === 'modal-item' && editingInDetailDrawer)) && formDirty) {
+        // 未儲存變更：手勢下滑不直接關閉，彈回原位並立刻彈出確認儲存提示
+        sheet.style.transition = 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
+        sheet.style.transform = 'translateY(0)';
+        if (overlay) {
+          overlay.style.transition = 'opacity 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
+          overlay.style.opacity = '1';
+        }
+        startY = 0; currentY = 0;
+        openUnsavedPrompt('item');
+        return;
+      }
+      if (sheet.id === 'modal-wishlist' && wishlistDirty) {
+        sheet.style.transition = 'transform 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
+        sheet.style.transform = 'translateY(0)';
+        if (overlay) {
+          overlay.style.transition = 'opacity 0.22s cubic-bezier(0.25, 1, 0.5, 1)';
+          overlay.style.opacity = '1';
+        }
+        startY = 0; currentY = 0;
+        openUnsavedPrompt('wishlist');
+        return;
+      }
       if (sheet.id === 'modal-item' && editingInDetailDrawer) {
         unmountEditFormFromDetailDrawer();
         editingItemId = null;
@@ -10752,6 +10768,9 @@ function wireEvents() {
   document.getElementById('btnUnsavedSave').addEventListener('click', () => {
     const context = unsavedContext;
     unsavedContext = null;
+    const prompt = document.getElementById('modal-unsaved');
+    prompt?.classList.remove('is-shown');
+    setTimeout(() => prompt?.classList.remove('is-active'), 220);
     const saved = context === 'wishlist' ? saveWishlistForm() : saveItemForm();
     if (saved === false) {
       if (context === 'wishlist') openModal('modal-wishlist');
@@ -11100,7 +11119,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v129';
+const CURRENT_APP_VERSION = 'v130';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
