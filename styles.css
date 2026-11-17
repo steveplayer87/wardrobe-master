@@ -5718,29 +5718,37 @@ button.scene-weather:active { transform: scale(0.97); }
   border: none !important;
 }
 
-/* AI 生圖類別選擇膠囊元件 */
+/* AI 生圖類別選擇膠囊元件（固定寬度使第 5 個膠囊微露，提示橫向滾動） */
 .ai-cat-chips-scroll {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 6px;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.ai-cat-chips-scroll::-webkit-scrollbar {
+  display: none;
 }
 .btn-ai-cat {
-  flex-shrink: 0;
+  flex: 0 0 72px;
+  width: 72px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 5px;
   height: 36px;
-  padding: 0 12px;
+  padding: 0 6px;
   border-radius: 18px;
   border: 1px solid var(--color-line);
   background: var(--color-surface);
   color: var(--color-ink);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 650;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 .btn-ai-cat.is-active {
   background: var(--color-denim, #2C4270);
@@ -5754,11 +5762,30 @@ button.scene-weather:active { transform: scale(0.97); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 .btn-ai-cat-icon svg {
-  width: 15px;
-  height: 15px;
+  width: 15px !important;
+  height: 15px !important;
   stroke: currentColor;
+}
+
+/* AI 生圖標題圖示尺寸約束（嚴格固定 18px 防爆長撐大） */
+.ai-title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  flex-shrink: 0;
+  color: var(--color-denim, #2C4270);
+}
+.ai-title-icon svg {
+  width: 18px !important;
+  height: 18px !important;
+  display: block;
 }
 
 /* 單品照片右側操作按鈕（垂直堆疊，獨立間距） */
@@ -5783,29 +5810,10 @@ button.scene-weather:active { transform: scale(0.97); }
   pointer-events: none;
 }
 
-/* AI 生圖抽屜左右留白擴大 1.5 倍 (16px * 1.5 = 24px) */
-#modal-ai-clothing-gen .ai-gen-body {
-  padding-left: 24px !important;
-  padding-right: 24px !important;
-}
-
-/* AI 生圖按鈕放大與點點動畫防抖 */
-.btn-ai-gen-action {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0 !important;
-  padding: 13px 20px !important;
-  font-size: 15px !important;
-  font-weight: 700 !important;
-  border-radius: 14px !important;
-  min-height: 48px !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-}
+/* AI 生圖按鈕載入點點防抖 */
 .btn-ai-gen-dots {
   display: inline-block;
-  width: 20px;
+  width: 18px;
   text-align: left;
   letter-spacing: 1px;
 }

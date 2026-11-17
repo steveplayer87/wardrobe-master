@@ -621,9 +621,6 @@ function openAiClothGenModal() {
     b.classList.toggle('is-active', b.dataset.cat === currentCat);
   });
   if (viewInput) viewInput.value = 'front';
-  document.querySelectorAll('#aiGenViewSegment .segment-btn').forEach(b => {
-    b.classList.toggle('is-active', b.dataset.view === 'front');
-  });
 
   if (previewWrap) previewWrap.classList.add('is-hidden');
   if (resultImg) resultImg.src = '';
@@ -10861,41 +10858,27 @@ function wireEvents() {
     btn.classList.add('is-active');
   });
 
-  // AI 視角切換選擇
-  document.getElementById('aiGenViewSegment')?.addEventListener('click', e => {
-    const btn = e.target.closest('.segment-btn');
-    if (!btn) return;
-    const view = btn.dataset.view;
-    const viewInput = document.getElementById('aiGenView');
-    if (viewInput) viewInput.value = view;
-    document.querySelectorAll('#aiGenViewSegment .segment-btn').forEach(b => b.classList.remove('is-active'));
-    btn.classList.add('is-active');
-  });
-
   const aiPromptEl = document.getElementById('aiGenPrompt');
   const aiModalEl = document.getElementById('modal-ai-clothing-gen');
 
   const runAiBtn = document.getElementById('btnRunAiClothGen');
   if (runAiBtn) {
-    const handleRunAi = e => {
-      if (document.activeElement === aiPromptEl) {
-        aiPromptEl?.blur();
+    runAiBtn.addEventListener('click', e => {
+      e?.preventDefault?.();
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
       }
       runAiClothGen();
-    };
-    runAiBtn.addEventListener('pointerdown', handleRunAi);
-    runAiBtn.addEventListener('click', handleRunAi);
+    });
   }
 
   document.getElementById('btnApplyAiClothGen')?.addEventListener('click', applyAiClothGenResult);
 
   const nameChipBtn = document.getElementById('btnAiGenUseNameChip');
   if (nameChipBtn) {
-    const handleUseNameChip = e => {
-      if (e && e.cancelable) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+    nameChipBtn.addEventListener('click', e => {
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
       const promptInput = document.getElementById('aiGenPrompt');
       const chipWrap = document.getElementById('aiGenNameChipWrap');
       const nameVal = nameChipBtn?.textContent?.trim() || '';
@@ -10907,11 +10890,14 @@ function wireEvents() {
         }
       }
       if (chipWrap) {
-        chipWrap.style.display = 'none'; // 點擊完該膠囊立即消失
+        chipWrap.style.display = 'none';
       }
-    };
-    nameChipBtn.addEventListener('pointerdown', handleUseNameChip);
-    nameChipBtn.addEventListener('click', handleUseNameChip);
+      // 明確失焦，防止手機軟體鍵盤被強制彈出
+      if (promptInput) promptInput.blur();
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+    });
   }
 
   if (aiPromptEl && aiModalEl) {
@@ -11659,7 +11645,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v136';
+const CURRENT_APP_VERSION = 'v137';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';

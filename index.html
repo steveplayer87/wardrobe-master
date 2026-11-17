@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261117_134">
+<link rel="stylesheet" href="styles.css?v=20261117_137">
 </head>
 <body>
 
@@ -825,10 +825,15 @@
       <div class="settings-version-card" id="btnOpenReleaseNotes" role="button" tabindex="0" style="margin-top:16px;padding:12px 14px;border-radius:12px;background:var(--color-surface);border:1px solid var(--color-line);display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
         <div style="display:flex;flex-direction:column;gap:2px;">
           <span style="font-size:13px;font-weight:700;color:var(--color-ink);">版本資訊</span>
-          <span style="font-size:11.5px;color:var(--color-ink-muted);" id="settingsVersionLabel">目前版本 v128</span>
+          <span style="font-size:11.5px;color:var(--color-ink-muted);" id="settingsVersionLabel">目前版本 v137</span>
         </div>
-        <span style="font-size:12px;color:var(--color-accent,#2563eb);font-weight:600;">更新說明 ›</span>
+        <span style="font-size:12px;color:var(--color-denim);font-weight:600;">更新說明 ›</span>
       </div>
+      <a href="https://github.com/steveplayer87/wardrobe-master" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;padding:10px 14px;border-radius:12px;margin-top:10px;font-weight:700;color:var(--color-ink);box-sizing:border-box;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+        <span>前往 GitHub 專案倉庫</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;opacity:0.6;flex-shrink:0;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      </a>
     </div>
   </div>
 
@@ -1059,9 +1064,9 @@
   <div class="modal-sheet modal-sheet-tall" id="modal-ai-clothing-gen" data-modal>
     <div class="modal-handle"></div>
     <div class="modal-head">
-      <h2 style="display:inline-flex;align-items:center;gap:6px;">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent,#2563eb);flex-shrink:0;"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4M3 8h4M19 14v4M17 16h4"/></svg>
-        <span>AI 生成電商平鋪單品</span>
+      <h2 style="display:flex;align-items:center;gap:8px;font-size:17px;font-weight:800;color:var(--color-ink);margin:0;">
+        <span class="ai-title-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4M3 8h4M19 14v4M17 16h4"/></svg></span>
+        <span style="white-space:nowrap;">AI 生成電商平鋪單品</span>
       </h2>
       <button class="modal-close" data-close aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
@@ -1076,7 +1081,8 @@
       <div class="field" style="margin-bottom:2px;">
         <span style="font-size:12px;font-weight:700;color:var(--color-ink);display:block;margin-bottom:6px;">單品類型</span>
         <input type="hidden" id="aiGenCategory" value="top">
-        <div class="ai-cat-chips-scroll" id="aiGenCatChips" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;">
+        <input type="hidden" id="aiGenView" value="front">
+        <div class="ai-cat-chips-scroll" id="aiGenCatChips">
           <button type="button" class="btn-ai-cat is-active" data-cat="top">
             <span class="btn-ai-cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3 4 8v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-3-5H7z"/><path d="M9 3v4a3 3 0 0 0 6 0V3"/></svg></span>
             <span>上衣</span>
@@ -1107,14 +1113,6 @@
           </button>
         </div>
       </div>
-      <div class="field" style="margin-bottom:4px;">
-        <span style="font-size:12px;font-weight:700;color:var(--color-ink);display:block;margin-bottom:6px;">視角選擇</span>
-        <input type="hidden" id="aiGenView" value="front">
-        <div class="segment" id="aiGenViewSegment" style="display:flex;width:100%;max-width:220px;">
-          <button type="button" class="segment-btn is-active" data-view="front" style="flex:1;">正視角</button>
-          <button type="button" class="segment-btn" data-view="back" style="flex:1;">背視角</button>
-        </div>
-      </div>
       <p style="font-size:11.5px;color:var(--color-ink-muted);margin:0;">已自動連線雲端後端。系統將自動套用超高畫質專業電商型錄頂視平鋪規格、袖管鏡像對稱、純白棚拍與邊緣去背處理。</p>
       
       <div id="aiGenPreviewWrap" class="is-hidden" style="margin-top:8px;text-align:center;">
@@ -1141,8 +1139,8 @@
       <p id="aiGenProgressStatus" class="is-hidden" style="font-size:12px;color:var(--color-ink-muted);font-weight:600;margin:4px 0 0;text-align:center;"></p>
 
       <div class="settings-actions" style="margin-top:8px;">
-        <button type="button" class="btn-primary btn-ai-gen-action" id="btnRunAiClothGen" style="margin-top:0;"><span class="btn-ai-gen-text" id="btnAiGenText">開始生成並自動去背</span><span class="btn-ai-gen-dots" id="btnAiGenDots"></span></button>
-        <button type="button" class="btn-secondary is-hidden" id="btnApplyAiClothGen">採用為此單品照片</button>
+        <button type="button" class="btn-primary" id="btnRunAiClothGen" style="margin-top:0;flex:1;display:flex;align-items:center;justify-content:center;height:44px;min-height:44px;font-size:15px;font-weight:700;border-radius:14px;background:var(--color-denim);color:#fff;border:none;box-sizing:border-box;"><span id="btnAiGenText">開始生成並自動去背</span><span class="btn-ai-gen-dots" id="btnAiGenDots"></span></button>
+        <button type="button" class="btn-secondary is-hidden" id="btnApplyAiClothGen" style="margin-top:0;flex:1;height:44px;min-height:44px;font-size:14px;font-weight:700;border-radius:14px;box-sizing:border-box;">採用為此單品照片</button>
       </div>
     </div>
   </div>
@@ -1261,28 +1259,43 @@
     </div>
     <div class="release-notes-body" style="padding:4px 0 16px;">
       <div id="releaseNotesCurrentWrap">
-        <div style="font-size:28px;font-weight:900;letter-spacing:-0.5px;color:var(--color-ink);margin:2px 0 10px;">v136</div>
-        <ul id="releaseNotesList" style="margin:0 0 16px 0;padding-left:18px;font-size:13.5px;line-height:1.75;color:var(--color-ink);">
-          <li>白色與極淺色系服飾專用中性對比灰底生成與鄰域防掏空去背</li>
-          <li>強化服飾端正對稱與蒸汽熨燙平整提示詞規範</li>
-          <li>AI 生圖載入點點動畫固定於按鈕內且防寬度抖動</li>
-          <li>AI 生成完成後切換為「重新生成」按鈕</li>
-          <li>AI 生圖抽屜左右留白擴大 1.5 倍並加入魔術棒圖示</li>
-          <li>色相調整頁專屬直角轉彎復原／重做按鈕</li>
-          <li>明日降溫提醒顯示今明日具體日期與星期並引導至天氣</li>
-          <li>抽屜下滑暗化背景平滑連動與防圖片扭曲</li>
-          <li>全域帽子圖示更換為正面老帽</li>
-          <li>AI 生圖類別選擇器改為標準圖示膠囊元件</li>
-          <li>衣櫥排序、常穿排行與篩選器持久化儲存</li>
-          <li>穿搭紀錄點進某日消除上衣虛線框殘留</li>
-          <li>照片右側操作鈕升級為上下雙按鈕</li>
-          <li>HSB 局部調色器支援 B/A 對比與黑虛線範圍標示</li>
-          <li>頂部標題列新增復原與重做圖示按鈕</li>
+        <div style="font-size:28px;font-weight:900;letter-spacing:-0.5px;color:var(--color-ink);margin:2px 0 10px;">v137</div>
+        <ul id="releaseNotesList" style="margin:0 0 14px 0;padding-left:18px;font-size:13.5px;line-height:1.75;color:var(--color-ink);">
+          <li>修正 AI 生圖抽屜標題圖示約束與回歸標準單寧藍風格</li>
+          <li>移除視角選擇選項，全面預設標準正面平鋪展示</li>
+          <li>快速代入單品名稱膠囊點擊防手機鍵盤喚起優化</li>
+          <li>單品類型膠囊微調寬度，露出第 5 個類別提示橫向滾動</li>
+          <li>版本資訊與設定視窗附上前往 GitHub 專案倉庫按鈕</li>
+          <li>歷史與當前版本紀錄最底部加入空行與細分隔線</li>
         </ul>
+        <a href="https://github.com/steveplayer87/wardrobe-master" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;padding:10px 14px;border-radius:12px;margin:12px 0 0;font-weight:700;color:var(--color-ink);box-sizing:border-box;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+          <span>前往 GitHub 專案倉庫</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;opacity:0.6;flex-shrink:0;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+        <div style="height:12px;"></div>
+        <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
       </div>
 
       <div id="releaseNotesHistoryWrap" class="is-hidden" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--color-line);">
         <p style="font-size:12px;font-weight:700;color:var(--color-ink-muted);margin:0 0 10px;">歷史版本更新紀錄</p>
+        <div class="release-history-item" style="margin-bottom:14px;">
+          <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v136</p>
+          <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
+            <li>白色服飾中性灰底對比生成與防掏空智慧去背</li>
+            <li>服飾端正對稱與蒸汽熨燙平整提示詞規範</li>
+            <li>AI 生圖載入點點動畫固定於按鈕內且防寬度抖動</li>
+            <li>AI 生成完成後切換為「重新生成」按鈕</li>
+            <li>色相調整頁專屬直角轉彎復原／重做按鈕</li>
+            <li>明日降溫提醒顯示今明日具體日期與星期並引導至天氣</li>
+            <li>抽屜下滑暗化背景平滑連動與防圖片扭曲</li>
+            <li>全域帽子圖示更換為正面老帽</li>
+            <li>衣櫥排序、常穿排行與篩選器持久化儲存</li>
+            <li>HSB 局部調色器支援 B/A 對比與黑虛線標示</li>
+          </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
+        </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v133</p>
           <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
@@ -1291,14 +1304,17 @@
             <li>衣櫥小圖全覽純淨無框與 8/10 列切換鈕</li>
             <li>單品選取拖曳連選手勢</li>
           </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
         </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v132</p>
           <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
             <li>全域多層子抽屜下滑退出對齊叉叉行為</li>
-            <li>全域多層子抽屜下滑退出對齊叉叉行為</li>
             <li>修正下滑背景閃爍與上層抽屜重新載入問題</li>
           </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
         </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v131</p>
@@ -1306,6 +1322,8 @@
             <li>品牌合作活動標籤與專屬子抽屜</li>
             <li>單品詳情標籤空值重複分隔點修正</li>
           </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
         </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v130</p>
@@ -1313,6 +1331,8 @@
             <li>編輯未儲存防護修復</li>
             <li>子抽屜平滑退回上一層</li>
           </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
         </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v129</p>
@@ -1321,6 +1341,8 @@
             <li>轉譯歷程透明顯示</li>
             <li>三階段生圖進度提示</li>
           </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
         </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v128</p>
@@ -1329,6 +1351,8 @@
             <li>單品名稱快速代入膠囊</li>
             <li>預覽框與調色畫布統一 4:5 比例</li>
           </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
         </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v126</p>
@@ -1344,6 +1368,8 @@
             <li>全域快捷鍵支援復原與重做</li>
             <li>沙盒物件懸浮列防遮擋</li>
           </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
         </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v124</p>
@@ -1352,6 +1378,8 @@
             <li>洗衣籃指定選取擴展支援耗材</li>
             <li>選取確認視窗滾動順暢度優化</li>
           </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
         </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v123</p>
@@ -1359,6 +1387,8 @@
             <li>氣象署預報與昨日觀測串接</li>
             <li>今昨日氣溫變化與溫差指示</li>
           </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
         </div>
       </div>
 
@@ -1984,7 +2014,8 @@
 </div>
 
 
-<script src="seed-items.js?v=20261117_134"></script>
-<script src="app.js?v=20261117_134"></script>
+<script src="seed-items.js?v=20261117_137"></script>
+<script src="app.js?v=20261117_137"></script>
+<script src="http://localhost:7788/magic-tweaker.js"></script>
 </body>
 </html>
