@@ -597,9 +597,12 @@ function openAiClothGenModal() {
     progressStatus.classList.add('is-hidden');
   }
   if (transBox) transBox.classList.add('is-hidden');
+  const btnAiText = document.getElementById('btnAiGenText');
+  const btnAiDots = document.getElementById('btnAiGenDots');
   if (runBtn) {
     runBtn.disabled = false;
-    runBtn.textContent = '開始生成並自動去背';
+    if (btnAiText) btnAiText.textContent = '開始生成並自動去背';
+    if (btnAiDots) btnAiDots.textContent = '';
   }
 
   const itemName = (document.getElementById('fieldName')?.value || '').trim();
@@ -647,7 +650,7 @@ function processCutoutAndNormalize(base64Data, category) {
         const imgData = ctx1.getImageData(0, 0, iw, ih);
         const data = imgData.data;
 
-        // 1. 取四角像素平均值做為基準背景色（純白棚拍 #FFFFFF）
+        // 1. 取四角像素平均值做為基準背景色（純白棚拍 #FFFFFF 或 中性灰底 #9EA8B6）
         const corners = [
           0,
           (iw - 1) * 4,
@@ -663,14 +666,20 @@ function processCutoutAndNormalize(base64Data, category) {
         bgR /= 4; bgG /= 4; bgB /= 4;
 
         // 2. 邊緣連通泛洪（BFS Edge-Connected Flood Fill）
-        // 容差設定為 20（高信賴棚拍背景）；同時加入邊緣輪廓梯度硬屏障，
-        // 唯有真正從外圍連通的攝影棚純白背景才清除，白色衣物內部布料絕不誤刪掏空！
+        // 若為白色或極淺色衣物，底圖會自動採用中性對比灰底 (bgR < 220)；
+        // 唯有真正從外圍連通的背景才清除，白色衣物內部布料絕不誤刪掏空！
         const visited = new Uint8Array(iw * ih);
         const queue = new Int32Array(iw * ih);
         let qHead = 0, qTail = 0;
 
+        const isSlateBg = bgR < 220;
         const isBgPixel = (r, g, b) => {
-          return Math.hypot(r - bgR, g - bgG, b - bgB) < 20;
+          if (isSlateBg) {
+            // 中性灰底模式：任何高亮白色衣物布料 (RGB皆大於222) 絕對不可判定為背景！
+            if (r > 222 && g > 222 && b > 222) return false;
+            return Math.hypot(r - bgR, g - bgG, b - bgB) < 55;
+          }
+          return Math.hypot(r - bgR, g - bgG, b - bgB) < 22;
         };
 
         const lum = (pIdx) => {
@@ -684,6 +693,19 @@ function processCutoutAndNormalize(base64Data, category) {
           const rL = lum(idx + 1);
           const bL = lum(idx + iw);
           return Math.abs(cL - rL) > 8.5 || Math.abs(cL - bL) > 8.5;
+        };
+
+        const canTraverse = (curIdx, nextIdx, nx, ny) => {
+          if (visited[nextIdx]) return false;
+          const np = nextIdx * 4;
+          const nr = data[np], ng = data[np + 1], nb = data[np + 2];
+          if (isSlateBg) {
+            if (nr > 222 && ng > 222 && nb > 222) return false; // 白衣硬邊界阻斷
+            const cp = curIdx * 4;
+            const cr = data[cp], cg = data[cp + 1], cb = data[cp + 2];
+            return Math.hypot(nr - cr, ng - cg, nb - cb) < 22;
+          }
+          return isBgPixel(nr, ng, nb) && !isBorderSeam(nx, ny);
         };
 
         // 將四個外邊緣上的背景像素加入 BFS 隊列
@@ -716,7 +738,7 @@ function processCutoutAndNormalize(base64Data, category) {
           }
         }
 
-        // BFS 泛洪擴散（遇到縫線/輪廓硬屏障時停止）
+        // BFS 泛洪擴散（遇到縫線/白衣輪廓硬屏障時停止）
         while (qHead < qTail) {
           const cur = queue[qHead++];
           const cx = cur % iw;
@@ -724,42 +746,30 @@ function processCutoutAndNormalize(base64Data, category) {
 
           if (cx > 0) {
             const left = cur - 1;
-            if (!visited[left]) {
-              const p = left * 4;
-              if (isBgPixel(data[p], data[p + 1], data[p + 2]) && !isBorderSeam(cx - 1, cy)) {
-                visited[left] = 1;
-                queue[qTail++] = left;
-              }
+            if (canTraverse(cur, left, cx - 1, cy)) {
+              visited[left] = 1;
+              queue[qTail++] = left;
             }
           }
           if (cx < iw - 1) {
             const right = cur + 1;
-            if (!visited[right]) {
-              const p = right * 4;
-              if (isBgPixel(data[p], data[p + 1], data[p + 2]) && !isBorderSeam(cx + 1, cy)) {
-                visited[right] = 1;
-                queue[qTail++] = right;
-              }
+            if (canTraverse(cur, right, cx + 1, cy)) {
+              visited[right] = 1;
+              queue[qTail++] = right;
             }
           }
           if (cy > 0) {
             const top = cur - iw;
-            if (!visited[top]) {
-              const p = top * 4;
-              if (isBgPixel(data[p], data[p + 1], data[p + 2]) && !isBorderSeam(cx, cy - 1)) {
-                visited[top] = 1;
-                queue[qTail++] = top;
-              }
+            if (canTraverse(cur, top, cx, cy - 1)) {
+              visited[top] = 1;
+              queue[qTail++] = top;
             }
           }
           if (cy < ih - 1) {
             const bot = cur + iw;
-            if (!visited[bot]) {
-              const p = bot * 4;
-              if (isBgPixel(data[p], data[p + 1], data[p + 2]) && !isBorderSeam(cx, cy + 1)) {
-                visited[bot] = 1;
-                queue[qTail++] = bot;
-              }
+            if (canTraverse(cur, bot, cx, cy + 1)) {
+              visited[bot] = 1;
+              queue[qTail++] = bot;
             }
           }
         }
@@ -840,19 +850,22 @@ async function runAiClothGen() {
 
   runBtn.disabled = true;
 
-  // 動態跳動點點動畫
+  // 動態跳動點點動畫（嚴格置於按鈕內部，固定寬度容器防寬度抖動）
   let dotCount = 1;
   let currentStageText = 'AI 語義解析與轉譯中';
+  const btnAiText = document.getElementById('btnAiGenText');
+  const btnAiDots = document.getElementById('btnAiGenDots');
+
   const updateDotsDisplay = () => {
     dotCount = (dotCount % 3) + 1;
     const dots = '.'.repeat(dotCount);
-    if (runBtn) runBtn.textContent = `${currentStageText}${dots}`;
-    if (progressStatus) progressStatus.textContent = `${currentStageText}${dots}`;
+    if (btnAiText) btnAiText.textContent = currentStageText;
+    if (btnAiDots) btnAiDots.textContent = dots;
   };
   updateDotsDisplay();
   const dotTimer = setInterval(updateDotsDisplay, 380);
 
-  if (progressStatus) progressStatus.classList.remove('is-hidden');
+  if (progressStatus) progressStatus.classList.add('is-hidden');
   if (transBox) transBox.classList.add('is-hidden');
 
   try {
@@ -905,13 +918,9 @@ async function runAiClothGen() {
       transBox.classList.remove('is-hidden');
     }
 
-    if (progressStatus) {
-      progressStatus.textContent = '已完成生成、精準去背與尺寸規格化';
-    }
     toast('已完成生成、去背與尺寸規格化');
   } catch (err) {
     const errMsg = err?.message || String(err);
-    if (progressStatus) progressStatus.textContent = `生成失敗：${errMsg}`;
     // 自動報錯並複製到剪貼簿
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(`AI生圖失敗：${errMsg}`).catch(() => {});
@@ -920,7 +929,12 @@ async function runAiClothGen() {
   } finally {
     clearInterval(dotTimer);
     runBtn.disabled = false;
-    runBtn.textContent = '開始生成並自動去背';
+    if (btnAiDots) btnAiDots.textContent = '';
+    if (currentAiGenResultUrl) {
+      if (btnAiText) btnAiText.textContent = '重新生成';
+    } else {
+      if (btnAiText) btnAiText.textContent = '開始生成並自動去背';
+    }
   }
 }
 
@@ -967,6 +981,60 @@ function hsbToRgb(h, s, b) {
   const k = (n) => (n + h / 60) % 6;
   const f = (n) => b * (1 - s * Math.max(0, Math.min(k(n), 4 - k(n), 1)));
   return [Math.round(f(5) * 255), Math.round(f(1) * 255), Math.round(f(3) * 255)];
+}
+
+let colorTunerHistory = [];
+let colorTunerHistoryIndex = -1;
+
+function updateColorTunerUndoRedoBtns() {
+  const uBtn = document.getElementById('colorTunerUndoBtn');
+  const rBtn = document.getElementById('colorTunerRedoBtn');
+  if (uBtn) uBtn.disabled = colorTunerHistoryIndex <= 0;
+  if (rBtn) rBtn.disabled = colorTunerHistoryIndex < 0 || colorTunerHistoryIndex >= colorTunerHistory.length - 1;
+}
+
+function pushColorTunerState() {
+  const h = document.getElementById('colorTunerHue')?.value || '0';
+  const s = document.getElementById('colorTunerSat')?.value || '0';
+  const b = document.getElementById('colorTunerBright')?.value || '0';
+  const t = document.getElementById('colorTunerTolerance')?.value || '35';
+  const stateObj = { h, s, b, t, target: tunerTargetHsb ? { ...tunerTargetHsb } : null };
+
+  if (colorTunerHistoryIndex < colorTunerHistory.length - 1) {
+    colorTunerHistory = colorTunerHistory.slice(0, colorTunerHistoryIndex + 1);
+  }
+  colorTunerHistory.push(stateObj);
+  colorTunerHistoryIndex = colorTunerHistory.length - 1;
+  updateColorTunerUndoRedoBtns();
+}
+
+function restoreColorTunerState(idx) {
+  if (idx < 0 || idx >= colorTunerHistory.length) return;
+  colorTunerHistoryIndex = idx;
+  const item = colorTunerHistory[idx];
+  tunerTargetHsb = item.target ? { ...item.target } : null;
+
+  const swatch = document.getElementById('colorTunerTargetSwatch');
+  const txt = document.getElementById('colorTunerTargetHsbText');
+  if (tunerTargetHsb) {
+    if (swatch) swatch.style.background = `rgb(${tunerTargetHsb.r},${tunerTargetHsb.g},${tunerTargetHsb.b})`;
+    if (txt) txt.textContent = `H: ${tunerTargetHsb.h}°, S: ${tunerTargetHsb.s}%, B: ${tunerTargetHsb.b}%`;
+  } else {
+    if (swatch) swatch.style.background = '#ccc';
+    if (txt) txt.textContent = '點擊上方調色預覽吸取衣服顏色';
+  }
+
+  const hInput = document.getElementById('colorTunerHue');
+  const sInput = document.getElementById('colorTunerSat');
+  const bInput = document.getElementById('colorTunerBright');
+  const tInput = document.getElementById('colorTunerTolerance');
+  if (hInput) hInput.value = item.h;
+  if (sInput) sInput.value = item.s;
+  if (bInput) bInput.value = item.b;
+  if (tInput) tInput.value = item.t;
+  updateColorTunerSliderLabels();
+  applyHsbTuning();
+  updateColorTunerUndoRedoBtns();
 }
 
 function openColorTunerModal() {
@@ -1018,6 +1086,10 @@ function openColorTunerModal() {
     if (bInput) bInput.value = '0';
     if (tInput) tInput.value = '35';
     updateColorTunerSliderLabels();
+
+    colorTunerHistory = [{ h: '0', s: '0', b: '0', t: '35', target: null }];
+    colorTunerHistoryIndex = 0;
+    updateColorTunerUndoRedoBtns();
 
     openModal('modal-color-tuner');
   };
@@ -1147,6 +1219,7 @@ function resetColorTuner() {
   if (bInput) bInput.value = '0';
   if (tInput) tInput.value = '35';
   updateColorTunerSliderLabels();
+  pushColorTunerState();
 }
 
 function saveColorTunerResult() {
@@ -1541,11 +1614,6 @@ function updateHistoryControls() {
   const redo = document.getElementById('btnRedo');
   if (undo) undo.disabled = undoStack.length === 0;
   if (redo) redo.disabled = redoStack.length === 0;
-
-  const headerUndo = document.getElementById('btnHeaderUndo');
-  const headerRedo = document.getElementById('btnHeaderRedo');
-  if (headerUndo) headerUndo.disabled = undoStack.length === 0;
-  if (headerRedo) headerRedo.disabled = redoStack.length === 0;
 
   const undoDesc = document.getElementById('undoActionDesc');
   const redoDesc = document.getElementById('redoActionDesc');
@@ -2149,7 +2217,10 @@ function getNotifications() {
   const threshold = Math.max(1, Number(weather.tempDropThreshold) || 4);
   const drop = currentTemp - tomorrowMin;
   if (weather.alertEnabled !== false && weather.forecast?.tomorrowMin != null && Number.isFinite(currentTemp) && Number.isFinite(tomorrowMin) && drop >= threshold) {
-    list.push({ type: 'weather', id: 'weather-drop', icon: 'cloud', text: `${weatherAreaLabel(weather)} 明日明顯降溫，預報低溫 ${tomorrowMin}°C（較目前低 ${Math.round(drop)}°C）`, currentTemp, tomorrowMin, drop: Math.round(drop), location: weatherAreaLabel(weather), weatherCode: weather.current?.weather_code });
+    const dTom = new Date();
+    dTom.setDate(dTom.getDate() + 1);
+    const tomWeek = ['日', '一', '二', '三', '四', '五', '六'][dTom.getDay()];
+    list.push({ type: 'weather', id: 'weather-drop', icon: 'cloud', text: `${weatherAreaLabel(weather)} 明天（${tomWeek}）明顯降溫，預報低溫 ${tomorrowMin}°C（較目前低 ${Math.round(drop)}°C）`, currentTemp, tomorrowMin, drop: Math.round(drop), location: weatherAreaLabel(weather), weatherCode: weather.current?.weather_code });
   }
   const pendingConsumables = getPendingLaundryConsumables();
   const laundrySnoozed = !!state.laundry?.snoozedUntil && state.laundry.snoozedUntil > todayStr();
@@ -5484,10 +5555,32 @@ function openWeatherAlert(notification = null) {
   const locationEl = document.getElementById('weatherAlertLocation');
   const copyEl = document.getElementById('weatherAlertCopy');
   if (locationEl) locationEl.textContent = location;
-  if (currentEl) currentEl.textContent = `${Number.isFinite(current) ? Math.round(current) : '—'}° → ${Number.isFinite(tomorrow) ? Math.round(tomorrow) : '—'}°`;
+
+  const dToday = new Date();
+  const dTom = new Date();
+  dTom.setDate(dTom.getDate() + 1);
+  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+  const todayFmt = `${dToday.getMonth() + 1}/${dToday.getDate()} (${weekDays[dToday.getDay()]})`;
+  const tomFmt = `${dTom.getMonth() + 1}/${dTom.getDate()} (${weekDays[dTom.getDay()]})`;
+
+  if (currentEl) {
+    currentEl.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;gap:14px;padding:4px 0;">
+        <div style="text-align:center;">
+          <div style="font-size:12px;color:var(--color-ink-muted);font-weight:600;margin-bottom:3px;">今天 ${todayFmt}</div>
+          <div style="font-size:26px;font-weight:800;color:var(--color-ink);line-height:1;">${Number.isFinite(current) ? Math.round(current) : '—'}°</div>
+        </div>
+        <div style="font-size:20px;color:var(--color-ink-soft);line-height:1;margin-top:14px;">➔</div>
+        <div style="text-align:center;">
+          <div style="font-size:12px;color:var(--color-ink-muted);font-weight:600;margin-bottom:3px;">明天 ${tomFmt}</div>
+          <div style="font-size:26px;font-weight:800;color:var(--color-accent,#2563eb);line-height:1;">${Number.isFinite(tomorrow) ? Math.round(tomorrow) : '—'}°</div>
+        </div>
+      </div>
+    `;
+  }
   if (copyEl) {
     const drop = Number.isFinite(current) && Number.isFinite(tomorrow) ? Math.round(current - tomorrow) : 0;
-    copyEl.textContent = drop > 0 ? `明日預報低溫比目前低 ${drop}°C，建議準備薄外套；若有降雨，也記得帶傘。` : '明日氣溫可能有變化，出門前建議再確認天氣。';
+    copyEl.textContent = drop > 0 ? `明天預報低溫比目前低 ${drop}°C，建議準備薄外套；若有降雨，也記得帶傘。` : '明日氣溫可能有變化，出門前建議再確認天氣。';
   }
   openModal('modal-weather-alert');
 }
@@ -8338,6 +8431,18 @@ let tryonTitleClickTimer = null;
 let tryonTitleClickCount = 0;
 
 function handleTryonTitleClick() {
+  const extraCats = ['outer', 'accessory', 'hat', 'pajamaTop', 'sportPants', 'pajamaBottom'];
+  if (extraCats.includes(tryonCurrentSlot)) {
+    const idx = extraCats.indexOf(tryonCurrentSlot);
+    const nextCat = extraCats[(idx + 1) % extraCats.length];
+    const chipsWrap = document.getElementById('tryonCategoryChips');
+    if (chipsWrap) {
+      chipsWrap.querySelectorAll('.chip').forEach(c => c.classList.toggle('is-active', c.dataset.cat === nextCat));
+    }
+    renderTryonGridFor(nextCat, nextCat);
+    toast(`已切換至：${categoryLabel(nextCat)}`);
+    return;
+  }
   if (!['top', 'inner', 'thermal'].includes(tryonCurrentSlot)) return;
   tryonTitleClickCount++;
   if (tryonTitleClickCount === 1) {
@@ -8369,6 +8474,7 @@ function switchToTryonSlot(slot) {
   }
   resetTryonToolbar();
   renderTryonGridFor(slot, slot);
+  toast(`已切換至：選擇${categoryLabel(slot)}`);
 }
 
 function renderTryonGridFor(slot, category) {
@@ -8655,7 +8761,7 @@ function openExtrasPicker() {
   window._pajamaChangingMode = false;
   window._sportPantsChangingMode = false;
   const titleBtn = document.getElementById('tryonTitleBtn');
-  if (titleBtn) titleBtn.classList.remove('is-switchable');
+  if (titleBtn) titleBtn.classList.add('is-switchable');
   document.getElementById('tryonTitle').textContent = '選擇其他單品';
   resetTryonToolbar();
   const chipsWrap = document.getElementById('tryonCategoryChips');
@@ -10741,10 +10847,6 @@ function wireEvents() {
     });
   });
 
-  // 頂部標題列復原與重做按鈕
-  document.getElementById('btnHeaderUndo')?.addEventListener('click', undoState);
-  document.getElementById('btnHeaderRedo')?.addEventListener('click', redoState);
-
   // AI 服飾生成與調色器事件綁定
   document.getElementById('btnOpenAiClothGen')?.addEventListener('click', openAiClothGenModal);
 
@@ -10855,13 +10957,24 @@ function wireEvents() {
     if (txt) txt.textContent = `H: ${hsb.h}°, S: ${hsb.s}%, B: ${hsb.b}%`;
 
     applyHsbTuning();
+    pushColorTunerState();
   };
   tunerCanvas?.addEventListener('click', handleTunerCanvasPick);
   ['colorTunerHue', 'colorTunerSat', 'colorTunerBright', 'colorTunerTolerance'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', () => {
+    const el = document.getElementById(id);
+    el?.addEventListener('input', () => {
       updateColorTunerSliderLabels();
       applyHsbTuning();
     });
+    el?.addEventListener('change', () => {
+      pushColorTunerState();
+    });
+  });
+  document.getElementById('colorTunerUndoBtn')?.addEventListener('click', () => {
+    if (colorTunerHistoryIndex > 0) restoreColorTunerState(colorTunerHistoryIndex - 1);
+  });
+  document.getElementById('colorTunerRedoBtn')?.addEventListener('click', () => {
+    if (colorTunerHistoryIndex < colorTunerHistory.length - 1) restoreColorTunerState(colorTunerHistoryIndex + 1);
   });
   document.getElementById('btnResetColorTuner')?.addEventListener('click', resetColorTuner);
   document.getElementById('btnSaveColorTuner')?.addEventListener('click', saveColorTunerResult);
@@ -11462,7 +11575,7 @@ function wireEvents() {
   });
   document.getElementById('btnWeatherAlertWardrobe')?.addEventListener('click', () => {
     closeModal();
-    activateView('wardrobe');
+    openWeatherDetailModal();
   });
 
   document.getElementById('btnWeatherRefresh')?.addEventListener('click', () => {
@@ -11546,7 +11659,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v135';
+const CURRENT_APP_VERSION = 'v136';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';

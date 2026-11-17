@@ -5783,3 +5783,44 @@ button.scene-weather:active { transform: scale(0.97); }
   pointer-events: none;
 }
 
+/* AI 生圖抽屜左右留白擴大 1.5 倍 (16px * 1.5 = 24px) */
+#modal-ai-clothing-gen .ai-gen-body {
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+}
+
+/* AI 生圖按鈕放大與點點動畫防抖 */
+.btn-ai-gen-action {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 13px 20px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  border-radius: 14px !important;
+  min-height: 48px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+.btn-ai-gen-dots {
+  display: inline-block;
+  width: 20px;
+  text-align: left;
+  letter-spacing: 1px;
+}
+
+/* 色相調整頁直角轉彎復原／重做按鈕 */
+.color-tuner-hist-btn {
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+.color-tuner-hist-btn:disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+

@@ -152,12 +152,28 @@ export default {
           negativeClause = "pants laid flat, symmetrical legs, no shirt, no top.";
         }
 
+        // 白衣去背防掏空專用背景策略：
+        // 若為白色或極淺色系，使用純淨均勻中性灰底 (#9EA8B6)，與白衣布料產生明確色彩落差，徹底防止連通去背時被誤掏空！
+        // 非白衣則維持純白無影棚拍 (#FFFFFF)
+        const isWhiteOrLight = /白|米白|乳白|象牙|杏色|white|cream|ivory/i.test(userPrompt + " " + englishPrompt);
+        const bgClause = isWhiteOrLight
+          ? "Isolated on a seamless uniform flat solid neutral slate-grey background (#9EA8B6), crisp studio product lighting, sharp distinct clothing edges, zero cast shadows."
+          : "Isolated on a seamless pure solid white background (#FFFFFF), crisp studio product lighting, sharp distinct clothing edges, zero cast shadows.";
+
+        // 強力防皺與端正對稱約束：
+        const arrangementClause = "Arrangement: laid completely flat, professionally steam-ironed, perfectly crisp and straight, 100% wrinkle-free, smooth flat fabric, perfectly symmetrical silhouette, vertical body alignment, horizontal sleeve alignment, flat lay apparel catalog packshot, no model, no mannequin, no hanger.";
+
+        const strictNegativeClause = [
+          negativeClause,
+          "NO wrinkles, NO creases, NO folded fabric, NO crumples, NO crumpled cloth, NO fabric folds, NO wavy fabric, NO tilted angle, NO crooked posture, NO asymmetric sleeves, NO shadows, NO background clutter, NO mannequin, NO hanger, NO human body, NO hands."
+        ].filter(Boolean).join(" ");
+
         const fullPrompt = [
           `A solid monochromatic ${englishPrompt}.`,
-          negativeClause,
-          `View: ${viewDesc}, perfectly centered, flat lay e-commerce product photograph.`,
-          `Arrangement: laid completely flat, smooth, wrinkle-free, perfectly symmetrical, no hanger, no model.`,
-          `Isolated on a seamless pure solid white background (#FFFFFF), studio soft lighting, no cast shadows.`
+          `View: ${viewDesc}, perfectly centered, top-down directly overhead 90-degree flat lay photograph.`,
+          arrangementClause,
+          bgClause,
+          strictNegativeClause
         ].filter(Boolean).join(" ");
 
         let base64Image = null;
