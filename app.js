@@ -9881,8 +9881,8 @@ async function backupWardrobeToCloud(options = {}) {
   }
 }
 
-async function applyCloudForceUpdateMerge(cloudState) {
-  toast('正在下載並融合雲端更新內容…');
+async function applyCloudForceUpdateMerge(cloudState, { silent = false, uploadBack = true } = {}) {
+  if (!silent) toast('正在下載並融合雲端更新內容…');
   try {
     if (!cloudState) {
       const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, { cache: 'no-store' });
@@ -9953,9 +9953,11 @@ async function applyCloudForceUpdateMerge(cloudState) {
     });
 
     // (B) 關鍵保全：本地有、雲端沒有的單品（本地尚未上傳的新單品）—— 100% 完整保留！
+    let localHadUnuploaded = false;
     localItems.forEach(lItem => {
       if (!cloudMap.has(String(lItem.id))) {
         mergedItems.push(lItem);
+        localHadUnuploaded = true;
       }
     });
 
@@ -10023,6 +10025,15 @@ async function applyCloudForceUpdateMerge(cloudState) {
     saveState({ action: '融合雲端更新' });
     renderAll();
 
+    // 7. 若本機有雲端尚未擁有的單品或資料，自動將融合結果回推至雲端
+    if (uploadBack && (localHadUnuploaded || localItems.length > cloudItems.length)) {
+      try {
+        await backupWardrobeToCloud({ silent: true, stateSnapshot: state, safetyChecked: true });
+      } catch (e) {
+        console.warn('Sync back to cloud failed:', e);
+      }
+    }
+
     cloudLastFingerprint = await cloudSyncFingerprint(state);
     localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, cloudLastFingerprint);
     localStorage.setItem(CLOUD_SYNC_LAST_AT_KEY, String(Date.now()));
@@ -10031,14 +10042,71 @@ async function applyCloudForceUpdateMerge(cloudState) {
     setCloudSyncStatus('synced');
 
     const addMsg = newlyAddedFromCloud.length > 0 ? `，並新增 ${newlyAddedFromCloud.length} 件單品` : '';
-    toast(`已完成雲端增量更新（本機未上傳之單品與紀錄已完整保留${addMsg}）`);
+    if (newlyAddedFromCloud.length > 0 || !silent) {
+      toast(`已完成雲端增量更新（本機未上傳之單品與紀錄已完整保留${addMsg}）`);
+    }
     closeModal();
     return true;
   } catch (err) {
     console.error('雲端融合更新失敗:', err);
-    toast('融合更新失敗：' + err.message);
+    if (!silent) toast('融合更新失敗：' + err.message);
     setCloudSyncStatus(navigator.onLine ? 'error' : 'offline');
     return false;
+  }
+}
+
+let lastReconcileTime = 0;
+
+async function reconcileCloudSync(options = {}) {
+  const { isResume = false, force = false } = options;
+  if (!navigator.onLine) {
+    if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') setCloudSyncStatus('offline');
+    return;
+  }
+  const now = Date.now();
+  if (isResume && !force && (now - lastReconcileTime < 20000)) {
+    return;
+  }
+  if (cloudAutoSyncInFlight) return;
+
+  try {
+    lastReconcileTime = now;
+    const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const remote = await res.json();
+    if (!remote || !Array.isArray(remote.items)) return;
+
+    const remoteFingerprint = await cloudSyncFingerprint(remote);
+    const localFingerprint = await cloudSyncFingerprint(state);
+    const acceptedForceAt = Number(localStorage.getItem('wm_cloud_accepted_force_at_v1') || state.forceUpdateAt || 0);
+    const remoteForceAt = Number(remote.forceUpdateAt || 0);
+    const hasNewForce = remoteForceAt > acceptedForceAt;
+
+    const localItems = Array.isArray(state.items) ? state.items : [];
+    const remoteItems = Array.isArray(remote.items) ? remote.items : [];
+    const localMap = new Map(localItems.map(i => [String(i.id), i]));
+    const cloudMap = new Map(remoteItems.map(i => [String(i.id), i]));
+
+    const cloudHasNewItems = remoteItems.some(ci => !localMap.has(String(ci.id)));
+    const localHasUnuploaded = localItems.some(li => !cloudMap.has(String(li.id)));
+    const pendingUpload = localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1';
+
+    if (hasNewForce || cloudHasNewItems || (remoteFingerprint !== localFingerprint && remoteFingerprint !== cloudLastFingerprint)) {
+      await applyCloudForceUpdateMerge(remote, { silent: true, uploadBack: true });
+    } else if (localHasUnuploaded || pendingUpload || localFingerprint !== remoteFingerprint) {
+      scheduleAutoCloudSync(300);
+    } else {
+      cloudLastFingerprint = localFingerprint;
+      localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, cloudLastFingerprint);
+      localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
+      localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
+      setCloudSyncStatus('synced');
+    }
+  } catch (err) {
+    console.warn('Startup/resume cloud reconcile check failed:', err);
+    if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') {
+      setCloudSyncStatus(navigator.onLine ? 'pending' : 'offline');
+    }
   }
 }
 
@@ -11871,7 +11939,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v139';
+const CURRENT_APP_VERSION = 'v140';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
@@ -13036,36 +13104,16 @@ async function init() {
     refreshWeather(false);
     checkVersionUpdateNotice();
     cloudAutoSyncReady = true;
-    // App 啟動時自動同步一次；之後切回前景時最多每 15 分鐘觸發一次，避免頻繁查詢 Notion。
+    // App 啟動時自動進行雙向資料交換比對與同步
     if (navigator.onLine) {
       syncNotionLifeTags({ automatic: true });
       retryPendingLaundryDiaryTags();
+      reconcileCloudSync({ isResume: false });
+    } else {
+      setCloudSyncStatus(localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1' ? 'offline' : 'ready');
     }
-    try {
-      cloudLastFingerprint = localStorage.getItem(CLOUD_SYNC_FINGERPRINT_KEY) || '';
-      const pending = localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1';
-      const currentFingerprint = await cloudSyncFingerprint(state);
-      const needsUpload = pending || currentFingerprint !== cloudLastFingerprint;
-      if (!navigator.onLine) {
-        setCloudSyncStatus(pending ? 'offline' : 'ready');
-      } else if (needsUpload) {
-        // 只有即將上傳時才讀取雲端做安全比對；單純開啟且資料未變更，不必消耗一次 KV 讀取。
-        const safety = await checkCloudSyncSafety(state);
-        if (!safety.safe && !safety.offline) {
-          localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
-          setCloudSyncStatus('blocked', safety.message)
-        } else if (safety.offline) {
-          setCloudSyncStatus('offline');
-        } else {
-          scheduleAutoCloudSync(500);
-        }
-      } else {
-        const lastAt = Number(localStorage.getItem(CLOUD_SYNC_LAST_AT_KEY)) || 0;
-        setCloudSyncStatus('synced', lastAt ? '上次同步：' + new Date(lastAt).toLocaleString() : '資料已建立同步基準');
-      }
-    } catch (_) { setCloudSyncStatus('ready'); }
     window.addEventListener('online', () => {
-      if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') scheduleAutoCloudSync(300);
+      reconcileCloudSync({ isResume: true, force: true });
       retryPendingLaundryDiaryTags();
     });
     window.addEventListener('offline', () => {
@@ -13073,7 +13121,7 @@ async function init() {
     });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && navigator.onLine) {
-        if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') scheduleAutoCloudSync(300);
+        reconcileCloudSync({ isResume: true });
         syncNotionLifeTags({ automatic: true });
       }
     });
