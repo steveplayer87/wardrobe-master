@@ -9515,10 +9515,10 @@ async function syncEverythingToCloud() {
     if (!safety.safe) {
       if (safety.offline) setCloudSyncStatus('offline');
       else if (safety.forced) {
-        // 雲端強制等級更新：不需經過確認視窗，按下同步就直接同步
+        // 雲端強制等級更新：不需經過確認視窗，按下同步就直接增量融合更新（保全本地未上傳內容）
         localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
-        setCloudSyncStatus('syncing', '正在直接同步雲端強制更新…');
-        await restoreWardrobeFromCloud({ confirmed: true, remoteState: safety.remote });
+        setCloudSyncStatus('syncing', '正在融合雲端更新內容…');
+        await applyCloudForceUpdateMerge(safety.remote);
         return;
       } else {
         localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
@@ -9526,13 +9526,13 @@ async function syncEverythingToCloud() {
         const remoteCount = safety.remote?.items?.length || 0;
         openConfirm(
           '下載雲端資料',
-          `偵測到雲端擁有較完整的衣櫥資料（雲端共 ${remoteCount} 件單品）。<br><br>為避免本地空白或較少的資料覆蓋雲端，已暫停上傳。<br>是否直接從雲端下載並還原完整資料？`,
+          `偵測到雲端擁有較完整的衣櫥資料（雲端共 ${remoteCount} 件單品）。<br><br>系統將採增量融合更新，完整保留本機尚未上傳的單品與修改。<br>是否立即下載融合雲端最新資料？`,
           [
             { label: '先不要', kind: 'secondary' },
             {
-              label: '下載並還原',
+              label: '下載並融合',
               kind: 'primary',
-              onClick: () => restoreWardrobeFromCloud({ confirmed: true, remoteState: safety.remote })
+              onClick: () => applyCloudForceUpdateMerge(safety.remote)
             }
           ]
         );
@@ -9877,6 +9877,167 @@ async function backupWardrobeToCloud(options = {}) {
   } catch (err) {
     console.error('雲端備份失敗:', err);
     if (!silent) toast('雲端備份失敗：' + err.message);
+    return false;
+  }
+}
+
+async function applyCloudForceUpdateMerge(cloudState) {
+  toast('正在下載並融合雲端更新內容…');
+  try {
+    if (!cloudState) {
+      const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('無法讀取雲端狀態');
+      cloudState = await res.json();
+    }
+    if (!cloudState || !Array.isArray(cloudState.items)) throw new Error('雲端資料格式不正確');
+
+    // 1. 安全快照備份：同步前先備份當前本地狀態至 localStorage
+    try {
+      localStorage.setItem('wm_safety_backup_before_sync_v1', JSON.stringify(state));
+    } catch (_) {}
+
+    // 2. 規格化雲端圖片網址
+    cloudState.items.forEach(it => {
+      if (it && it.image && it.image.startsWith('/api/image/')) {
+        it.image = `${CLOUDFLARE_WORKER_URL}${it.image}?v=2`;
+      }
+      if (it && it.imageBack && it.imageBack.startsWith('/api/image/')) {
+        it.imageBack = `${CLOUDFLARE_WORKER_URL}${it.imageBack}?v=2`;
+      }
+    });
+
+    // 3. 單品增量融合（Merge items）
+    const localItems = Array.isArray(state.items) ? state.items : [];
+    const cloudItems = Array.isArray(cloudState.items) ? cloudState.items : [];
+    const localMap = new Map(localItems.map(i => [String(i.id), i]));
+    const cloudMap = new Map(cloudItems.map(i => [String(i.id), i]));
+    const mergedItems = [];
+    const newlyAddedFromCloud = [];
+
+    // (A) 處理雲端清單：已存在則智慧融合，不存在則作為新單品加入
+    cloudItems.forEach(cItem => {
+      const cId = String(cItem.id);
+      if (localMap.has(cId)) {
+        const lItem = localMap.get(cId);
+        // 兩端皆有：以雲端更新為基礎，但完整保留本地個人的穿著/暫存/修改生活動態
+        const merged = Object.assign({}, cItem);
+        if (lItem.wearCount !== undefined && lItem.wearCount > (cItem.wearCount || 0)) {
+          merged.wearCount = lItem.wearCount;
+        }
+        if (lItem.totalWearCount !== undefined && lItem.totalWearCount > (cItem.totalWearCount || 0)) {
+          merged.totalWearCount = lItem.totalWearCount;
+        }
+        if (lItem.lastWornDate) merged.lastWornDate = lItem.lastWornDate;
+        if (lItem.wornToday) merged.wornToday = lItem.wornToday;
+        if (lItem.wearHistory && Array.isArray(lItem.wearHistory) && lItem.wearHistory.length > (cItem.wearHistory?.length || 0)) {
+          merged.wearHistory = lItem.wearHistory;
+        }
+        if (lItem.status && lItem.status !== cItem.status) {
+          merged.status = lItem.status;
+          merged.restingSince = lItem.restingSince;
+          merged.basketAt = lItem.basketAt;
+        }
+        // 若本地修改時間更新，保留本地自訂欄位
+        if (lItem.modifiedAt && cItem.modifiedAt && lItem.modifiedAt > cItem.modifiedAt) {
+          if (lItem.name) merged.name = lItem.name;
+          if (lItem.image && !lItem.image.startsWith('/api/image/')) merged.image = lItem.image;
+          if (lItem.notes) merged.notes = lItem.notes;
+          if (lItem.tags) merged.tags = lItem.tags;
+        }
+        mergedItems.push(merged);
+      } else {
+        // 雲端有、本地無：純新單品
+        mergedItems.push(cItem);
+        newlyAddedFromCloud.push(cItem.id);
+      }
+    });
+
+    // (B) 關鍵保全：本地有、雲端沒有的單品（本地尚未上傳的新單品）—— 100% 完整保留！
+    localItems.forEach(lItem => {
+      if (!cloudMap.has(String(lItem.id))) {
+        mergedItems.push(lItem);
+      }
+    });
+
+    // 4. 歷史穿搭記錄融合（按日期聯集，本地最新不覆蓋）
+    const ootdMap = new Map();
+    (cloudState.ootdHistory || []).forEach(o => { if (o && o.date) ootdMap.set(o.date, o); });
+    (state.ootdHistory || []).forEach(o => { if (o && o.date) ootdMap.set(o.date, o); });
+    const mergedOotd = Array.from(ootdMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+
+    // 5. 願望清單、風格圖庫、理髮、沙盒、分類融合（按 ID 聯集，兩端內容皆保全）
+    const mergeCollectionById = (cloudList, localList) => {
+      const map = new Map();
+      (cloudList || []).forEach(item => { if (item && item.id) map.set(String(item.id), item); });
+      (localList || []).forEach(item => { if (item && item.id) map.set(String(item.id), item); });
+      return Array.from(map.values());
+    };
+
+    const mergedWishlist = mergeCollectionById(cloudState.wishlist, state.wishlist);
+    const mergedStyleGallery = mergeCollectionById(cloudState.styleGallery, state.styleGallery);
+    const mergedHaircuts = mergeCollectionById(cloudState.haircuts, state.haircuts).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const mergedSandboxes = mergeCollectionById(cloudState.sandboxes, state.sandboxes);
+    const mergedSandboxItems = mergeCollectionById(cloudState.sandboxItems, state.sandboxItems);
+    const mergedCustomCategories = mergeCollectionById(cloudState.customCategories, state.customCategories);
+
+    // 6. 套用至 state
+    state.items = mergedItems;
+    state.ootdHistory = mergedOotd;
+    state.wishlist = mergedWishlist;
+    state.styleGallery = mergedStyleGallery;
+    state.haircuts = mergedHaircuts;
+    state.sandboxes = mergedSandboxes;
+    state.sandboxItems = mergedSandboxItems;
+    state.customCategories = mergedCustomCategories;
+
+    // 洗衣與耗材動態聯集
+    if (cloudState.laundry && state.laundry) {
+      const localHist = Array.isArray(state.laundry.history) ? state.laundry.history : [];
+      const cloudHist = Array.isArray(cloudState.laundry.history) ? cloudState.laundry.history : [];
+      const histDates = new Set();
+      const unionHist = [];
+      [...localHist, ...cloudHist].forEach(h => {
+        const d = typeof h === 'string' ? h : h?.date;
+        if (d && !histDates.has(d)) {
+          histDates.add(d);
+          unionHist.push(h);
+        }
+      });
+      state.laundry.history = unionHist;
+      const allDates = [...histDates].sort();
+      if (allDates.length) state.laundry.lastWashDate = allDates[allDates.length - 1];
+    }
+
+    // 標註新單品紅點燈號
+    if (newlyAddedFromCloud.length > 0) {
+      markNewItemIds(newlyAddedFromCloud);
+    }
+
+    // 更新強制更新確認時間戳
+    if (cloudState.forceUpdateAt) {
+      localStorage.setItem('wm_cloud_accepted_force_at_v1', String(cloudState.forceUpdateAt));
+      state.forceUpdateAt = cloudState.forceUpdateAt;
+    }
+
+    normalizeLoadedState();
+    saveState({ action: '融合雲端更新' });
+    renderAll();
+
+    cloudLastFingerprint = await cloudSyncFingerprint(state);
+    localStorage.setItem(CLOUD_SYNC_FINGERPRINT_KEY, cloudLastFingerprint);
+    localStorage.setItem(CLOUD_SYNC_LAST_AT_KEY, String(Date.now()));
+    localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
+    localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
+    setCloudSyncStatus('synced');
+
+    const addMsg = newlyAddedFromCloud.length > 0 ? `，並新增 ${newlyAddedFromCloud.length} 件單品` : '';
+    toast(`已完成雲端增量更新（本機未上傳之單品與紀錄已完整保留${addMsg}）`);
+    closeModal();
+    return true;
+  } catch (err) {
+    console.error('雲端融合更新失敗:', err);
+    toast('融合更新失敗：' + err.message);
+    setCloudSyncStatus(navigator.onLine ? 'error' : 'offline');
     return false;
   }
 }
@@ -11710,7 +11871,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v138';
+const CURRENT_APP_VERSION = 'v139';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
