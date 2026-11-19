@@ -10055,22 +10055,14 @@ async function applyCloudForceUpdateMerge(cloudState, { silent = false, uploadBa
   }
 }
 
-let lastReconcileTime = 0;
-
-async function reconcileCloudSync(options = {}) {
-  const { isResume = false, force = false } = options;
+async function reconcileCloudSync() {
   if (!navigator.onLine) {
     if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') setCloudSyncStatus('offline');
-    return;
-  }
-  const now = Date.now();
-  if (isResume && !force && (now - lastReconcileTime < 20000)) {
     return;
   }
   if (cloudAutoSyncInFlight) return;
 
   try {
-    lastReconcileTime = now;
     const res = await fetch(`${CLOUDFLARE_WORKER_URL}/api/state`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const remote = await res.json();
@@ -10103,7 +10095,7 @@ async function reconcileCloudSync(options = {}) {
       setCloudSyncStatus('synced');
     }
   } catch (err) {
-    console.warn('Startup/resume cloud reconcile check failed:', err);
+    console.warn('Startup cloud reconcile check failed:', err);
     if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') {
       setCloudSyncStatus(navigator.onLine ? 'pending' : 'offline');
     }
@@ -11939,7 +11931,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v140';
+const CURRENT_APP_VERSION = 'v141';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
@@ -13104,16 +13096,16 @@ async function init() {
     refreshWeather(false);
     checkVersionUpdateNotice();
     cloudAutoSyncReady = true;
-    // App 啟動時自動進行雙向資料交換比對與同步
+    // App 啟動時自動進行雙向資料交換比對與同步（僅限手動滑掉重開或移出記憶體冷啟動）
     if (navigator.onLine) {
       syncNotionLifeTags({ automatic: true });
       retryPendingLaundryDiaryTags();
-      reconcileCloudSync({ isResume: false });
+      reconcileCloudSync();
     } else {
       setCloudSyncStatus(localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1' ? 'offline' : 'ready');
     }
     window.addEventListener('online', () => {
-      reconcileCloudSync({ isResume: true, force: true });
+      if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') scheduleAutoCloudSync(300);
       retryPendingLaundryDiaryTags();
     });
     window.addEventListener('offline', () => {
@@ -13121,7 +13113,7 @@ async function init() {
     });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && navigator.onLine) {
-        reconcileCloudSync({ isResume: true });
+        if (localStorage.getItem(CLOUD_SYNC_PENDING_KEY) === '1') scheduleAutoCloudSync(300);
         syncNotionLifeTags({ automatic: true });
       }
     });

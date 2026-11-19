@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261119_140">
+<link rel="stylesheet" href="styles.css?v=20261119_141">
 </head>
 <body>
 
@@ -826,7 +826,7 @@
       <div class="settings-version-card" id="btnOpenReleaseNotes" role="button" tabindex="0" style="margin-top:16px;padding:12px 14px;border-radius:12px;background:var(--color-surface);border:1px solid var(--color-line);display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
         <div style="display:flex;flex-direction:column;gap:2px;">
           <span style="font-size:13px;font-weight:700;color:var(--color-ink);">版本資訊</span>
-          <span style="font-size:11.5px;color:var(--color-ink-muted);" id="settingsVersionLabel">目前版本 v140</span>
+          <span style="font-size:11.5px;color:var(--color-ink-muted);" id="settingsVersionLabel">目前版本 v141</span>
         </div>
         <span style="font-size:12px;color:var(--color-denim);font-weight:600;">更新說明 ›</span>
       </div>
@@ -1260,11 +1260,11 @@
     </div>
     <div class="release-notes-body" style="padding:4px 0 16px;">
       <div id="releaseNotesCurrentWrap">
-        <div style="font-size:28px;font-weight:900;letter-spacing:-0.5px;color:var(--color-ink);margin:2px 0 10px;">v140</div>
+        <div style="font-size:28px;font-weight:900;letter-spacing:-0.5px;color:var(--color-ink);margin:2px 0 10px;">v141</div>
         <ul id="releaseNotesList" style="margin:0 0 14px 0;padding-left:18px;font-size:13.5px;line-height:1.75;color:var(--color-ink);">
-          <li>App 開啟與切回前台時自動進行雙向資料交換比對與同步</li>
-          <li>雲端直接寫入享有較高權限（自動融合更新並標註新單品紅點）</li>
-          <li>100% 保全本地未上傳之單品與紀錄，並自動回推補全雲端</li>
+          <li>調整同步時機：僅限 App 真正重開／移出記憶體啟動時進行雙向比對</li>
+          <li>移除從背景切回前台時的重複檢查，操作體驗純粹流暢</li>
+          <li>雲端直接寫入維持高權限融合，本地未上傳資料 100% 完整保全</li>
         </ul>
         <a href="https://github.com/steveplayer87/wardrobe-master" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;padding:10px 14px;border-radius:12px;margin:12px 0 0;font-weight:700;color:var(--color-ink);box-sizing:border-box;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
@@ -1277,6 +1277,16 @@
 
       <div id="releaseNotesHistoryWrap" class="is-hidden" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--color-line);">
         <p style="font-size:12px;font-weight:700;color:var(--color-ink-muted);margin:0 0 10px;">歷史版本更新紀錄</p>
+        <div class="release-history-item" style="margin-bottom:14px;">
+          <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v140</p>
+          <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
+            <li>實作 App 開啟時雙向資料交換比對與同步</li>
+            <li>雲端直接寫入享有較高權限（自動融合更新並標註新單品紅點）</li>
+            <li>100% 保全本地未上傳之單品與紀錄，並自動回推補全雲端</li>
+          </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
+        </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v139</p>
           <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
@@ -2045,8 +2055,8 @@
 </div>
 
 
-<script src="seed-items.js?v=20261119_140"></script>
-<script src="app.js?v=20261119_140"></script>
+<script src="seed-items.js?v=20261119_141"></script>
+<script src="app.js?v=20261119_141"></script>
 
 </body>
 </html>
