@@ -282,6 +282,18 @@ svg { width: 100%; height: 100%; display: block; }
   color: var(--color-ink-faint);
   position: relative;
 }
+.tab-dot {
+  position: absolute;
+  top: 3px;
+  right: calc(50% - 14px);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-coral, #E0564C);
+  border: 1.5px solid #fff;
+  pointer-events: none;
+  z-index: 5;
+}
 .tab-icon { width: 21px; height: 21px; }
 .tab-btn.is-active { color: var(--color-denim-deep); font-weight: 600; }
 .tab-btn.is-active::after {
@@ -667,6 +679,14 @@ svg { width: 100%; height: 100%; display: block; }
 #wardrobeGrid.is-dense-grid .item-dirty-badge {
   display: none !important;
 }
+#wardrobeGrid.is-dense-grid .item-new-dot {
+  display: block !important;
+  top: 2px !important;
+  right: 2px !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-width: 1px !important;
+}
 #wardrobeGrid.is-dense-grid .item-card:hover {
   outline: none;
   border-color: rgba(59, 130, 246, 0.3) !important;
@@ -754,6 +774,22 @@ svg { width: 100%; height: 100%; display: block; }
 .item-status-dot { position: absolute; top: 6px; left: 6px; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #fff; background: var(--color-sage); z-index: 2; }
 .item-status-dot.is-dirty { background: var(--color-coral); }
 .item-status-dot.is-resting { background: var(--color-apricot); }
+.item-new-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-coral, #E0564C);
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 2px rgba(224, 86, 76, 0.28);
+  z-index: 3;
+  pointer-events: none;
+}
+.item-card.has-new-dot .item-resting-badge {
+  right: 18px;
+}
 .item-resting-badge {
   position: absolute;
   top: 6px;

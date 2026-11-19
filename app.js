@@ -4276,6 +4276,60 @@ function getVisibleWardrobeItems() {
     return (b.createdAt||0) - (a.createdAt||0);
   });
 }
+
+/* ==================== Newly Added Items Red Dot Indicator ==================== */
+function getNewItemIds() {
+  try {
+    const raw = localStorage.getItem('wm_new_item_ids_v1');
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function isNewItemId(id) {
+  if (!id) return false;
+  return getNewItemIds().includes(String(id));
+}
+
+function markNewItemIds(ids) {
+  if (!Array.isArray(ids) || !ids.length) return;
+  const current = new Set(getNewItemIds());
+  ids.forEach(id => { if (id) current.add(String(id)); });
+  try {
+    localStorage.setItem('wm_new_item_ids_v1', JSON.stringify(Array.from(current)));
+  } catch (_) {}
+  updateWardrobeTabDot();
+}
+
+function clearNewItemId(id) {
+  if (!id) return;
+  const current = new Set(getNewItemIds());
+  if (current.has(String(id))) {
+    current.delete(String(id));
+    try {
+      localStorage.setItem('wm_new_item_ids_v1', JSON.stringify(Array.from(current)));
+    } catch (_) {}
+    updateWardrobeTabDot();
+    const card = document.querySelector(`.item-card[data-id="${id}"]`);
+    if (card) {
+      card.classList.remove('has-new-dot');
+      card.querySelector('.item-new-dot')?.remove();
+    }
+  }
+}
+
+function updateWardrobeTabDot() {
+  const newIds = getNewItemIds();
+  const validIds = new Set((state.items || []).map(i => String(i.id)));
+  const activeCount = newIds.filter(id => validIds.has(id)).length;
+  const tabDot = document.getElementById('wardrobeTabDot');
+  if (tabDot) {
+    tabDot.hidden = activeCount === 0;
+  }
+}
+
 function renderWardrobe() {
   const grid = document.getElementById('wardrobeGrid');
   const emptyHint = document.getElementById('wardrobeEmpty');
@@ -4310,6 +4364,7 @@ function renderWardrobe() {
   items.forEach(item => grid.appendChild(buildItemCard(item)));
   document.getElementById('deleteCategoryWrap').classList.toggle('is-hidden', !uiWardrobeCat.startsWith('custom-'));
   updateCompactGridState();
+  updateWardrobeTabDot();
 }
 function toggleItemSelection(id, cardEl) {
   if (uiSelectedIds.has(id)) uiSelectedIds.delete(id); else uiSelectedIds.add(id);
@@ -4408,10 +4463,15 @@ function buildItemCard(item, opts) {
     ? `<span class="item-resting-badge">已穿 ${restingWornCount} 次</span>`
     : (!opts.badge && item.status === 'dirty' && opts && opts.tryonMode ? `<span class="item-dirty-badge">待洗</span>` : '');
 
+  const isNew = isNewItemId(item.id);
+  if (isNew) card.classList.add('has-new-dot');
+  const newDotMarkup = isNew ? `<span class="item-new-dot" aria-label="新增單品" title="新增單品"></span>` : '';
+
   card.innerHTML = `
     <div class="item-photo">${itemPhotoMarkup(item)}</div>
     ${cornerMarkup}
     ${restingBadge}
+    ${newDotMarkup}
     <div class="item-info">
       ${infoHtml}
     </div>`;
@@ -6163,6 +6223,7 @@ function getItemWearHistoryEntries(item) {
 }
 
 function openItemDetail(itemId) {
+  clearNewItemId(itemId);
   const item = findItem(itemId);
   if (!item) return;
   const body = document.getElementById('itemDetailBody');
@@ -7135,6 +7196,7 @@ function unmountEditFormFromDetailDrawer() {
 }
 
 function openAddModal(editId = null) {
+  if (editId) clearNewItemId(editId);
   editingItemId = editId;
   pendingPhoto = null;
   pendingPhotoBack = null;
@@ -9453,20 +9515,11 @@ async function syncEverythingToCloud() {
     if (!safety.safe) {
       if (safety.offline) setCloudSyncStatus('offline');
       else if (safety.forced) {
-        localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
-        setCloudSyncStatus('blocked', safety.message);
-        openConfirm(
-          '套用雲端強制更新',
-          `偵測到雲端有較高層級的強制更新紀錄（例如管理者資料校正）。<br><br>為避免本地舊資料覆蓋，已暫停上傳。<br>是否立即下載並套用雲端最新資料？`,
-          [
-            { label: '先不要', kind: 'secondary' },
-            {
-              label: '下載並套用',
-              kind: 'primary',
-              onClick: () => restoreWardrobeFromCloud({ confirmed: true, remoteState: safety.remote })
-            }
-          ]
-        );
+        // 雲端強制等級更新：不需經過確認視窗，按下同步就直接同步
+        localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
+        setCloudSyncStatus('syncing', '正在直接同步雲端強制更新…');
+        await restoreWardrobeFromCloud({ confirmed: true, remoteState: safety.remote });
+        return;
       } else {
         localStorage.setItem(CLOUD_SYNC_SAFETY_KEY, '1');
         setCloudSyncStatus('blocked', safety.message);
@@ -9839,6 +9892,13 @@ async function restoreWardrobeFromCloud(options = {}) {
       }
       if (!cloudState || !Array.isArray(cloudState.items)) throw new Error('雲端尚無備份資料');
 
+      // 找出新增的單品（原本本地不存在的單品），標記紅點燈號
+      const existingIds = new Set((state.items || []).map(i => i.id));
+      const newlyAddedItems = cloudState.items.filter(it => it && it.id && !existingIds.has(it.id));
+      if (existingIds.size > 0 && newlyAddedItems.length > 0) {
+        markNewItemIds(newlyAddedItems.map(it => it.id));
+      }
+
       cloudState.items.forEach(it => {
         if (it.image && it.image.startsWith('/api/image/')) {
           it.image = `${CLOUDFLARE_WORKER_URL}${it.image}?v=2`;
@@ -9862,7 +9922,8 @@ async function restoreWardrobeFromCloud(options = {}) {
       localStorage.removeItem(CLOUD_SYNC_PENDING_KEY);
       localStorage.removeItem(CLOUD_SYNC_SAFETY_KEY);
       setCloudSyncStatus('synced');
-      toast('雲端資料已成功下載並還原！');
+      const addMsg = newlyAddedItems.length > 0 ? `（新增 ${newlyAddedItems.length} 件單品）` : '';
+      toast(`雲端資料已成功下載同步！${addMsg}`);
       closeModal();
     } catch (err) {
       console.error('雲端還原失敗:', err);
@@ -11084,14 +11145,18 @@ function wireEvents() {
       }
       toast('已儲存修改');
     } else {
+      const newCreatedId = uid();
       state.items.push({
-        id: uid(), name, category, tags, material, purchaseDate, price, notes, washThresholdOverride,
+        id: newCreatedId, name, category, tags, material, purchaseDate, price, notes, washThresholdOverride,
         color, colorHex, colorFamily,
         image: pendingPhoto, imageBack: pendingPhotoBack, brand, brandIcon,
         wearCount: 0, totalWearCount: 0, status: archiveDirect ? 'retired' : 'clean',
         lastWornDate: null, wornToday: false, wearHistory: [], createdAt: Date.now(), modifiedAt: Date.now(),
         deodorizeHistory: [], stainHistory: [],
       });
+      if (!archiveDirect) {
+        markNewItemIds([newCreatedId]);
+      }
       toast(archiveDirect ? '已加入典藏' : '已加入衣櫥');
     }
     state.drafts.addItem = null;
@@ -11645,7 +11710,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v137';
+const CURRENT_APP_VERSION = 'v138';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';

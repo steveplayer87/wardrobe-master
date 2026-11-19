@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe Master">
-<link rel="stylesheet" href="styles.css?v=20261117_137">
+<link rel="stylesheet" href="styles.css?v=20261119_138">
 </head>
 <body>
 
@@ -368,6 +368,7 @@
     </button>
     <button class="tab-btn" data-view="wardrobe">
       <span class="tab-icon" data-icon="wardrobe"></span><span>衣櫥</span>
+      <span class="tab-dot" id="wardrobeTabDot" hidden></span>
     </button>
     <button class="tab-btn" data-view="inspiration">
       <span class="tab-icon" data-icon="inspire"></span><span>穿搭靈感</span>
@@ -825,7 +826,7 @@
       <div class="settings-version-card" id="btnOpenReleaseNotes" role="button" tabindex="0" style="margin-top:16px;padding:12px 14px;border-radius:12px;background:var(--color-surface);border:1px solid var(--color-line);display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
         <div style="display:flex;flex-direction:column;gap:2px;">
           <span style="font-size:13px;font-weight:700;color:var(--color-ink);">版本資訊</span>
-          <span style="font-size:11.5px;color:var(--color-ink-muted);" id="settingsVersionLabel">目前版本 v137</span>
+          <span style="font-size:11.5px;color:var(--color-ink-muted);" id="settingsVersionLabel">目前版本 v138</span>
         </div>
         <span style="font-size:12px;color:var(--color-denim);font-weight:600;">更新說明 ›</span>
       </div>
@@ -1259,14 +1260,11 @@
     </div>
     <div class="release-notes-body" style="padding:4px 0 16px;">
       <div id="releaseNotesCurrentWrap">
-        <div style="font-size:28px;font-weight:900;letter-spacing:-0.5px;color:var(--color-ink);margin:2px 0 10px;">v137</div>
+        <div style="font-size:28px;font-weight:900;letter-spacing:-0.5px;color:var(--color-ink);margin:2px 0 10px;">v138</div>
         <ul id="releaseNotesList" style="margin:0 0 14px 0;padding-left:18px;font-size:13.5px;line-height:1.75;color:var(--color-ink);">
-          <li>修正 AI 生圖抽屜標題圖示約束與回歸標準單寧藍風格</li>
-          <li>移除視角選擇選項，全面預設標準正面平鋪展示</li>
-          <li>快速代入單品名稱膠囊點擊防手機鍵盤喚起優化</li>
-          <li>單品類型膠囊微調寬度，露出第 5 個類別提示橫向滾動</li>
-          <li>版本資訊與設定視窗附上前往 GitHub 專案倉庫按鈕</li>
-          <li>歷史與當前版本紀錄最底部加入空行與細分隔線</li>
+          <li>雲端強制等級更新直接同步（免確認視窗立即生效）</li>
+          <li>新增單品卡片專屬紅點燈號提示</li>
+          <li>底欄衣櫥分頁紅點狀態提示與已讀自動熄滅</li>
         </ul>
         <a href="https://github.com/steveplayer87/wardrobe-master" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;padding:10px 14px;border-radius:12px;margin:12px 0 0;font-weight:700;color:var(--color-ink);box-sizing:border-box;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
@@ -1279,6 +1277,19 @@
 
       <div id="releaseNotesHistoryWrap" class="is-hidden" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--color-line);">
         <p style="font-size:12px;font-weight:700;color:var(--color-ink-muted);margin:0 0 10px;">歷史版本更新紀錄</p>
+        <div class="release-history-item" style="margin-bottom:14px;">
+          <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v137</p>
+          <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
+            <li>修正 AI 生圖抽屜標題圖示約束與回歸標準單寧藍風格</li>
+            <li>移除視角選擇選項，全面預設標準正面平鋪展示</li>
+            <li>快速代入單品名稱膠囊點擊防手機鍵盤喚起優化</li>
+            <li>單品類型膠囊微調寬度，露出第 5 個類別提示橫向滾動</li>
+            <li>版本資訊與設定視窗附上前往 GitHub 專案倉庫按鈕</li>
+            <li>歷史與當前版本紀錄最底部加入空行與細分隔線</li>
+          </ul>
+          <div style="height:12px;"></div>
+          <hr style="border:none;border-top:1px solid var(--color-line);margin:14px 0 18px;">
+        </div>
         <div class="release-history-item" style="margin-bottom:14px;">
           <p style="font-size:13px;font-weight:800;color:var(--color-ink);margin:0 0 4px;">v136</p>
           <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.7;color:var(--color-ink-soft);">
@@ -2014,8 +2025,8 @@
 </div>
 
 
-<script src="seed-items.js?v=20261117_137"></script>
-<script src="app.js?v=20261117_137"></script>
-<script src="http://localhost:7788/magic-tweaker.js"></script>
+<script src="seed-items.js?v=20261119_138"></script>
+<script src="app.js?v=20261119_138"></script>
+
 </body>
 </html>
