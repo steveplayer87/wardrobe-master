@@ -10102,6 +10102,52 @@ async function reconcileCloudSync() {
   }
 }
 
+function recoverFromSafetyBackup({ silent = false } = {}) {
+  try {
+    const raw = localStorage.getItem('wm_safety_backup_before_sync_v1');
+    if (!raw) {
+      if (!silent) toast('本機尚無同步前的安全快照備份');
+      return 0;
+    }
+    const safety = JSON.parse(raw);
+    if (!safety || typeof safety !== 'object') {
+      if (!silent) toast('快照格式不正確');
+      return 0;
+    }
+    const existingDates = new Set((state.ootdHistory || []).map(o => o.date));
+    let recoveredCount = 0;
+    const candidates = [];
+    if (Array.isArray(safety.ootdHistory)) {
+      candidates.push(...safety.ootdHistory);
+    }
+    if (safety.today && safety.today.date && ALL_SLOTS.some(s => safety.today[s])) {
+      candidates.push(safety.today);
+    }
+    candidates.forEach(entry => {
+      if (entry && entry.date && !existingDates.has(entry.date) && ALL_SLOTS.some(s => entry[s])) {
+        state.ootdHistory.push(JSON.parse(JSON.stringify(entry)));
+        existingDates.add(entry.date);
+        recoveredCount++;
+      }
+    });
+    if (recoveredCount > 0) {
+      state.ootdHistory.sort((a, b) => b.date.localeCompare(a.date));
+      saveState({ action: `找回 ${recoveredCount} 筆同步前穿搭` });
+      renderAll();
+      toast(`已成功找回 ${recoveredCount} 筆同步前的穿搭紀錄`);
+      scheduleAutoCloudSync(500);
+      return recoveredCount;
+    } else {
+      if (!silent) toast('快照中無缺漏之穿搭紀錄（目前紀錄已完整）');
+      return 0;
+    }
+  } catch (err) {
+    console.warn('Recover from safety backup failed:', err);
+    if (!silent) toast('讀取快照失敗：' + err.message);
+    return 0;
+  }
+}
+
 async function restoreWardrobeFromCloud(options = {}) {
   const executeRestore = async (cloudState) => {
     toast('正在自雲端下載完整資料...');
@@ -10480,6 +10526,7 @@ function wireEvents() {
   document.getElementById('btnImportData').addEventListener('click', () => openModal('modal-import-source'));
   document.getElementById('btnImportLocalBackup')?.addEventListener('click', () => { closeModal(); document.getElementById('importFileInput').click(); });
   document.getElementById('btnImportCloudBackup')?.addEventListener('click', () => { closeModal(); restoreWardrobeFromCloud(); });
+  document.getElementById('btnRecoverSafetyBackup')?.addEventListener('click', () => recoverFromSafetyBackup({ silent: false }));
   document.getElementById('importFileInput').addEventListener('change', async e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -11931,7 +11978,7 @@ function wireEvents() {
   setupSandboxInteractions();
 }
 
-const CURRENT_APP_VERSION = 'v141';
+const CURRENT_APP_VERSION = 'v142';
 
 function checkVersionUpdateNotice() {
   const K = 'wm_seen_version';
@@ -13088,6 +13135,7 @@ async function init() {
     wireDisplaySimulations();
     renderCategoryChips();
     ensureNewDay();
+    recoverFromSafetyBackup({ silent: true });
     historySnapshot = cloneState(state);
     historyReady = true;
     activateView('home');
